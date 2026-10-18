@@ -27,7 +27,7 @@ async def test_seed_creates_placeholder_authority_per_department(conn):
 
 async def test_every_category_has_a_routing_rule(conn):
     assert await conn.fetchval(
-        "SELECT count(*) FROM complaints.complaint_category c WHERE c.default_department_id IS NOT NULL "
+        "SELECT count(*) FROM complaints.complaint_category c WHERE c.category_id <= 10 AND c.default_department_id IS NOT NULL "
         "AND NOT EXISTS (SELECT 1 FROM complaints.routing_rule r WHERE r.category_id=c.category_id)") == 0
     rule = await conn.fetchrow("SELECT r.department_id, c.default_department_id FROM complaints.routing_rule r "
                                "JOIN complaints.complaint_category c USING (category_id) LIMIT 1")
@@ -37,12 +37,20 @@ async def test_every_category_has_a_routing_rule(conn):
 async def test_seed_is_repeatable_for_routing(conn):
     from scripts import seed
 
-    before = (await conn.fetchval("SELECT count(*) FROM administration.authority"),
-              await conn.fetchval("SELECT count(*) FROM complaints.routing_rule"))
+    async def snapshot():
+        return (await conn.fetchval("SELECT count(*) FROM administration.authority"),
+                await conn.fetchval("SELECT count(*) FROM complaints.routing_rule"))
+
+    before = await snapshot()
     await seed.apply_seed(conn)
-    after = (await conn.fetchval("SELECT count(*) FROM administration.authority"),
-             await conn.fetchval("SELECT count(*) FROM complaints.routing_rule"))
-    assert before == after
+    assert await snapshot() == before          # repeatable
+    # records created later (not defined by the seed) must NOT receive routing rows from a re-seed
+    await conn.execute("INSERT INTO administration.department (department_code, department_name) VALUES ('LATE','Late dept')")
+    await conn.execute("INSERT INTO complaints.complaint_category (category_code, category_name, default_department_id) "
+                       "VALUES ('CAT-LATE','x',(SELECT department_id FROM administration.department WHERE department_code='LATE'))")
+    before = await snapshot()
+    await seed.apply_seed(conn)
+    assert await snapshot() == before
 
 
 async def test_seeded_category_routes_to_department_level_target(client, make_citizen, conn):

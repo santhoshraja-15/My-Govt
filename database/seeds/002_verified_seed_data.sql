@@ -510,6 +510,7 @@ SELECT d.department_id, 'department_office', d.department_name || ' (department-
        'provisional', true,
        'Platform-created routing target for complaints; not a verified office or officer.'
 FROM administration.department d
+WHERE d.department_code IN ('REVT', 'HLTH', 'EDUC', 'AGRI', 'SWWF', 'HRCE', 'MAWS', 'RDPR', 'LABO', 'HOUS', 'FISH', 'FORE', 'ELEC', 'HHSS', 'ADTR', 'CTRG', 'FCPD')   -- only departments defined by this seed
 ON CONFLICT (department_id, jurisdiction_level) WHERE is_routing_placeholder DO NOTHING;
 
 INSERT INTO complaints.routing_rule
@@ -517,4 +518,5 @@ INSERT INTO complaints.routing_rule
 SELECT c.category_id, 'state', c.default_department_id, 'department_office', 1, 'provisional'
 FROM complaints.complaint_category c
 WHERE c.default_department_id IS NOT NULL
+  AND c.category_code IN ('CAT-POW', 'CAT-WAT', 'CAT-ROA', 'CAT-GAR', 'CAT-HOS', 'CAT-SCH', 'CAT-REV', 'CAT-RUR', 'CAT-AGR', 'CAT-WEL')   -- only categories defined by this seed
 ON CONFLICT (category_id, jurisdiction_level, priority_order) DO NOTHING;
