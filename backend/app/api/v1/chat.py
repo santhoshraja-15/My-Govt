@@ -41,7 +41,7 @@ async def list_conversations(
     if not current_user:
         return []
     service = ChatService(db)
-    return await service.get_conversations(current_user.user_id)
+    return await service.get_conversations(current_user.citizen_id)
 
 
 @router.get("/conversations/{conversation_id}")
@@ -62,10 +62,11 @@ async def get_conversation(
 async def get_decision_lineage(
     decision_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_optional),
 ):
     """Get the 'Why this answer?' lineage for a specific decision."""
     service = ChatService(db)
-    lineage = await service.get_decision_lineage(decision_id)
+    lineage = await service.get_decision_lineage(decision_id, current_user)
     if not lineage:
         raise HTTPException(status_code=404, detail="Decision not found")
     return lineage

@@ -9,47 +9,57 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import setup_logging
+from app.services import complaint_rules as rules
 
 setup_logging()
 logger = structlog.get_logger(__name__)
 
 
-async def escalate_overdue_complaints() -> int:
-    """Mark complaints that have breached SLA as escalated."""
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
+async def escalate_overdue_complaints(session_factory=None) -> int:
+    """Escalate complaints whose escalation deadline has passed.
+
+    Only statuses from which 'escalated' is a legal transition are touched (see
+    complaint_rules.TRANSITIONS). The status-history row is written by the
+    trg_complaint_history trigger; we annotate it. When the complaint's authority has a
+    parent authority an open complaints.escalation row records the hand-off.
+    """
+    factory = session_factory or AsyncSessionLocal
+    async with factory() as db:
+        overdue = (await db.execute(
             text("""
-                WITH overdue AS (
-                    SELECT complaint_id, status
-                    FROM complaints.complaint
-                    WHERE status NOT IN ('resolved', 'closed', 'rejected', 'escalated')
-                      AND escalation_due_at IS NOT NULL
-                      AND escalation_due_at < now()
-                )
-                UPDATE complaints.complaint c
-                SET status = 'escalated', updated_at = now()
-                FROM overdue o
-                WHERE c.complaint_id = o.complaint_id
-                RETURNING c.complaint_id, o.status AS old_status
-            """)
-        )
-        rows = result.fetchall()
-        escalated = len(rows)
-
-        if escalated > 0:
-            for complaint_id, old_status in rows:
-                await db.execute(
-                    text("""
-                        INSERT INTO complaints.complaint_history
-                            (complaint_id, old_status, new_status, remarks, changed_at)
-                        VALUES (:cid, :old, 'escalated', 'Auto-escalated by SLA scheduler', now())
-                    """),
-                    {"cid": str(complaint_id), "old": old_status},
-                )
-            await db.commit()
-            logger.info("Escalated overdue complaints", count=escalated)
-
-    return escalated
+                SELECT complaint_id, authority_id FROM complaints.complaint
+                WHERE status = ANY(:statuses)
+                  AND escalation_due_at IS NOT NULL AND escalation_due_at < now()
+                FOR UPDATE SKIP LOCKED
+            """),
+            {"statuses": list(rules.ESCALATABLE)},
+        )).fetchall()
+        for row in overdue:
+            await db.execute(
+                text("UPDATE complaints.complaint SET status = 'escalated' WHERE complaint_id = :cid"),
+                {"cid": row.complaint_id},
+            )
+            await db.execute(
+                text("""
+                    UPDATE complaints.complaint_history SET remarks = 'Auto-escalated by SLA scheduler'
+                    WHERE history_id = (SELECT max(history_id) FROM complaints.complaint_history
+                                        WHERE complaint_id = :cid)
+                """),
+                {"cid": row.complaint_id},
+            )
+            await db.execute(
+                text("""
+                    INSERT INTO complaints.escalation (complaint_id, from_authority_id, to_authority_id, reason)
+                    SELECT :cid, a.authority_id, a.parent_authority_id, 'SLA escalation deadline passed'
+                    FROM administration.authority a
+                    WHERE a.authority_id = :aid AND a.parent_authority_id IS NOT NULL
+                """),
+                {"cid": row.complaint_id, "aid": row.authority_id},
+            )
+        await db.commit()
+        if overdue:
+            logger.info("Escalated overdue complaints", count=len(overdue))
+        return len(overdue)
 
 
 async def run_scheduler():

@@ -2,7 +2,7 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -78,6 +78,24 @@ class Settings(BaseSettings):
     FEATURE_VOICE: bool = False
     FEATURE_GRAPH: bool = True
     FEATURE_VECTOR_SEARCH: bool = True
+
+    @model_validator(mode="after")
+    def _reject_insecure_production_defaults(self):
+        """Refuse to start in production with placeholder secrets."""
+        if self.APP_ENV.lower() == "production":
+            bad = [
+                name for name, val in (
+                    ("JWT_SECRET_KEY", self.JWT_SECRET_KEY),
+                    ("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD),
+                    ("NEO4J_PASSWORD", self.NEO4J_PASSWORD),
+                    ("MINIO_SECRET_KEY", self.MINIO_SECRET_KEY),
+                ) if val.lower().startswith(("change", "minioadmin")) or len(val) < 8
+            ]
+            if len(self.JWT_SECRET_KEY) < 32 and "JWT_SECRET_KEY" not in bad:
+                bad.append("JWT_SECRET_KEY")
+            if bad:
+                raise ValueError("Insecure placeholder secrets in production: " + ", ".join(bad))
+        return self
 
     @property
     def DATABASE_URL(self) -> str:

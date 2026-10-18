@@ -20,6 +20,11 @@ _FORBIDDEN_SQL = re.compile(
 )
 
 
+_IDENT = re.compile(r"[a-z_][a-z0-9_]{0,62}")
+# Columns never returned by the admin console (credentials / secrets)
+_SENSITIVE_COLUMNS = frozenset({"password_hash", "token_hash", "secret", "api_key"})
+
+
 class AdminService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -158,6 +163,14 @@ class AdminService:
         if schema_name not in allowed_schemas:
             return {"error": "Schema not accessible", "rows": [], "columns": []}
 
+        if not _IDENT.fullmatch(table_name):
+            return {"error": "Invalid table name", "rows": [], "columns": []}
+        exists = await self.db.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_schema = :s AND table_name = :t"),
+            {"s": schema_name, "t": table_name},
+        )
+        if not exists.fetchone():
+            return {"error": "Table not found", "rows": [], "columns": []}
         safe_table = f'"{schema_name}"."{table_name}"'
         try:
             count_r = await self.db.execute(text(f"SELECT count(*) FROM {safe_table}"))
@@ -170,11 +183,11 @@ class AdminService:
             rows = result.fetchall()
             columns = list(result.keys()) if rows else []
 
-            # Serialize rows safely
             serialized = []
             for row in rows:
                 serialized.append({
-                    col: (str(val) if not isinstance(val, (str, int, float, bool, type(None))) else val)
+                    col: ("[REDACTED]" if col in _SENSITIVE_COLUMNS
+                          else str(val) if not isinstance(val, (str, int, float, bool, type(None))) else val)
                     for col, val in zip(columns, row)
                 })
 
@@ -225,9 +238,15 @@ class AdminService:
             return {"error": "Mutating or unsafe SQL statements are not allowed in the query workspace."}
         if ";" in sql:
             return {"error": "Multiple statements are not allowed."}
+        if not re.match(r"(?is)^\s*(select|with|explain|show|table)", sql):
+            return {"error": "Only read-only SELECT queries are allowed."}
+        if re.search(r"(?i)password_hash|token_hash", sql):
+            return {"error": "Credential columns cannot be queried."}
         if len(sql) > 5000:
             return {"error": "Query too long (max 5000 chars)."}
         try:
+            # Defence in depth beyond the keyword filter: a READ ONLY transaction rejects writes.
+            await self.db.execute(text("SET TRANSACTION READ ONLY"))
             await self.db.execute(text("SET LOCAL statement_timeout = '10s'"))
             result = await self.db.execute(text(sql))
             rows = result.fetchmany(500)
@@ -252,8 +271,7 @@ class AdminService:
                 LEFT JOIN system.source_registry s ON s.source_id = d.source_id
                 ORDER BY d.download_date DESC NULLS LAST
             """))
-            return [dict(zip(result.keys(), row)) for result, row in
-                    [(r, r2) for r2 in r.fetchall()]]
+            return [dict(row._mapping) for row in r.fetchall()]
         except Exception:
             result = await self.db.execute(text("""
                 SELECT dataset_id, dataset_name, file_format,

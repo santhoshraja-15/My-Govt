@@ -32,29 +32,25 @@ class AuthService:
         user_id = uuid4()
         citizen_id = uuid4()
 
-        # Create citizen record
+        # app_user first: identity.citizen.user_id references it
         await self.db.execute(
             text("""
-                INSERT INTO identity.citizen (citizen_id, full_name, created_at, updated_at)
-                VALUES (:cid, :name, now(), now())
-            """),
-            {"cid": str(citizen_id), "name": data.full_name},
-        )
-
-        # Create app_user record
-        await self.db.execute(
-            text("""
-                INSERT INTO identity.app_user
-                    (user_id, citizen_id, email, phone, password_hash, role, status, created_at, updated_at)
-                VALUES (:uid, :cid, :email, :phone, :pwd, 'citizen', 'active', now(), now())
+                INSERT INTO identity.app_user (user_id, email, phone, password_hash, role, status)
+                VALUES (:uid, :email, :phone, :pwd, 'citizen', 'active')
             """),
             {
-                "uid": str(user_id),
-                "cid": str(citizen_id),
+                "uid": user_id,
                 "email": data.email,
                 "phone": data.phone,
                 "pwd": hash_password(data.password),
             },
+        )
+        await self.db.execute(
+            text("""
+                INSERT INTO identity.citizen (citizen_id, user_id, name)
+                VALUES (:cid, :uid, :name)
+            """),
+            {"cid": citizen_id, "uid": user_id, "name": data.full_name},
         )
         await self.db.commit()
 
@@ -70,9 +66,9 @@ class AuthService:
         result = await self.db.execute(
             text("""
                 SELECT u.user_id, u.email, u.password_hash, u.role, u.status,
-                       u.citizen_id, c.full_name
+                       c.citizen_id, c.name AS full_name
                 FROM identity.app_user u
-                LEFT JOIN identity.citizen c ON c.citizen_id = u.citizen_id
+                LEFT JOIN identity.citizen c ON c.user_id = u.user_id
                 WHERE u.email = :email
             """),
             {"email": email},
@@ -85,16 +81,20 @@ class AuthService:
         if status != "active":
             return None
         if not verify_password(password, pwd_hash):
+            await self.db.execute(
+                text("UPDATE identity.app_user SET failed_logins = failed_logins + 1 WHERE user_id = :uid"),
+                {"uid": user_id},
+            )
+            await self.db.commit()
             return None
 
         token_data = {"sub": str(user_id), "role": role}
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token(token_data)
 
-        # Update last login
         await self.db.execute(
-            text("UPDATE identity.app_user SET last_login_at = now() WHERE user_id = :uid"),
-            {"uid": str(user_id)},
+            text("UPDATE identity.app_user SET failed_logins = 0 WHERE user_id = :uid"),
+            {"uid": user_id},
         )
         await self.db.commit()
 

@@ -20,6 +20,9 @@ class Citation(BaseModel):
     published_date: Optional[str] = None
     jurisdiction: Optional[str] = None
     verified_at: Optional[str] = None
+    # Only 'official_verified' sources may be described as verified.
+    verification_status: str = 'unverified'
+    source_document_ref: Optional[str] = None
 
 
 class DecisionLineageItem(BaseModel):
@@ -42,6 +45,7 @@ class ChatResponse(BaseModel):
     action_type: str = "inform"   # inform | guide | act
     suggested_actions: List[str] = []
     degraded: bool = False        # True if LLM unavailable
+    contains_unverified: bool = False  # True if any cited source is not official_verified
 
 
 class ConversationOut(BaseModel):

@@ -27,8 +27,9 @@ async def _get_user_from_token(
         return None
     result = await db.execute(
         text("""
-            SELECT u.user_id, u.email, u.role, u.status, u.citizen_id
+            SELECT u.user_id, u.email, u.role, u.status, c.citizen_id, coalesce(c.name, '') AS full_name
             FROM identity.app_user u
+            LEFT JOIN identity.citizen c ON c.user_id = u.user_id
             WHERE u.user_id = :uid AND u.status = 'active'
         """),
         {"uid": user_id},
@@ -44,6 +45,7 @@ async def _get_user_from_token(
             self.role = r.role
             self.status = r.status
             self.citizen_id = r.citizen_id
+            self.full_name = r.full_name
 
     return UserContext(row)
 

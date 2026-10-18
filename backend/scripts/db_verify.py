@@ -3,7 +3,7 @@
 Creates ``mygovt_test_<random>`` on the server given by ``--admin-dsn``, then:
 
     1. applies database/schema/001_schema.sql
-    2. applies database/migrations/002_provenance_and_audit_fixes.sql (twice - must be idempotent)
+    2. applies every database/migrations/NNN_*.sql in order (each twice - must be idempotent)
     3. runs scripts.seed (apply + checks)
     4. runs the seed a second time and compares table fingerprints (idempotency)
     5. probes constraints with statements that MUST be rejected
@@ -33,7 +33,7 @@ from scripts import seed
 
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = REPO / "database" / "schema" / "001_schema.sql"
-MIGRATION = REPO / "database" / "migrations" / "002_provenance_and_audit_fixes.sql"
+MIGRATIONS = sorted((REPO / "database" / "migrations").glob("[0-9][0-9][0-9]_*.sql"))
 
 POSTGIS_STUBS = """
 CREATE FUNCTION public.st_point(float8, float8) RETURNS text LANGUAGE sql IMMUTABLE AS 'SELECT NULL::text';
@@ -133,10 +133,11 @@ async def main() -> int:
         step("001_schema.sql applies to a clean database", True)
 
         # 2. migration (twice)
-        mig = MIGRATION.read_text(encoding="utf-8")
-        await conn.execute(mig)
-        await conn.execute(mig)
-        step("002 migration applies, and re-applies without error", True)
+        for mig_file in MIGRATIONS:
+            mig = mig_file.read_text(encoding="utf-8")
+            await conn.execute(mig)
+            await conn.execute(mig)
+            step(f"{mig_file.name} applies, and re-applies without error", True)
 
         # preflight must fail on a schema without the migration -> checked via seed preflight passing now
         problems = await seed.preflight(conn)

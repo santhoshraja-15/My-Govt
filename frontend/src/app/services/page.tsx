@@ -22,7 +22,7 @@ function ServiceCard({ svc }: { svc: any }) {
           {svc.department_name && <span className="badge badge-blue">{svc.department_name}</span>}
           {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
           {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
-          {svc.processing_days > 0 && <span className="badge badge-slate">{svc.processing_days} days</span>}
+          {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
         </div>
       </div>
     </Link>

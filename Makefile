@@ -32,7 +32,7 @@ schema:
 
 # Step 2: raw SQL migration (002 adds headquarters, lgd_code, verification_status etc.)
 migrate-sql:
-	docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < database/migrations/002_provenance_and_audit_fixes.sql
+	for f in database/migrations/[0-9][0-9][0-9]_*.sql; do 		echo "applying $$f"; 		docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < $$f || exit 1; 	done
 
 # Full first-time database initialisation in correct dependency order:
 #   1. Base schema (001_schema.sql)      → tables, functions, triggers

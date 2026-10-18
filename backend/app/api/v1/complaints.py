@@ -11,7 +11,9 @@ from app.schemas.complaints import (
     ComplaintCreate, ComplaintOut, ComplaintDetail,
     ComplaintListResponse, ComplaintStatusUpdate, ComplaintTrack,
 )
-from app.services.complaint_service import ComplaintService
+from app.services.complaint_service import (
+    ComplaintForbidden, ComplaintNotFound, ComplaintService, InvalidTransition,
+)
 from app.security.dependencies import get_current_user, require_role
 
 logger = structlog.get_logger(__name__)
@@ -26,7 +28,10 @@ async def submit_complaint(
 ):
     """Submit a new civic complaint."""
     service = ComplaintService(db)
-    return await service.submit(data, current_user.user_id)
+    try:
+        return await service.submit(data, current_user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/track/{reference}", response_model=ComplaintTrack)
@@ -63,7 +68,10 @@ async def get_complaint(
 ):
     """Get full complaint detail including timeline."""
     service = ComplaintService(db)
-    complaint = await service.get_complaint(complaint_id, current_user)
+    try:
+        complaint = await service.get_complaint(complaint_id, current_user)
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e))
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return complaint
@@ -78,7 +86,14 @@ async def update_status(
 ):
     """Update complaint status (officer/admin only)."""
     service = ComplaintService(db)
-    return await service.update_status(complaint_id, data, current_user)
+    try:
+        return await service.update_status(complaint_id, data, current_user)
+    except ComplaintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except InvalidTransition as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{complaint_id}/evidence")

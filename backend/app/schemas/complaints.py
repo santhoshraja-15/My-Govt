@@ -2,18 +2,24 @@
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 
 class ComplaintCreate(BaseModel):
-    title: str
-    description: str
-    category_id: Optional[UUID] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    address: Optional[str] = None
-    district_id: Optional[int] = None
+    title: str = Field(min_length=3, max_length=200)
+    description: str = Field(min_length=10, max_length=5000)
+    category_id: Optional[int] = Field(default=None, ge=1)
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    address: Optional[str] = Field(default=None, max_length=500)
+    district_id: Optional[int] = Field(default=None, ge=1)
     is_anonymous: bool = False
+
+    @model_validator(mode="after")
+    def _both_coordinates(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be provided together")
+        return self
 
 
 class ComplaintOut(BaseModel):
@@ -83,7 +89,7 @@ class ComplaintStatusUpdate(BaseModel):
 
 
 class CategoryOut(BaseModel):
-    category_id: UUID
+    category_id: int
     name: str
     name_ta: Optional[str] = None
     description: Optional[str] = None

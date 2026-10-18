@@ -107,6 +107,7 @@ async def preflight(conn: asyncpg.Connection) -> list[str]:
         ("schemes", "scheme", "source_document_ref"),
         ("services", "service", "verification_status"),
         ("complaints", "sla_rule", "sla_source_type"),
+        ("complaints", "complaint", "address"),
     ]
     for schema, table, col in needed:
         ok = await conn.fetchval(
@@ -115,7 +116,7 @@ async def preflight(conn: asyncpg.Connection) -> list[str]:
         )
         if not ok:
             problems.append(
-                f"{schema}.{table}.{col} missing - apply database/migrations/002_provenance_and_audit_fixes.sql"
+                f"{schema}.{table}.{col} missing - apply the SQL files in database/migrations/ (002, 003, ...)"
             )
     return problems
 

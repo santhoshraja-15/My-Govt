@@ -1,15 +1,15 @@
 """Services and documents Pydantic schemas."""
 from datetime import date
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ── Services ──────────────────────────────────────────────────
 class ServiceRequirementOut(BaseModel):
     requirement_id: UUID
     document_type: str
-    description: str
+    description: Optional[str] = None
     mandatory: bool = True
 
     class Config:
@@ -18,7 +18,7 @@ class ServiceRequirementOut(BaseModel):
 
 class ServiceListItem(BaseModel):
     service_id: UUID
-    service_code: str
+    service_code: Optional[str] = None
     name: str
     name_ta: Optional[str] = None
     description: Optional[str] = None
@@ -26,8 +26,11 @@ class ServiceListItem(BaseModel):
     category: Optional[str] = None
     government_fee: Optional[float] = None
     service_charge: Optional[float] = None
-    processing_days: Optional[int] = None
+    processing_time: Optional[str] = None
     status: str = "active"
+    # Only 'official_verified' may be presented as verified information.
+    verification_status: str = "provisional"
+    source_document_ref: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -84,19 +87,19 @@ class DocumentDetail(DocumentListItem):
 # ── Citizens ──────────────────────────────────────────────────
 class CitizenProfileIn(BaseModel):
     date_of_birth: Optional[date] = None
-    gender: Optional[str] = None
+    gender: Optional[Literal["female", "male", "transgender", "other", "undisclosed"]] = None
     occupation: Optional[str] = None
     is_student: Optional[bool] = None
-    annual_income: Optional[float] = None
+    annual_income: Optional[float] = Field(default=None, ge=0)
     social_category: Optional[str] = None
     disability_status: Optional[bool] = None
     bpl_status: Optional[bool] = None
-    residence_type: Optional[str] = None
+    residence_type: Optional[Literal["rural", "urban"]] = None
     district_id: Optional[int] = None
     taluk_id: Optional[int] = None
     education_level: Optional[str] = None
     marital_status: Optional[str] = None
-    family_size: Optional[int] = None
+    family_size: Optional[int] = Field(default=None, ge=1, le=50)
     held_documents: Optional[List[str]] = None
     profile_consent: bool = False
 
