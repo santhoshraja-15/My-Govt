@@ -11,10 +11,14 @@ import { admin as adminAPI } from "@/lib/api";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { LoadingState } from "@/components/ui/AsyncState";
+import { ComplaintsPanel, DepartmentPerformancePanel, VerificationQueuePanel } from "@/components/admin/OperationsPanels";
 
 // ── Sidebar items ──────────────────────────────────────────────
 const NAV_ITEMS = [
   { key: "overview",   icon: BarChart3, label: "Overview" },
+  { key: "complaints", icon: Activity,  label: "Complaints" },
+  { key: "departments", icon: BarChart3, label: "Department Performance" },
+  { key: "verification", icon: CheckCircle2, label: "Verification Queue" },
   { key: "schemas",    icon: Database,  label: "Schema Explorer" },
   { key: "query",      icon: Play,      label: "SQL Workspace", systemOnly: true },
   { key: "datasets",   icon: HardDrive, label: "Datasets" },
@@ -527,6 +531,9 @@ function AdminConsole() {
 
   const PANELS: Record<string, React.ReactNode> = {
     overview: <OverviewPanel />,
+    complaints: <ComplaintsPanel />,
+    departments: <DepartmentPerformancePanel />,
+    verification: <VerificationQueuePanel />,
     schemas:  <SchemaExplorer />,
     query:    <SQLWorkspace />,
     datasets: <DataQualityPanel />,

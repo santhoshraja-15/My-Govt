@@ -176,6 +176,12 @@ export const admin = {
   query: (sql: string) => request<any>("/api/v1/admin/query", { method: "POST", body: JSON.stringify({ sql }) }),
   datasets: () => request<any[]>("/api/v1/admin/datasets"),
   sources: () => request<any[]>("/api/v1/admin/sources"),
+  complaints: (params: Record<string, any> = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
+    return request<any>(`/api/v1/admin/complaints?${q}`);
+  },
+  departmentPerformance: () => request<any[]>("/api/v1/admin/department-performance"),
+  verificationQueue: () => request<any>("/api/v1/admin/verification-queue"),
   auditLogs: (limit = 50, offset = 0) => request<any>(`/api/v1/admin/audit-logs?limit=${limit}&offset=${offset}`),
   kgStats: () => request<any>("/api/v1/admin/knowledge-graph/stats"),
   dataQuality: () => request<any>("/api/v1/admin/data-quality"),

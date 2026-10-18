@@ -111,3 +111,62 @@ test.describe("administrator console", () => {
     await expect(page.getByText(/Mutating or unsafe SQL statements are not allowed/)).toBeVisible();
   });
 });
+
+test.describe("operations panels", () => {
+  test("complaint backlog: filter, legal status transition, and routing text", async ({ page, request }) => {
+    const c = await apiCitizen(request);
+    const title = `Backlog test ${Date.now()}`;
+    const r = await request.post(`${API}/complaints`, { headers: bearer(c.token), data: { title, description: "A complaint with no category to triage" } });
+    expect(r.status()).toBe(201);
+    const ref = (await r.json()).reference_number as string;
+
+    await loginViaUI(page, ADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    await page.getByRole("button", { name: "Complaints" }).click();
+    const row = page.getByTestId("complaint-row").filter({ hasText: ref });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("awaiting triage");
+
+    await page.getByRole("button", { name: "No authority" }).click();
+    await expect(page.getByTestId("complaint-row").filter({ hasText: ref })).toBeVisible();
+
+    // only legal transitions are offered: needs_triage -> classified
+    const select = page.getByLabel(`Move ${ref}`);
+    await expect(select.locator("option")).toHaveText(["—", "classified"]);
+    await select.selectOption("classified");
+    await expect(page.getByTestId("complaint-row").filter({ hasText: ref }).locator("[data-status]")).toHaveAttribute("data-status", "classified");
+    const tracked = await (await request.get(`${API}/complaints/track/${ref}`)).json();
+    expect(tracked.status).toBe("classified");
+    expect(tracked.timeline.at(-1).remarks).toBe("Updated from admin console");
+  });
+
+  test("system administrators see the backlog read-only (the API reserves updates for state/department staff)", async ({ page }) => {
+    await loginViaUI(page, SYSADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    await page.getByRole("button", { name: "Complaints" }).click();
+    await expect(page.getByTestId("complaints-panel")).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Move to" })).toHaveCount(0);
+  });
+
+  test("department performance reflects routed complaints", async ({ page, request }) => {
+    const c = await apiCitizen(request);
+    const cats = await (await request.get(`${API}/complaints/categories/list`)).json();
+    const water = cats.find((x: any) => x.name.startsWith("Water"));
+    expect((await request.post(`${API}/complaints`, { headers: bearer(c.token), data: { title: "Perf test", description: "Routed to its department", category_id: water.category_id } })).status()).toBe(201);
+    await loginViaUI(page, ADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    await page.getByRole("button", { name: "Department Performance" }).click();
+    await expect(page.getByTestId("department-performance")).toBeVisible();
+    await expect(page.getByTestId("department-performance").locator("tbody tr").first()).toBeVisible();
+  });
+
+  test("verification queue lists every unverified record and says references are unconfirmed", async ({ page }) => {
+    await loginViaUI(page, ADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    await page.getByRole("button", { name: "Verification Queue" }).click();
+    const q = page.getByTestId("verification-queue");
+    await expect(q).toContainText("has not been confirmed against the issuing document");
+    await expect(q.getByRole("button", { name: /scheme \(12\)/ })).toBeVisible();
+    await expect(q.getByRole("button", { name: /district \(38\)/ })).toBeVisible();
+    await expect(q.getByTestId("queue-row").filter({ hasText: "TN-CM-BREAKFAST" })).toContainText("Provisional");
+    await q.getByRole("button", { name: /district/ }).click();
+    await expect(q.getByTestId("queue-row")).toHaveCount(38);
+    await expect(q).toContainText("no official document evidence recorded");   // the logged reason for the status is visible
+  });
+});
