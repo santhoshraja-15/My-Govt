@@ -1,0 +1,59 @@
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Data (raw files can be large)
+data/raw/
+data/embeddings/
+*.pkl
+*.parquet
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+.DS_Store
+
+# Docker volumes (local)
+postgres_data/
+neo4j_data/
+redis_data/
+minio_data/
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets/

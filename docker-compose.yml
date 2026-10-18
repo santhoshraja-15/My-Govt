@@ -1,0 +1,174 @@
+version: "3.9"
+
+# ================================================================
+# MyGovt — Local Development Docker Compose
+# Run: docker compose up -d --build
+# ================================================================
+
+services:
+
+  # ── PostgreSQL 16 + PostGIS + pgvector ──────────────────────
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: mygovt_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mygovt
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      MYGOVT_APP_PASSWORD: ${MYGOVT_APP_PASSWORD:-changeme_app}
+      MYGOVT_AI_READONLY_PASSWORD: ${MYGOVT_AI_READONLY_PASSWORD:-changeme_ai}
+      MYGOVT_ETL_PASSWORD: ${MYGOVT_ETL_PASSWORD:-changeme_etl}
+      MYGOVT_ADMIN_PASSWORD: ${MYGOVT_ADMIN_PASSWORD:-changeme_admin}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d mygovt"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Neo4j 5 ─────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:5
+    container_name: mygovt_neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/changeme_neo4j}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7474:7474"   # HTTP browser
+      - "7687:7687"   # Bolt
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7474"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ── Redis 7 ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mygovt_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MinIO object storage ─────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: mygovt_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-changeme_minio}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── FastAPI backend ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: mygovt_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      NEO4J_URI: bolt://neo4j:7687
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+      - ./database:/database
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Background worker (SLA / escalation scheduler) ──────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: mygovt_worker
+    restart: unless-stopped
+    command: python -m app.jobs.scheduler
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      NEO4J_URI: bolt://neo4j:7687
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Next.js frontend ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    container_name: mygovt_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_ENV: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+  minio_data:

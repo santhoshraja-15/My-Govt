@@ -1,0 +1,116 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "mygovt-backend"
+version = "1.0.0"
+description = "MyGovt — AI-Powered Citizen Intelligence & State Governance Platform (Backend)"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+
+    # Database
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "psycopg[binary]>=3.1.19",
+    "alembic>=1.13.1",
+    "pgvector>=0.3.0",
+    "geoalchemy2>=0.15.0",
+
+    # Validation
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "email-validator>=2.1.1",
+
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[argon2]>=1.7.4",
+
+    # Cache / Queue
+    "redis>=5.0.4",
+
+    # Object storage
+    "minio>=7.2.7",
+
+    # AI / ML
+    "langchain>=0.2.0",
+    "langgraph>=0.1.0",
+    "langchain-community>=0.2.0",
+    "openai>=1.30.0",
+    "anthropic>=0.28.0",
+    "sentence-transformers>=2.7.0",
+    "torch>=2.3.0",
+
+    # NLP / ML
+    "scikit-learn>=1.5.0",
+    "numpy>=1.26.4",
+    "pandas>=2.2.2",
+
+    # Neo4j
+    "neo4j>=5.20.0",
+
+    # Document processing
+    "pymupdf>=1.24.3",
+    "pdfplumber>=0.11.0",
+    "openpyxl>=3.1.2",
+    "python-docx>=1.1.0",
+
+    # HTTP
+    "httpx>=0.27.0",
+    "aiohttp>=3.9.5",
+
+    # Utils
+    "python-slugify>=8.0.4",
+    "structlog>=24.1.0",
+    "tenacity>=8.3.0",
+    "apscheduler>=3.10.4",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+all = ["mygovt-backend[test,dev]"]
+test = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.7",
+    "pytest-cov>=5.0.0",
+    "httpx>=0.27.0",
+    "testcontainers[postgresql]>=4.5.0",
+    "hypothesis>=6.104.0",
+    "factory-boy>=3.3.0",
+]
+dev = [
+    "ruff>=0.4.7",
+    "black>=24.4.2",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.1",
+    "ipython>=8.24.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = ["B008", "N805"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+exclude = ["migrations/", "tests/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "scripts*", "etl*", "knowledge_graph*"]

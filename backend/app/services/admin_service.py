@@ -1,0 +1,317 @@
+"""Admin service — database intelligence console backend."""
+import re
+from typing import Any, Optional
+
+import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.health import get_health_status
+
+logger = structlog.get_logger(__name__)
+
+# SQL keywords that are NOT allowed in the query workspace
+_FORBIDDEN_SQL = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE"
+    r"|EXEC|EXECUTE|COPY|\\|pg_read_file|pg_ls_dir|lo_import|lo_export"
+    r"|dblink|openquery|SET\s+ROLE|SET\s+SESSION)\b",
+    re.IGNORECASE,
+)
+
+
+class AdminService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_overview(self) -> dict:
+        queries = {
+            "schemas": "SELECT count(*) FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast')",
+            "tables": "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema','pg_toast') AND table_type='BASE TABLE'",
+            "indexes": "SELECT count(*) FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog','information_schema')",
+            "foreign_keys": "SELECT count(*) FROM information_schema.table_constraints WHERE constraint_type='FOREIGN KEY'",
+            "datasets": "SELECT count(*) FROM system.dataset_registry",
+            "sources": "SELECT count(*) FROM system.source_registry",
+        }
+        overview = {}
+        for key, sql in queries.items():
+            try:
+                r = await self.db.execute(text(sql))
+                overview[key] = r.scalar() or 0
+            except Exception:
+                overview[key] = None
+        return overview
+
+    async def get_connection_status(self) -> dict:
+        health = await get_health_status()
+        # Enrich with extension info
+        try:
+            ext_result = await self.db.execute(text(
+                "SELECT extname, extversion FROM pg_extension ORDER BY extname"
+            ))
+            extensions = [{"name": r[0], "version": r[1]} for r in ext_result.fetchall()]
+        except Exception:
+            extensions = []
+
+        return {
+            "services": health["services"],
+            "postgresql_extensions": extensions,
+        }
+
+    async def list_schemas(self) -> list:
+        result = await self.db.execute(text("""
+            SELECT s.schema_name,
+                   count(DISTINCT t.table_name) FILTER (WHERE t.table_type='BASE TABLE') AS table_count,
+                   count(DISTINCT t.table_name) FILTER (WHERE t.table_type='VIEW') AS view_count
+            FROM information_schema.schemata s
+            LEFT JOIN information_schema.tables t ON t.table_schema = s.schema_name
+            WHERE s.schema_name NOT IN ('pg_catalog','information_schema','pg_toast','pg_temp_1','pg_toast_temp_1')
+            GROUP BY s.schema_name
+            ORDER BY s.schema_name
+        """))
+        return [
+            {"schema_name": r[0], "table_count": r[1] or 0, "view_count": r[2] or 0}
+            for r in result.fetchall()
+        ]
+
+    async def list_tables(self, schema_name: str) -> list:
+        result = await self.db.execute(text("""
+            SELECT t.table_name, t.table_type,
+                   obj_description(pc.oid, 'pg_class') AS description,
+                   pc.reltuples::bigint AS estimated_rows
+            FROM information_schema.tables t
+            LEFT JOIN pg_class pc ON pc.relname = t.table_name
+            LEFT JOIN pg_namespace pn ON pn.oid = pc.relnamespace AND pn.nspname = t.table_schema
+            WHERE t.table_schema = :schema
+            ORDER BY t.table_name
+        """), {"schema": schema_name})
+        return [
+            {
+                "table_name": r[0],
+                "table_type": r[1],
+                "description": r[2],
+                "estimated_rows": max(r[3], 0) if r[3] else 0,
+            }
+            for r in result.fetchall()
+        ]
+
+    async def get_table_detail(self, schema_name: str, table_name: str) -> dict:
+        # Columns
+        col_result = await self.db.execute(text("""
+            SELECT column_name, data_type, is_nullable, column_default,
+                   character_maximum_length, numeric_precision
+            FROM information_schema.columns
+            WHERE table_schema = :schema AND table_name = :table
+            ORDER BY ordinal_position
+        """), {"schema": schema_name, "table": table_name})
+        columns = [
+            {
+                "name": r[0], "type": r[1], "nullable": r[2] == "YES",
+                "default": r[3], "max_length": r[4], "precision": r[5],
+            }
+            for r in col_result.fetchall()
+        ]
+
+        # Indexes
+        idx_result = await self.db.execute(text("""
+            SELECT indexname, indexdef
+            FROM pg_indexes
+            WHERE schemaname = :schema AND tablename = :table
+            ORDER BY indexname
+        """), {"schema": schema_name, "table": table_name})
+        indexes = [{"name": r[0], "definition": r[1]} for r in idx_result.fetchall()]
+
+        # Constraints
+        con_result = await self.db.execute(text("""
+            SELECT constraint_name, constraint_type
+            FROM information_schema.table_constraints
+            WHERE table_schema = :schema AND table_name = :table
+            ORDER BY constraint_type, constraint_name
+        """), {"schema": schema_name, "table": table_name})
+        constraints = [{"name": r[0], "type": r[1]} for r in con_result.fetchall()]
+
+        # Row count estimate
+        rc = await self.db.execute(text("""
+            SELECT reltuples::bigint FROM pg_class
+            WHERE relname = :table AND relnamespace = (
+                SELECT oid FROM pg_namespace WHERE nspname = :schema
+            )
+        """), {"schema": schema_name, "table": table_name})
+        row_count = rc.scalar() or 0
+
+        return {
+            "schema_name": schema_name,
+            "table_name": table_name,
+            "columns": columns,
+            "indexes": indexes,
+            "constraints": constraints,
+            "estimated_rows": max(row_count, 0),
+        }
+
+    async def get_table_sample(self, schema_name: str, table_name: str,
+                                limit: int = 20, offset: int = 0) -> dict:
+        # Safety: only allow known schemas
+        allowed_schemas = [
+            "system", "administration", "identity", "schemes",
+            "services", "policies", "documents", "complaints", "ai", "audit"
+        ]
+        if schema_name not in allowed_schemas:
+            return {"error": "Schema not accessible", "rows": [], "columns": []}
+
+        safe_table = f'"{schema_name}"."{table_name}"'
+        try:
+            count_r = await self.db.execute(text(f"SELECT count(*) FROM {safe_table}"))
+            total = count_r.scalar() or 0
+
+            result = await self.db.execute(
+                text(f"SELECT * FROM {safe_table} LIMIT :lim OFFSET :off"),
+                {"lim": limit, "off": offset},
+            )
+            rows = result.fetchall()
+            columns = list(result.keys()) if rows else []
+
+            # Serialize rows safely
+            serialized = []
+            for row in rows:
+                serialized.append({
+                    col: (str(val) if not isinstance(val, (str, int, float, bool, type(None))) else val)
+                    for col, val in zip(columns, row)
+                })
+
+            return {"total": total, "columns": columns, "rows": serialized,
+                    "limit": limit, "offset": offset}
+        except Exception as e:
+            return {"error": str(e), "rows": [], "columns": []}
+
+    async def get_relationships(self, schema_name: Optional[str] = None) -> list:
+        where = "AND kcu.table_schema = :schema" if schema_name else ""
+        params: dict = {}
+        if schema_name:
+            params["schema"] = schema_name
+
+        result = await self.db.execute(text(f"""
+            SELECT
+                kcu.table_schema || '.' || kcu.table_name AS from_table,
+                kcu.column_name AS from_column,
+                ccu.table_schema || '.' || ccu.table_name AS to_table,
+                ccu.column_name AS to_column,
+                tc.constraint_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage ccu
+                ON ccu.constraint_name = tc.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              {where}
+            ORDER BY from_table, from_column
+        """), params)
+
+        return [
+            {
+                "from_table": r[0], "from_column": r[1],
+                "to_table": r[2], "to_column": r[3],
+                "constraint_name": r[4],
+            }
+            for r in result.fetchall()
+        ]
+
+    async def run_safe_query(self, sql: str) -> dict:
+        """Execute a read-only SQL statement with safety checks."""
+        sql = sql.strip().rstrip(";")
+        if not sql:
+            return {"error": "Empty query"}
+        if _FORBIDDEN_SQL.search(sql):
+            return {"error": "Mutating or unsafe SQL statements are not allowed in the query workspace."}
+        if ";" in sql:
+            return {"error": "Multiple statements are not allowed."}
+        if len(sql) > 5000:
+            return {"error": "Query too long (max 5000 chars)."}
+        try:
+            await self.db.execute(text("SET LOCAL statement_timeout = '10s'"))
+            result = await self.db.execute(text(sql))
+            rows = result.fetchmany(500)
+            columns = list(result.keys()) if rows else []
+            serialized = [
+                {col: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
+                 for col, v in zip(columns, row)}
+                for row in rows
+            ]
+            return {"columns": columns, "rows": serialized, "row_count": len(serialized)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def list_datasets(self) -> list:
+        try:
+            r = await self.db.execute(text("""
+                SELECT d.dataset_id, d.dataset_name, d.file_format,
+                       d.download_date, d.record_count, d.processing_status,
+                       d.validation_status, d.checksum_sha256,
+                       s.source_name, s.source_type, s.reliability_score
+                FROM system.dataset_registry d
+                LEFT JOIN system.source_registry s ON s.source_id = d.source_id
+                ORDER BY d.download_date DESC NULLS LAST
+            """))
+            return [dict(zip(result.keys(), row)) for result, row in
+                    [(r, r2) for r2 in r.fetchall()]]
+        except Exception:
+            result = await self.db.execute(text("""
+                SELECT dataset_id, dataset_name, file_format,
+                       download_date, record_count, processing_status,
+                       validation_status, checksum_sha256
+                FROM system.dataset_registry
+                ORDER BY download_date DESC NULLS LAST
+            """))
+            cols = list(result.keys())
+            return [dict(zip(cols, row)) for row in result.fetchall()]
+
+    async def list_sources(self) -> list:
+        result = await self.db.execute(text("""
+            SELECT source_id, source_code, source_name, source_type,
+                   url, jurisdiction, reliability_score, license,
+                   last_checked, status
+            FROM system.source_registry
+            ORDER BY source_name
+        """))
+        cols = list(result.keys())
+        return [dict(zip(cols, row)) for row in result.fetchall()]
+
+    async def get_audit_logs(self, limit: int = 50, offset: int = 0) -> dict:
+        try:
+            count_r = await self.db.execute(text("SELECT count(*) FROM audit.audit_log"))
+            total = count_r.scalar() or 0
+            result = await self.db.execute(text("""
+                SELECT log_id, actor_id, actor_role, action, entity_type,
+                       entity_id, created_at, ip_address
+                FROM audit.audit_log
+                ORDER BY created_at DESC
+                LIMIT :lim OFFSET :off
+            """), {"lim": limit, "off": offset})
+            cols = list(result.keys())
+            rows = [
+                {col: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
+                 for col, v in zip(cols, row)}
+                for row in result.fetchall()
+            ]
+            return {"total": total, "rows": rows, "limit": limit, "offset": offset}
+        except Exception as e:
+            return {"total": 0, "rows": [], "error": str(e)}
+
+    async def get_data_quality_report(self) -> dict:
+        try:
+            result = await self.db.execute(text("""
+                SELECT dataset_name,
+                       quality_completeness,
+                       quality_accuracy,
+                       quality_consistency,
+                       quality_freshness,
+                       processing_status,
+                       validation_status,
+                       record_count
+                FROM system.dataset_registry
+                ORDER BY dataset_name
+            """))
+            cols = list(result.keys())
+            return {"datasets": [dict(zip(cols, r)) for r in result.fetchall()]}
+        except Exception as e:
+            return {"datasets": [], "error": str(e)}
