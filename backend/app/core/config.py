@@ -59,7 +59,10 @@ class Settings(BaseSettings):
 
     # Embedding
     EMBEDDING_PROVIDER: str = "local"
-    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    # English 1024-d model; multilingual retrieval is not required. Changing model or dimension means
+    # changing the vector(1024) columns deliberately (see docs); vectors are never truncated or padded.
+    EMBEDDING_MODEL: str = "BAAI/bge-large-en-v1.5"
+    EMBEDDING_API_KEY: str = ""        # only for EMBEDDING_PROVIDER=openai; set via environment
     EMBEDDING_DIMENSION: int = 1024
     EMBEDDING_BATCH_SIZE: int = 32
 
