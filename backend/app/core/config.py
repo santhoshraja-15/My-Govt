@@ -77,8 +77,9 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_CHUNKS: int = 50
     # A vector hit with no keyword match must reach this cosine similarity to count as evidence; otherwise
     # nearest-neighbour search would return something for ANY question and the assistant could never abstain.
-    # NOT calibrated against real queries yet - tune with an evaluation set before relying on it.
-    RETRIEVAL_MIN_SIMILARITY: float = 0.6
+    # Provisional calibration with BAAI/bge-large-en-v1.5 on 5 sample queries: relevant 0.59-0.78, irrelevant 0.31-0.39.
+    # Re-measure with a proper evaluation set (and again whenever the model changes) before relying on it.
+    RETRIEVAL_MIN_SIMILARITY: float = 0.5
     MAX_CONTEXT_TOKENS: int = 6000
 
     # Abuse protection (per client IP, per process)

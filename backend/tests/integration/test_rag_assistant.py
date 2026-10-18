@@ -139,7 +139,7 @@ async def test_citations_point_at_the_exact_retrieved_passage(session_factory, d
 async def test_keyword_only_retrieval_is_reported_when_no_embeddings_exist(session_factory, docs):
     await docs("Gadget Order", [(1, "The gadget allowance is paid quarterly to registered gadget users.")])
     r = await ask(session_factory, "gadget allowance quarterly", embedder=DeterministicTestProvider())
-    assert any("embeddings have not been generated" in n for n in r.evidence_notes)
+    assert any("mbeddings have not been generated" in n for n in r.evidence_notes)
     assert r.citations
 
 
@@ -152,7 +152,7 @@ async def test_vector_signal_is_used_when_embeddings_exist(conn, session_factory
     r = await ask(session_factory, "Quillion subsidy covers drip irrigation equipment for small farmers.", embedder=p)
     top = next(c for c in r.citations if c.document_id == str(d))
     assert top.chunk_id == str(ids[0])                                           # exact-vector + keyword winner ranks first
-    assert not any("embeddings have not been generated" in n for n in r.evidence_notes)
+    assert not any("mbeddings have not been generated" in n for n in r.evidence_notes)
 
 
 @pytest.mark.db
@@ -283,4 +283,33 @@ async def test_irrelevant_vector_neighbours_do_not_prevent_abstention(conn, sess
     p = DeterministicTestProvider()
     await emb.embed_chunks(conn, p)
     r = await ask(session_factory, "qqzzxx wwvvuu", llm=None, embedder=p)
+    assert r.abstained and r.citations == []
+
+
+@pytest.mark.db
+async def test_generic_words_do_not_let_catalogue_records_crowd_out_the_relevant_document(session_factory, docs):
+    """Regression (found with real data): 'Tamil Nadu ...' matched many schemes and pushed the one relevant
+    official document out of the cited evidence."""
+    d, ids = await docs("Wakf Board Election Form", [(1, "Nomination paper for election of members of the Wakf Board from the electoral college.")])
+    r = await ask(session_factory, "How do I nominate a member for the Tamil Nadu Wakf Board election?", embedder=DeterministicTestProvider())
+    assert r.citations and r.citations[0].document_id == str(d)            # relevant document is the top citation
+    assert [c.index for c in r.citations] == list(range(1, len(r.citations) + 1))
+
+
+@pytest.mark.db
+async def test_no_record_type_exceeds_its_quota(session_factory, docs):
+    for i in range(6):
+        await docs(f"Pension Circular {i}", [(1, f"Pension circular {i} describes the monthly pension payment for elderly persons.")])
+    r = await ask(session_factory, "monthly pension payment for elderly persons", embedder=DeterministicTestProvider())
+    kinds = [("doc" if c.chunk_id else "cat") for c in r.citations]
+    assert kinds.count("doc") <= 4
+
+
+@pytest.mark.db
+async def test_semantic_veto_of_stray_keyword_hits(conn, session_factory, docs):
+    """When embeddings exist, a chunk that matches one stray keyword but is semantically far away is not evidence."""
+    await docs("Form Capital Letters", [(1, "Fill the form in capital letters using black ink only.")])
+    p = DeterministicTestProvider()
+    await emb.embed_chunks(conn, p)
+    r = await ask(session_factory, "What is the capital of France?", embedder=p)
     assert r.abstained and r.citations == []

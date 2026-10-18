@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.orchestration import answering
 from app.ai.orchestration.llm import LLMClient, get_llm
-from app.ai.retrieval.hybrid import search_chunks
+from app.ai.retrieval.hybrid import search
 from app.core.config import settings  # noqa: F401
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 
@@ -25,6 +25,14 @@ _INTENT_PATTERNS = {
     "policy_query": ["policy", "law", "act", "order", "GO ", "நடைமுறை"],
     "location_info": ["office", "taluk", "district", "address", "near", "அலுவலகம்"],
     "eligibility_check": ["am i eligible", "qualify", "criteria", "தகுதி"],
+}
+
+
+_ALL_KINDS = ("document_chunk", "scheme", "service")
+_KINDS_BY_INTENT: dict[str, tuple[str, ...]] = {
+    "complaint_status": (),
+    "service_lookup": ("service", "document_chunk"),
+    "policy_query": ("document_chunk", "scheme"),
 }
 
 
@@ -50,7 +58,7 @@ def _detect_language(message: str) -> str:
 _STOPWORDS = frozenset(
     "a an and are as at be by can do does for from get give has have how i in is it me my of on or "
     "please tell the to what when where which who why will with you your about any there their "
-    "this that these those should would could".split()
+    "this that these those should would could tamil nadu government govt state".split()
 )
 
 # Weight applied to a source's reliability when computing answer trust.
@@ -152,7 +160,7 @@ class ChatService:
         )
 
     async def _hybrid_retrieve(self, query: str, intent: str, limit: int = 8) -> list[dict]:
-        """Curated records (schemes, services) by keyword + ingested document passages (keyword + vector).
+        """Ranked evidence from schemes, services and ingested document passages on one score scale.
 
         Deprecated records are never retrieved. Provisional / externally-referenced / unverified items are
         returned WITH their verification_status so they can be labelled. A scheme's recorded eligibility
@@ -160,76 +168,33 @@ class ChatService:
         """
         self.last_retrieval_notes = []
         tsq = build_tsquery(query)
-        if tsq is None:
+        kinds = _KINDS_BY_INTENT.get(intent, _ALL_KINDS)
+        if not kinds:
             return []
+        ranked, info = await search(self.db, tsq, query, kinds=kinds, limit=limit, embedder=self.embedder)
+        self.last_retrieval_notes.extend(info["notes"])
         results: list[dict] = []
-
-        if intent in ("scheme_search", "eligibility_check", "general_query"):
-            r = await self.db.execute(
-                text("""
-                    SELECT s.scheme_id::text AS entity_id, s.scheme_name AS title,
-                           s.short_description AS description, d.department_name,
-                           'scheme' AS entity_type, s.verified_at::text AS verified_at,
-                           coalesce(s.official_url, sr.url) AS source_url,
-                           sr.reliability_score::float AS reliability_score,
-                           s.verification_status, s.source_document_ref,
-                           (SELECT string_agg(er.human_readable, '; ' ORDER BY er.rule_group, er.attribute)
-                              FROM schemes.eligibility_rule er WHERE er.scheme_id = s.scheme_id
-                               AND er.human_readable IS NOT NULL) AS rules_text
-                    FROM schemes.scheme s
-                    LEFT JOIN administration.department d ON d.department_id = s.department_id
-                    LEFT JOIN system.source_registry sr ON sr.source_id = s.source_id
-                    WHERE s.status = 'active' AND s.verification_status <> 'deprecated'
-                      AND s.tsv @@ to_tsquery('simple', :tsq)
-                    ORDER BY ts_rank(s.tsv, to_tsquery('simple', :tsq)) DESC, s.scheme_name
-                    LIMIT :lim
-                """),
-                {"tsq": tsq, "lim": limit},
-            )
-            for row in r.fetchall():
-                rec = dict(row._mapping)
-                rules = rec.pop("rules_text")
-                rec["description"] = (rec["description"] or "") + (
-                    f" Recorded eligibility criteria: {rules}." if rules
-                    else " No eligibility criteria are recorded for this scheme.")
-                results.append(rec)
-
-        if intent in ("service_lookup", "general_query"):
-            r = await self.db.execute(
-                text("""
-                    SELECT s.service_id::text AS entity_id, s.service_name AS title,
-                           s.description, d.department_name,
-                           'service' AS entity_type, s.verified_at::text AS verified_at,
-                           coalesce(s.official_url, s.application_url, sr.url) AS source_url,
-                           sr.reliability_score::float AS reliability_score,
-                           s.verification_status, s.source_document_ref
-                    FROM services.service s
-                    LEFT JOIN administration.department d ON d.department_id = s.department_id
-                    LEFT JOIN system.source_registry sr ON sr.source_id = s.source_id
-                    WHERE s.status = 'active' AND s.verification_status <> 'deprecated'
-                      AND to_tsvector('simple', coalesce(s.service_name,'') || ' ' || coalesce(s.description,''))
-                          @@ to_tsquery('simple', :tsq)
-                    ORDER BY s.service_name
-                    LIMIT :lim
-                """),
-                {"tsq": tsq, "lim": limit},
-            )
-            results.extend(dict(row._mapping) for row in r.fetchall())
-
-        if intent != "complaint_status":
-            chunks, info = await search_chunks(self.db, tsq, query, limit=max(limit // 2, 3), embedder=self.embedder)
-            self.last_retrieval_notes.extend(info["notes"])
-            for c in chunks:
+        for v in ranked:
+            if v["kind"] == "document_chunk":
                 results.append({
-                    "entity_id": c["chunk_id"], "entity_type": "document_chunk", "document_id": c["document_id"],
-                    "title": c["title"], "description": c["content"], "department_name": c["department_name"],
-                    "verified_at": None, "source_url": c["source_url"], "page": c["page_number"],
-                    "retrieved_at": c["retrieved_at"].isoformat() if c["retrieved_at"] else None,
-                    "reliability_score": c["reliability"], "verification_status": c["verification_status"],
-                    "source_document_ref": f"{c['source_url']}#page={c['page_number']}" if c["source_url"] else None,
-                    "outdated": c["outdated"], "score": c["score"],
+                    "entity_id": v["chunk_id"], "entity_type": "document_chunk", "document_id": v["document_id"],
+                    "title": v["title"], "description": v["content"], "department_name": v["department_name"],
+                    "verified_at": None, "source_url": v["source_url"], "page": v["page_number"],
+                    "retrieved_at": v["retrieved_at"].isoformat() if v["retrieved_at"] else None,
+                    "reliability_score": v["reliability"], "verification_status": v["verification_status"],
+                    "source_document_ref": f"{v['source_url']}#page={v['page_number']}" if v["source_url"] else None,
+                    "outdated": v["outdated"], "score": v["score"],
                 })
-        return results[:limit]
+                continue
+            rec = {k: v[k] for k in ("entity_id", "title", "description", "department_name", "entity_type", "verified_at",
+                                     "source_url", "verification_status", "source_document_ref", "score")}
+            rec["reliability_score"] = v["reliability"]
+            if v["kind"] == "scheme":
+                rules = v.get("rules_text")
+                rec["description"] = (rec["description"] or "") + (
+                    f" Recorded eligibility criteria: {rules}." if rules else " No eligibility criteria are recorded for this scheme.")
+            results.append(rec)
+        return results
 
     def _build_context(self, retrieved: list[dict]) -> tuple[str, list[Citation], list[answering.Source]]:
         citations: list[Citation] = []
