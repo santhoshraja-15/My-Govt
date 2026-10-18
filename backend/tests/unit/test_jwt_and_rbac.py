@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
-from jose import jwt
+import jwt
 
 from app.core.config import settings
 from app.security import dependencies
@@ -35,7 +35,7 @@ def test_tampered_token_rejected():
 
 
 def test_token_signed_with_other_secret_rejected():
-    forged = jwt.encode({"sub": "u1", "type": "access"}, "another-secret", algorithm=settings.JWT_ALGORITHM)
+    forged = jwt.encode({"sub": "u1", "type": "access"}, "another-secret-key-that-is-long-enough-0123456789", algorithm=settings.JWT_ALGORITHM)
     assert decode_token(forged) is None
 
 
