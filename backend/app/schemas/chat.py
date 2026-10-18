@@ -23,6 +23,13 @@ class Citation(BaseModel):
     # Only 'official_verified' sources may be described as verified.
     verification_status: str = 'unverified'
     source_document_ref: Optional[str] = None
+    # set for passages from ingested documents: exactly what was retrieved and from where
+    document_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    page: Optional[int] = None
+    excerpt: Optional[str] = None
+    retrieved_at: Optional[str] = None
+    outdated: bool = False
 
 
 class DecisionLineageItem(BaseModel):
@@ -46,6 +53,7 @@ class ChatResponse(BaseModel):
     suggested_actions: List[str] = []
     degraded: bool = False        # True if LLM unavailable
     contains_unverified: bool = False  # True if any cited source is not official_verified
+    evidence_notes: List[str] = []     # caveats: incomplete / outdated / keyword-only / model answer rejected
 
 
 class ConversationOut(BaseModel):

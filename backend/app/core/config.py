@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     HYBRID_WEIGHT_RELIABILITY: float = 0.15
     HYBRID_WEIGHT_FRESHNESS: float = 0.10
     MAX_RETRIEVAL_CHUNKS: int = 50
+    # A vector hit with no keyword match must reach this cosine similarity to count as evidence; otherwise
+    # nearest-neighbour search would return something for ANY question and the assistant could never abstain.
+    # NOT calibrated against real queries yet - tune with an evaluation set before relying on it.
+    RETRIEVAL_MIN_SIMILARITY: float = 0.6
     MAX_CONTEXT_TOKENS: int = 6000
 
     # Abuse protection (per client IP, per process)

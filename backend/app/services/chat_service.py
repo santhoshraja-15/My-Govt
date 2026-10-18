@@ -9,7 +9,10 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.ai.orchestration import answering
+from app.ai.orchestration.llm import LLMClient, get_llm
+from app.ai.retrieval.hybrid import search_chunks
+from app.core.config import settings  # noqa: F401
 from app.schemas.chat import ChatRequest, ChatResponse, Citation
 
 logger = structlog.get_logger(__name__)
@@ -81,8 +84,11 @@ def compute_trust(retrieved: list[dict]) -> float:
 
 
 class ChatService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, llm: Optional[LLMClient] = None, embedder=None):
         self.db = db
+        self.llm = llm if llm is not None else get_llm()
+        self.embedder = embedder
+        self.last_retrieval_notes: list[str] = []
 
     async def process_message(self, request: ChatRequest, current_user) -> ChatResponse:
         message_id = uuid.uuid4()
@@ -96,13 +102,21 @@ class ChatService:
         language = request.language if request.language in ("en", "ta") else _detect_language(request.message)
 
         retrieved = await self._hybrid_retrieve(request.message, intent, limit=8)
-        context_text, citations = self._build_context(retrieved)
+        context_text, citations, sources = self._build_context(retrieved)
         trust_score = self._compute_trust(retrieved)
         contains_unverified = any(c.verification_status != "official_verified" for c in citations)
+        notes = list(self.last_retrieval_notes)
+        if sources and len(sources) < 2:
+            notes.append("Only one supporting source was found; the answer may be incomplete.")
+        if any(s.outdated for s in sources):
+            notes.append("At least one source is marked outdated (past its expiry date); check for a newer order.")
+        if intent == "eligibility_check":
+            notes.append("This assistant does not decide eligibility. Use the eligibility checker on the scheme page.")
 
-        answer, abstained, abstain_reason, degraded = await self._generate_answer(
-            request.message, intent, context_text, language, trust_score, contains_unverified
+        answer, abstained, abstain_reason, degraded, answer_notes = await self._generate_answer(
+            request.message, intent, sources, language, contains_unverified
         )
+        notes += answer_notes
         actions = self._suggest_actions(intent)
 
         decision_id = uuid.uuid4()
@@ -110,7 +124,7 @@ class ChatService:
             decision_id, citizen_id, conversation_id if citizen_id else None,
             {"query": request.message, "intent": intent, "language": language,
              "retrieved_count": len(retrieved), "degraded": degraded,
-             "contains_unverified": contains_unverified},
+             "contains_unverified": contains_unverified, "evidence_notes": notes},
             trust_score, abstained, retrieved,
         )
         if citizen_id:
@@ -131,14 +145,17 @@ class ChatService:
             suggested_actions=actions,
             degraded=degraded,
             contains_unverified=contains_unverified,
+            evidence_notes=notes,
         )
 
     async def _hybrid_retrieve(self, query: str, intent: str, limit: int = 8) -> list[dict]:
-        """Keyword retrieval over curated tables (vector search joins in once embeddings exist).
+        """Curated records (schemes, services) by keyword + ingested document passages (keyword + vector).
 
-        Deprecated records are never retrieved. Provisional / externally-referenced records are
-        returned WITH their verification_status so callers can label them.
+        Deprecated records are never retrieved. Provisional / externally-referenced / unverified items are
+        returned WITH their verification_status so they can be labelled. A scheme's recorded eligibility
+        rules (or the explicit absence of any) are attached so the model never has to guess them.
         """
+        self.last_retrieval_notes = []
         tsq = build_tsquery(query)
         if tsq is None:
             return []
@@ -152,7 +169,10 @@ class ChatService:
                            'scheme' AS entity_type, s.verified_at::text AS verified_at,
                            coalesce(s.official_url, sr.url) AS source_url,
                            sr.reliability_score::float AS reliability_score,
-                           s.verification_status, s.source_document_ref
+                           s.verification_status, s.source_document_ref,
+                           (SELECT string_agg(er.human_readable, '; ' ORDER BY er.rule_group, er.attribute)
+                              FROM schemes.eligibility_rule er WHERE er.scheme_id = s.scheme_id
+                               AND er.human_readable IS NOT NULL) AS rules_text
                     FROM schemes.scheme s
                     LEFT JOIN administration.department d ON d.department_id = s.department_id
                     LEFT JOIN system.source_registry sr ON sr.source_id = s.source_id
@@ -163,7 +183,13 @@ class ChatService:
                 """),
                 {"tsq": tsq, "lim": limit},
             )
-            results.extend(dict(row._mapping) for row in r.fetchall())
+            for row in r.fetchall():
+                rec = dict(row._mapping)
+                rules = rec.pop("rules_text")
+                rec["description"] = (rec["description"] or "") + (
+                    f" Recorded eligibility criteria: {rules}." if rules
+                    else " No eligibility criteria are recorded for this scheme.")
+                results.append(rec)
 
         if intent in ("service_lookup", "general_query"):
             r = await self.db.execute(
@@ -187,41 +213,31 @@ class ChatService:
             )
             results.extend(dict(row._mapping) for row in r.fetchall())
 
-        if intent in ("policy_query", "general_query"):
-            r = await self.db.execute(
-                text("""
-                    SELECT d.document_id::text AS entity_id, d.title,
-                           substring(d.full_text, 1, 500) AS description,
-                           dep.department_name, 'document' AS entity_type,
-                           NULL::text AS verified_at, d.source_url,
-                           sr.reliability_score::float AS reliability_score,
-                           'unverified' AS verification_status,
-                           d.source_url AS source_document_ref
-                    FROM documents.document d
-                    LEFT JOIN administration.department dep ON dep.department_id = d.department_id
-                    LEFT JOIN system.source_registry sr ON sr.source_id = d.source_id
-                    WHERE d.status = 'active'
-                      AND to_tsvector('simple', coalesce(d.title,'') || ' ' || coalesce(d.full_text,''))
-                          @@ to_tsquery('simple', :tsq)
-                    LIMIT :lim
-                """),
-                {"tsq": tsq, "lim": max(limit // 2, 1)},
-            )
-            results.extend(dict(row._mapping) for row in r.fetchall())
-
+        if intent != "complaint_status":
+            chunks, info = await search_chunks(self.db, tsq, query, limit=max(limit // 2, 3), embedder=self.embedder)
+            self.last_retrieval_notes.extend(info["notes"])
+            for c in chunks:
+                results.append({
+                    "entity_id": c["chunk_id"], "entity_type": "document_chunk", "document_id": c["document_id"],
+                    "title": c["title"], "description": c["content"], "department_name": c["department_name"],
+                    "verified_at": None, "source_url": c["source_url"], "page": c["page_number"],
+                    "retrieved_at": c["retrieved_at"].isoformat() if c["retrieved_at"] else None,
+                    "reliability_score": c["reliability"], "verification_status": c["verification_status"],
+                    "source_document_ref": f"{c['source_url']}#page={c['page_number']}" if c["source_url"] else None,
+                    "outdated": c["outdated"], "score": c["score"],
+                })
         return results[:limit]
 
-    def _build_context(self, retrieved: list[dict]) -> tuple[str, list[Citation]]:
+    def _build_context(self, retrieved: list[dict]) -> tuple[str, list[Citation], list[answering.Source]]:
         citations: list[Citation] = []
-        context_parts: list[str] = []
+        sources: list[answering.Source] = []
         for i, item in enumerate(retrieved, 1):
             status = item.get("verification_status") or "unverified"
             title = item.get("title", "")
             description = item.get("description") or ""
             dept = item.get("department_name") or ""
-            context_parts.append(
-                f"[{i}] **{title}** ({dept}) [{status}]\n{description[:400]}"
-            )
+            sources.append(answering.Source(i, item.get("entity_type", "unknown"), title, description, status,
+                                            bool(item.get("outdated"))))
             citations.append(Citation(
                 index=i,
                 title=title,
@@ -230,82 +246,48 @@ class ChatService:
                 verified_at=str(item["verified_at"]) if item.get("verified_at") else None,
                 verification_status=status,
                 source_document_ref=item.get("source_document_ref"),
+                document_id=item.get("document_id"),
+                chunk_id=item["entity_id"] if item.get("entity_type") == "document_chunk" else None,
+                page=item.get("page"),
+                excerpt=answering.sanitize_passage(description, 300) if item.get("entity_type") == "document_chunk" else None,
+                retrieved_at=item.get("retrieved_at"),
+                outdated=bool(item.get("outdated")),
             ))
-        return "\n\n".join(context_parts), citations
+        return answering.build_context(sources), citations, sources
 
     def _compute_trust(self, retrieved: list[dict]) -> float:
         return compute_trust(retrieved)
 
     async def _generate_answer(
-        self, query: str, intent: str, context: str,
-        language: str, trust_score: float, contains_unverified: bool = True,
-    ) -> tuple[str, bool, Optional[str], bool]:
-        """LLM answer grounded in `context`, or a deterministic template. Abstains with no context."""
-        if not context:
+        self, query: str, intent: str, sources: list[answering.Source],
+        language: str, contains_unverified: bool = True,
+    ) -> tuple[str, bool, Optional[str], bool, list[str]]:
+        """Grounded answer: the LLM's text if (and only if) it passes validation, else an extractive answer.
+
+        Returns (answer, abstained, abstain_reason, degraded, notes). Abstains when nothing was retrieved.
+        """
+        if not sources:
             msg = (
                 "I couldn't find verified information to answer your question reliably. "
                 "Please visit the official Tamil Nadu government portal at https://www.tn.gov.in "
                 "or contact your nearest e-Sevai centre."
             )
-            return msg, True, "no_supporting_sources", False
+            return msg, True, "no_supporting_sources", False, []
 
-        if settings.LLM_PROVIDER != "none" and settings.LLM_API_KEY:
+        notes: list[str] = []
+        if self.llm is not None:
+            system = answering.SYSTEM_PROMPT.format(language="Tamil" if language == "ta" else "English")
             try:
-                answer = await self._call_llm(query, context, language)
-                return answer, False, None, False
-            except Exception as e:
-                logger.warning("LLM call failed, using template", error=str(e))
-
-        answer = self._template_answer(query, intent, context, language, contains_unverified)
-        return answer, False, None, True
-
-    async def _call_llm(self, query: str, context: str, language: str) -> str:
-        system_prompt = (
-            "You are MyGovt Assistant, a trusted AI for Tamil Nadu government services. "
-            "Answer ONLY from the provided context. If the answer is not in the context, say you don't know. "
-            "Never invent government facts, scheme names, amounts, or eligibility criteria. "
-            f"Respond in {'Tamil' if language == 'ta' else 'English'}."
-        )
-        prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-
-        if settings.LLM_PROVIDER == "openai":
-            import openai
-            client = openai.AsyncOpenAI(api_key=settings.LLM_API_KEY)
-            resp = await client.chat.completions.create(
-                model=settings.LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=settings.LLM_MAX_TOKENS,
-                temperature=settings.LLM_TEMPERATURE,
-            )
-            return resp.choices[0].message.content or ""
-
-        elif settings.LLM_PROVIDER == "google":
-            import google.generativeai as genai
-            genai.configure(api_key=settings.LLM_API_KEY)
-            model = genai.GenerativeModel(settings.LLM_MODEL)
-            resp = await model.generate_content_async(f"{system_prompt}\n\n{prompt}")
-            return resp.text or ""
-
-        raise ValueError(f"Unsupported LLM provider: {settings.LLM_PROVIDER}")
-
-    def _template_answer(self, query: str, intent: str, context: str, language: str,
-                         contains_unverified: bool = True) -> str:
-        if not context:
-            if language == "ta":
-                return "மன்னிக்கவும், இந்தக் கேள்விக்கான சரிபார்க்கப்பட்ட தகவல் கிடைக்கவில்லை."
-            return ("I found limited verified information for your query. "
-                    "Please check https://www.tn.gov.in or your nearest e-Sevai centre.")
-        if contains_unverified:
-            intro = ("Here is what I found. Items marked [provisional], [unverified] or "
-                     "[externally_referenced] have NOT been confirmed against an official document:\n")
-            closing = "\n\n*Please confirm details with the respective department portal before acting.*"
-        else:
-            intro = "Based on records verified against official sources, here is what I found:\n"
-            closing = "\n\n*For official confirmation, please visit the respective department portal.*"
-        return "\n".join([intro, context[:1500], closing])
+                raw = await self.llm.generate(system, answering.build_prompt(query, answering.build_context(sources)))
+                answer, problems = answering.validate_answer(raw, sources)
+                if not problems:
+                    return answer, False, None, False, notes
+                logger.warning("llm_answer_rejected", problems=problems)
+                notes.append("The model's draft answer failed grounding checks and was replaced by a direct quotation of the sources.")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("llm_call_failed", error=str(e))
+                notes.append("The language model was unavailable; showing the sources directly.")
+        return answering.extractive_answer(sources, contains_unverified, language), False, None, True, notes
 
     def _suggest_actions(self, intent: str) -> list[str]:
         mapping = {

@@ -155,15 +155,18 @@ async def test_documents_list_and_search(client, conn):
         "INSERT INTO documents.document (title, document_type, full_text, file_hash, source_url, status) "
         "VALUES ('Test GO on widgets','GO','This order concerns widget subsidies.', $1, 'https://example.com/go', 'active') "
         "RETURNING document_id", uuid.uuid4().hex)
+    await conn.execute("UPDATE documents.document SET extraction_status='ok' WHERE document_id=$1", did)
+    await conn.execute("INSERT INTO documents.document_chunk (document_id,chunk_number,content,page_number) VALUES ($1,0,'This order concerns widget subsidies.',1)", did)
     lst = (await client.get(f"{API}/documents", params={"q": "widget"})).json()
     assert lst["total"] == 1 and lst["items"][0]["doc_type"] == "GO" and lst["items"][0]["verified_at"] is None
     det = (await client.get(f"{API}/documents/{did}")).json()
-    assert det["extracted_text"].startswith("This order") and det["chunk_count"] == 0
+    assert det["extracted_text"].startswith("This order") and det["chunk_count"] == 1
     hits = (await client.get(f"{API}/documents/search/full-text", params={"q": "widget subsidies"})).json()
     assert hits and hits[0]["title"] == "Test GO on widgets"
     chat = (await client.post(f"{API}/chat/message", json={"message": "widget subsidies order policy"})).json()
     doc_cits = [c for c in chat["citations"] if c["title"] == "Test GO on widgets"]
     assert doc_cits and doc_cits[0]["verification_status"] == "unverified"   # ingested docs are not verified by default
+    assert doc_cits[0]["chunk_id"] and doc_cits[0]["page"] == 1 and doc_cits[0]["document_id"] == str(did)
 
 
 # -- verification governance (DB level) ------------------------------------------------
