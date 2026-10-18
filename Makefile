@@ -1,4 +1,4 @@
-.PHONY: up down build migrate seed embed graph-rebuild test eval lint clean logs shell-db shell-backend
+.PHONY: up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
 
 # ── Docker ───────────────────────────────────────────────────
 up:
@@ -26,22 +26,35 @@ migrate-down:
 migrate-status:
 	docker compose exec backend alembic current
 
-# Run base schema only (no provenance columns — do NOT seed yet)
+# Step 1: baseline schema (no provenance columns — do NOT seed yet). Fails fast on any SQL error.
 schema:
-	docker compose exec -T postgres psql -U postgres -d mygovt < database/schema/001_schema.sql
+	docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < database/schema/001_schema.sql
 
-# Apply raw SQL migrations (002 adds headquarters, lgd_code, verification_status etc.)
+# Step 2: raw SQL migration (002 adds headquarters, lgd_code, verification_status etc.)
 migrate-sql:
-	docker compose exec -T postgres psql -U postgres -d mygovt < database/migrations/002_provenance_and_audit_fixes.sql
+	docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < database/migrations/002_provenance_and_audit_fixes.sql
 
 # Full first-time database initialisation in correct dependency order:
 #   1. Base schema (001_schema.sql)      → tables, functions, triggers
 #   2. Migration 002                     → provenance columns seeds depend on
-#   3. Seed data (via scripts/seed.py)   → districts, departments, schemes, services
+#   3. Seed data (backend/scripts/seed.py, applies database/seeds/002_verified_seed_data.sql only,
+#      then runs integrity + provenance checks; idempotent)
+# db-init is for a CLEAN database only (001_schema.sql is not re-runnable). To re-seed an existing
+# database use 'make seed' (idempotent).
+# NOTE: 'migrate' (alembic) has no revisions yet; use migrate-sql until Milestone 7.
 db-init: schema migrate-sql seed
 
 seed:
 	docker compose exec backend python -m scripts.seed
+
+# Re-run the post-seed integrity/provenance checks without changing data
+seed-verify:
+	docker compose exec backend python -m scripts.seed --verify-only
+
+# Build a throw-away mygovt_test_* database, run schema -> migration -> seed (twice) -> constraint probes, drop it.
+# Never touches the 'mygovt' database. Requires the postgres service (PostGIS image) to be up.
+db-verify:
+	docker compose exec backend sh -c 'python -m scripts.db_verify --admin-dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres'
 
 seed-synthetic:
 	docker compose exec backend python -m scripts.synth_data
@@ -109,6 +122,5 @@ scheduler:
 setup: up
 	@echo "Waiting for services to be healthy..."
 	@sleep 15
-	$(MAKE) migrate
-	$(MAKE) seed
+	$(MAKE) db-init
 	@echo "Setup complete. Visit http://localhost:3000"

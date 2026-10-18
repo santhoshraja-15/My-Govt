@@ -94,7 +94,54 @@ ON CONFLICT (district_code) DO UPDATE SET
   name_ta = EXCLUDED.name_ta,
   headquarters = EXCLUDED.headquarters;
 
--- ── 4. Departments (15 key departments with verified URLs) ─────────
+-- ── 3b. District LGD codes (from data/validated/tn_districts_master_2026.json) ──
+-- Applied as UPDATE so lgd_code (added by migration 002) is populated on every run.
+-- seed.py verifies these values against the validated JSON file.
+UPDATE administration.district AS d
+SET lgd_code = v.lgd_code
+FROM (VALUES
+  ('TN-CHN', 562),
+  ('TN-CBE', 563),
+  ('TN-MDU', 575),
+  ('TN-TRY', 589),
+  ('TN-SLM', 584),
+  ('TN-TNV', 590),
+  ('TN-VEL', 593),
+  ('TN-ERD', 568),
+  ('TN-TNJ', 586),
+  ('TN-DGL', 567),
+  ('TN-KPM', 571),
+  ('TN-TVL', 588),
+  ('TN-CUD', 565),
+  ('TN-VPM', 594),
+  ('TN-NGP', 577),
+  ('TN-TVR', 591),
+  ('TN-PDK', 581),
+  ('TN-SVG', 585),
+  ('TN-RAM', 582),
+  ('TN-TUT', 592),
+  ('TN-KKI', 572),
+  ('TN-VRD', 595),
+  ('TN-THN', 587),
+  ('TN-KRI', 574),
+  ('TN-DPI', 566),
+  ('TN-TVM', 583),
+  ('TN-NKL', 578),
+  ('TN-KRR', 573),
+  ('TN-ARI', 561),
+  ('TN-PBL', 580),
+  ('TN-TPR', 634),
+  ('TN-NLG', 579),
+  ('TN-MYD', 737),
+  ('TN-KLK', 732),
+  ('TN-TKS', 734),
+  ('TN-CGL', 731),
+  ('TN-RPT', 733),
+  ('TN-TPT', 735)
+) AS v(district_code, lgd_code)
+WHERE d.district_code = v.district_code;
+
+-- ── 4. Departments (17 departments with verified URLs) ─────────
 INSERT INTO administration.department (
   department_id, department_code, department_name, name_ta, short_name,
   description, website_url, status, verification_status, verified_by
@@ -178,7 +225,7 @@ ON CONFLICT (department_id, category_id, priority) DO UPDATE SET
   escalation_hours = EXCLUDED.escalation_hours,
   notes = EXCLUDED.notes;
 
--- ── 7. Schemes (30 Real Verified Schemes with Correct Provenance) ────
+-- ── 7. Schemes (12 curated schemes; see data/validated/tn_schemes_verified_2026.json) ────
 INSERT INTO schemes.scheme (
   scheme_id, scheme_code, scheme_name, name_ta, short_description, full_description,
   department_id, state_id, scheme_level, category, benefits_summary,
@@ -290,7 +337,28 @@ ON CONFLICT (scheme_code) DO UPDATE SET
   verification_status = EXCLUDED.verification_status,
   official_url = EXCLUDED.official_url;
 
--- ── 8. Services (20 Verified e-Sevai & Portal Services) ───────────────
+-- ── 7b. Scheme source references (from data/validated/tn_schemes_verified_2026.json) ──
+-- NOTE: these are references ASSERTED by the curated dataset (GO numbers / guideline
+-- names). They have not been independently re-checked against the issuing GOs.
+UPDATE schemes.scheme AS sc
+SET source_document_ref = v.source_document_ref
+FROM (VALUES
+  ('TN-CM-BREAKFAST', 'GO Ms No 138 School Education 2022'),
+  ('TN-KALAIGNAR-MAGALIR-URIMAI', 'GO Ms No 1 Social Welfare 2023'),
+  ('TN-CM-HEALTH-INS', 'GO Ms No 49 Health 2012'),
+  ('TN-MOOVALUR-RAMAMIRTHAM', 'GO Ms No 47 Social Welfare 2022'),
+  ('TN-MAKKALAI-THEDI', 'Directorate of Public Health 2021'),
+  ('TN-FREE-BUS-PASS', 'GO Ms No 1 Transport 2021'),
+  ('TN-PM-KISAN', 'PM-Kisan Operational Guidelines 2019'),
+  ('TN-NIRP-PENSION', 'National Social Assistance Programme Guidelines'),
+  ('TN-DISABILITY-PENSION', 'Welfare of Differently Abled Persons Department Guidelines'),
+  ('TN-AMMA-UNAVAGAM', 'Greater Chennai Corporation / MAWS Orders'),
+  ('TN-PATTA-CHITTA', 'Directorate of Survey and Settlement'),
+  ('TN-AMMA-BABY-CARE', 'Health and Family Welfare Department Orders')
+) AS v(scheme_code, source_document_ref)
+WHERE sc.scheme_code = v.scheme_code;
+
+-- ── 8. Services (10 curated e-Sevai services) ───────────────
 INSERT INTO services.service (
   service_id, service_code, service_name, name_ta, description,
   department_id, category, government_fee, service_charge, processing_time,
@@ -375,3 +443,19 @@ INSERT INTO system.dataset_registry (
    'Audited revenue and vital statistics citizen services with official fee and turnaround standards')
 ON CONFLICT (source_id, checksum_sha256) DO NOTHING;
 
+
+-- ── 10. Advance serial sequences past the explicit ids inserted above ──────────
+-- Without this the first application-created row (e.g. a new department) would
+-- collide with a seeded id. Never moves a sequence backwards.
+SELECT setval(pg_get_serial_sequence('administration.state', 'state_id'),
+              GREATEST((SELECT max(state_id) FROM administration.state),
+                       (SELECT last_value FROM administration.state_state_id_seq)));
+SELECT setval(pg_get_serial_sequence('administration.district', 'district_id'),
+              GREATEST((SELECT max(district_id) FROM administration.district),
+                       (SELECT last_value FROM administration.district_district_id_seq)));
+SELECT setval(pg_get_serial_sequence('administration.department', 'department_id'),
+              GREATEST((SELECT max(department_id) FROM administration.department),
+                       (SELECT last_value FROM administration.department_department_id_seq)));
+SELECT setval(pg_get_serial_sequence('complaints.complaint_category', 'category_id'),
+              GREATEST((SELECT max(category_id) FROM complaints.complaint_category),
+                       (SELECT last_value FROM complaints.complaint_category_category_id_seq)));
