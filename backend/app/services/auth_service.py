@@ -15,9 +15,15 @@ from app.security.jwt import (
 logger = structlog.get_logger(__name__)
 
 
+MAX_FAILED_LOGINS = 5
+LOCKOUT_MINUTES = 15
+
+
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        # why the last login() returned None: unknown_user | inactive | locked | bad_password
+        self.last_failure: Optional[str] = None
 
     async def register(self, data: RegisterRequest) -> UserOut:
         # Check email uniqueness
@@ -65,19 +71,29 @@ class AuthService:
         result = await self.db.execute(
             text("""
                 SELECT u.user_id, u.email, u.password_hash, u.role, u.status,
-                       c.citizen_id, c.name AS full_name
+                       c.citizen_id, c.name AS full_name,
+                       (u.failed_logins >= :max_failed
+                        AND u.updated_at > now() - make_interval(mins => :lock_min)) AS locked
                 FROM identity.app_user u
                 LEFT JOIN identity.citizen c ON c.user_id = u.user_id
                 WHERE u.email = :email
             """),
-            {"email": email},
+            {"email": email, "max_failed": MAX_FAILED_LOGINS, "lock_min": LOCKOUT_MINUTES},
         )
         row = result.fetchone()
+        self.last_failure = None
         if not row:
+            self.last_failure = "unknown_user"
             return None
-        user_id, email_, pwd_hash, role, status, citizen_id, full_name = row
+        user_id, email_, pwd_hash, role, status, citizen_id, full_name, locked = row
 
         if status != "active":
+            self.last_failure = "inactive"
+            return None
+        if locked:
+            # Temporary lockout: no password check (no oracle) and no counter increment, so the
+            # lock lapses LOCKOUT_MINUTES after the last failed attempt.
+            self.last_failure = "locked"
             return None
         if not verify_password(password, pwd_hash):
             await self.db.execute(
@@ -85,6 +101,7 @@ class AuthService:
                 {"uid": user_id},
             )
             await self.db.commit()
+            self.last_failure = "bad_password"
             return None
 
         token_data = {"sub": str(user_id), "role": role}

@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -15,6 +15,7 @@ from app.services.complaint_service import (
     ComplaintForbidden, ComplaintNotFound, ComplaintService, InvalidTransition,
 )
 from app.security.dependencies import get_current_user, require_role
+from app.services import audit
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -22,6 +23,7 @@ router = APIRouter()
 
 @router.post("", response_model=ComplaintOut, status_code=201)
 async def submit_complaint(
+    request: Request,
     data: ComplaintCreate,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -29,9 +31,13 @@ async def submit_complaint(
     """Submit a new civic complaint."""
     service = ComplaintService(db)
     try:
-        return await service.submit(data, current_user.user_id)
+        out = await service.submit(data, current_user.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    await audit.record(db, action="COMPLAINT_SUBMITTED", entity_type="complaint", entity_id=out.reference_number,
+                       user=current_user, request=request,
+                       new={"status": out.status, "assignment_state": out.assignment_state, "anonymous": data.is_anonymous})
+    return out
 
 
 @router.get("/track/{reference}", response_model=ComplaintTrack)
@@ -79,6 +85,7 @@ async def get_complaint(
 
 @router.patch("/{complaint_id}/status")
 async def update_status(
+    request: Request,
     complaint_id: UUID,
     data: ComplaintStatusUpdate,
     db: AsyncSession = Depends(get_db),
@@ -87,13 +94,18 @@ async def update_status(
     """Update complaint status (officer/admin only)."""
     service = ComplaintService(db)
     try:
-        return await service.update_status(complaint_id, data, current_user)
+        out = await service.update_status(complaint_id, data, current_user)
     except ComplaintNotFound as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except InvalidTransition as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        await audit.record(db, action="COMPLAINT_STATUS_REJECTED", entity_type="complaint", entity_id=str(complaint_id),
+                           user=current_user, request=request, new={"requested": data.new_status}, outcome="failure")
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    await audit.record(db, action="COMPLAINT_STATUS_CHANGED", entity_type="complaint", entity_id=str(complaint_id),
+                       user=current_user, request=request, new={"new_status": data.new_status})
+    return out
 
 
 @router.post("/{complaint_id}/evidence")

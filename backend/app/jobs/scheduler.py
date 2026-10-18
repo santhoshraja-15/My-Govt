@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.core.database import AsyncSessionLocal
 from app.core.logging import setup_logging
+from app.services import audit
 from app.services import complaint_rules as rules
 
 setup_logging()
@@ -54,6 +55,8 @@ async def escalate_overdue_complaints(session_factory=None) -> int:
                 """),
                 {"cid": row.complaint_id, "aid": row.authority_id},
             )
+            await audit.record(db, action="COMPLAINT_ESCALATED", entity_type="complaint", entity_id=str(row.complaint_id),
+                               new={"trigger": "sla_scheduler"}, commit=False)
         await db.commit()
         if overdue:
             logger.info("Escalated overdue complaints", count=len(overdue))

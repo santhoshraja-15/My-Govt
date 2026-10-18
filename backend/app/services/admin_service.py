@@ -258,6 +258,9 @@ class AdminService:
             return {"columns": columns, "rows": serialized, "row_count": len(serialized)}
         except Exception as e:
             return {"error": str(e)}
+        finally:
+            # end the READ ONLY transaction so later writes in this request (e.g. the audit row) work
+            await self.db.rollback()
 
     async def list_datasets(self) -> list:
         try:

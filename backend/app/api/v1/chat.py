@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationOut
+from app.security.ratelimit import chat_limiter, rate_limit
 from app.services.chat_service import ChatService
 from app.security.dependencies import get_current_user_optional
 
@@ -14,7 +15,8 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/message", response_model=ChatResponse)
+@router.post("/message", response_model=ChatResponse,
+             dependencies=[Depends(rate_limit(chat_limiter, "chat"))])
 async def chat_message(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),

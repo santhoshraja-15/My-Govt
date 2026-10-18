@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 
 import httpx
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -12,6 +13,16 @@ from app.main import app
 from app.security.jwt import create_access_token, hash_password
 
 PASSWORD = "Str0ng-test-pass"
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters():
+    """Limiters are process-global; isolate tests from each other."""
+    from app.security import ratelimit
+
+    for lim in (ratelimit.login_limiter, ratelimit.register_limiter, ratelimit.chat_limiter):
+        lim.reset()
+    yield
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
