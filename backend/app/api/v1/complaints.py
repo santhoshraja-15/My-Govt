@@ -12,7 +12,7 @@ from app.schemas.complaints import (
     ComplaintListResponse, ComplaintStatusUpdate, ComplaintTrack,
 )
 from app.services.complaint_service import (
-    ComplaintForbidden, ComplaintNotFound, ComplaintService, InvalidTransition,
+    ComplaintForbidden, ComplaintNotFound, ComplaintService, EvidenceStorageUnavailable, InvalidTransition,
 )
 from app.security.dependencies import get_current_user, require_role
 from app.services import audit
@@ -117,7 +117,16 @@ async def upload_evidence(
 ):
     """Upload evidence for a complaint."""
     service = ComplaintService(db)
-    return await service.upload_evidence(complaint_id, file, current_user)
+    try:
+        return await service.upload_evidence(complaint_id, file, current_user)
+    except ComplaintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=415 if "not allowed" in str(e) else 413, detail=str(e)) from e
+    except EvidenceStorageUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.get("/categories/list")

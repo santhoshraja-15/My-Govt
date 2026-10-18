@@ -78,7 +78,7 @@ class AdminService:
         return overview
 
     async def get_connection_status(self) -> dict:
-        health = await get_health_status()
+        health = await get_health_status(detailed=True)
         # Enrich with extension info
         try:
             ext_result = await self.db.execute(text(

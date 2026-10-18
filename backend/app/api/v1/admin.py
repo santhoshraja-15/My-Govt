@@ -10,13 +10,14 @@ from app.security.dependencies import require_role
 from app.services import audit
 
 router = APIRouter()
-admin_dep = require_role(["system_admin", "state_admin", "data_steward"])
+# roles must exist in identity.app_user's CHECK constraint ('data_steward' did not and could never match)
+admin_dep = require_role(["system_admin", "state_admin"])
 
 
 # ── Health & Overview ─────────────────────────────────────────
 @router.get("/health")
-async def admin_health():
-    return await get_health_status()
+async def admin_health(_=Depends(admin_dep)):
+    return await get_health_status(detailed=True)
 
 
 @router.get("/overview")

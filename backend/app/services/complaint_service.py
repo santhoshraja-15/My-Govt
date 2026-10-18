@@ -37,6 +37,10 @@ class InvalidTransition(ValueError):
     pass
 
 
+class EvidenceStorageUnavailable(RuntimeError):
+    pass
+
+
 _HISTORY_COLS = ["changed_at", "old_status", "new_status", "remarks", "changed_by_role"]
 
 
@@ -340,13 +344,21 @@ class ComplaintService:
         return {"status": "updated", "new_status": data.new_status}
 
     async def upload_evidence(self, complaint_id: UUID, file, user) -> dict:
+        """Authorise and validate the upload. Object storage is not wired yet, so a valid upload is refused with
+        EvidenceStorageUnavailable: the caller must never be told a file was saved when it was not."""
+        owner = (await self.db.execute(
+            text("SELECT citizen_id FROM complaints.complaint WHERE complaint_id = :cid"), {"cid": complaint_id})).fetchone()
+        if owner is None:
+            raise ComplaintNotFound("Complaint not found")
+        if not rules.can_view_complaint(getattr(user, "role", ""), getattr(user, "citizen_id", None), owner.citizen_id):
+            raise ComplaintForbidden("You may only add evidence to your own complaints")
         allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf",
                          "audio/mpeg", "audio/wav", "video/mp4"}
         if file.content_type not in allowed_types:
             raise ValueError(f"File type {file.content_type} not allowed")
         if file.size and file.size > 50 * 1024 * 1024:
             raise ValueError("File too large (max 50MB)")
-        return {"message": "Evidence upload requires MinIO configuration", "filename": file.filename}
+        raise EvidenceStorageUnavailable("Evidence storage is not configured on this server; your file was NOT saved.")
 
     async def get_categories(self) -> list:
         r = await self.db.execute(
