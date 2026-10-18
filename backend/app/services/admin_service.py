@@ -281,10 +281,16 @@ class AdminService:
             count_r = await self.db.execute(text("SELECT count(*) FROM audit.audit_log"))
             total = count_r.scalar() or 0
             result = await self.db.execute(text("""
-                SELECT log_id, actor_id, actor_role, action, entity_type,
-                       entity_id, created_at, ip_address
+                SELECT audit_id AS log_id,
+                       user_id AS actor_id,
+                       user_role AS actor_role,
+                       action,
+                       entity_type,
+                       entity_id,
+                       occurred_at AS created_at,
+                       ip_address
                 FROM audit.audit_log
-                ORDER BY created_at DESC
+                ORDER BY occurred_at DESC
                 LIMIT :lim OFFSET :off
             """), {"lim": limit, "off": offset})
             cols = list(result.keys())

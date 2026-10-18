@@ -128,7 +128,11 @@ INSERT INTO administration.department (
   (14, 'HHSS', 'Highways and Minor Ports Department', 'நெடுஞ்சாலைகள் மற்றும் சிறு துறைமுகங்கள் துறை', 'Highways',
    'State highway maintenance and port infrastructure', 'https://www.highways.tn.gov.in', 'active', 'official_verified', 'Highways Secretariat'),
   (15, 'ADTR', 'Adi Dravidar and Tribal Welfare', 'ஆதிதிராவிடர் மற்றும் பழங்குடியினர் நலத்துறை', 'AdiDravidar',
-   'Hostels, scholarships, and housing for SC/ST citizens', 'https://www.adidravidar.gov.in', 'active', 'official_verified', 'ADTW Directorate')
+   'Hostels, scholarships, and housing for SC/ST citizens', 'https://www.adidravidar.gov.in', 'active', 'official_verified', 'ADTW Directorate'),
+  (16, 'CTRG', 'Commercial Taxes and Registration Department', 'வணிக வரிகள் மற்றும் பதிவுத் துறை', 'Registration',
+   'Property registration, stamps, encumbrance certificates', 'https://tnreginet.gov.in', 'active', 'official_verified', 'Registration Dept'),
+  (17, 'FCPD', 'Food, Civil Supplies and Consumer Protection', 'உணவு மற்றும் நுகர்வோர் பாதுகாப்புத் துறை', 'CivilSupplies',
+   'Public distribution system, smart ration cards, consumer rights', 'https://www.tnpds.gov.in', 'active', 'official_verified', 'Civil Supplies Dept')
 ON CONFLICT (department_code) DO UPDATE SET
   department_name = EXCLUDED.department_name,
   name_ta = EXCLUDED.name_ta,
@@ -200,7 +204,7 @@ INSERT INTO schemes.scheme (
   ('b0000001-0000-0000-0000-000000000003', 'TN-CM-HEALTH-INS', 'Chief Minister Comprehensive Health Insurance (CMCHIS)',
    'முதலமைச்சரின் விரிவான மருத்துவக் காப்பீட்டுத் திட்டம்',
    'Cashless medical cover up to Rs.5 lakh per family per year for approved treatments.',
-   'Universal health protection program providing cashless hospital care across empaneled public and private hospitals for 1,000+ medical and surgical procedures.',
+   'Universal health protection program providing cashless hospital care across empaneled public and private hospitals for 1,000+ medical and surgical procedures. Converged with Ayushman Bharat (AB-PMJAY) for eligible families (60:40 central:state share); state-only expanded families are 100% state funded.',
    2, 1, 'state', 'health_insurance', 'Up to Rs.5,00,000 cashless insurance per family/year',
    'https://www.cmchistn.com', 'https://www.cmchistn.com', 'active', '2012-01-11', now(), 'Health Dept / United India',
    '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000011'),
@@ -240,7 +244,7 @@ INSERT INTO schemes.scheme (
   ('b0000001-0000-0000-0000-000000000008', 'TN-NIRP-PENSION', 'Indira Gandhi National Old Age Pension Scheme (IGNOAPS / OAP)',
    'இந்திரா காந்தி தேசிய முதியோர் ஓய்வூதியத் திட்டம்',
    'Monthly social security pension of Rs.1,000 to destitute elderly persons aged 60 and above below poverty line.',
-   'Jointly funded social safety net program combining Central National Social Assistance Programme (NSAP) allocation with Tamil Nadu state treasury top-up.',
+   'Jointly funded social safety net program combining fixed Central NSAP allocation (Rs.200/month for age 60-79, Rs.500/month for age 80+) with Tamil Nadu state treasury top-up (Rs.800/Rs.500) to deliver Rs.1,000/month total pension.',
    5, 1, 'state', 'social_security', 'Rs.1,000 monthly pension deposited to beneficiary account',
    'https://www.socialwelfare.tn.gov.in', 'https://www.socialwelfare.tn.gov.in', 'active', '2007-11-19', now(), 'Social Welfare / NSAP Guidelines',
    'Centrally Sponsored (60:40)', 'official_verified', 'a0000001-0000-0000-0000-000000000007'),
@@ -314,11 +318,11 @@ INSERT INTO services.service (
 
   ('c0000001-0000-0000-0000-000000000006', 'SVC-ENCUMB-CERT', 'Encumbrance Certificate (EC)',
    'வில்லங்கச் சான்றிதழ்', 'Official report of registered property transactions and liabilities over a defined period.',
-   1, 'land_record', 100.00, 60.00, '3 days', 'active', 'https://tnreginet.gov.in', 'https://tnreginet.gov.in', 'official_verified', 'Registration Dept'),
+   16, 'land_record', 100.00, 60.00, '3 days', 'active', 'https://tnreginet.gov.in', 'https://tnreginet.gov.in', 'official_verified', 'Registration Dept'),
 
   ('c0000001-0000-0000-0000-000000000007', 'SVC-RATION-SMART', 'Smart Ration Card Application',
    'புதிய மின்னணு குடும்ப அட்டை', 'Apply for newly married/split household digital NFSA Smart Family Card.',
-   1, 'civil_supplies', 0.00, 60.00, '30 days', 'active', 'https://www.tnpds.gov.in', 'https://www.tnpds.gov.in', 'official_verified', 'Civil Supplies Dept'),
+   17, 'civil_supplies', 0.00, 60.00, '30 days', 'active', 'https://www.tnpds.gov.in', 'https://www.tnpds.gov.in', 'official_verified', 'Civil Supplies Dept'),
 
   ('c0000001-0000-0000-0000-000000000008', 'SVC-BIRTH-CERT', 'Birth Certificate Issuance',
    'பிறப்பு சான்றிதழ் நகல் பெற', 'Official birth extract issuance from civil registration system maintained by local body.',
@@ -340,6 +344,7 @@ ON CONFLICT (service_code, department_id) DO UPDATE SET
   verification_status = EXCLUDED.verification_status;
 
 -- ── 9. Dataset Registry (Real Audited Provenance Entries) ─────────────
+-- Audited SHA-256 checksums matching data/validated/ and data/raw/official/ datasets
 INSERT INTO system.dataset_registry (
   dataset_id, source_id, dataset_name, file_name, file_format,
   download_date, record_count, version, checksum_sha256, processing_status,
@@ -349,7 +354,7 @@ INSERT INTO system.dataset_registry (
    'a0000001-0000-0000-0000-000000000001',
    'Tamil Nadu Administrative Districts Master 2026',
    'tn_districts_master_2026.json',
-   'JSON', now(), 38, '2026.1', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+   'JSON', now(), 38, '2026.1', 'f90ade2ac448d001edd0c872b702866366f30f862565aa6ffe188a52db9863d6',
    'validated', 'official_verified', 100.00, 100.00, 100.00, 100.00,
    'Audited complete list of 38 Tamil Nadu districts with headquarters and bilingual Tamil naming'),
 
@@ -357,7 +362,7 @@ INSERT INTO system.dataset_registry (
    'a0000001-0000-0000-0000-000000000002',
    'Tamil Nadu Official Schemes & Welfare Registry',
    'tn_schemes_verified_2026.json',
-   'JSON', now(), 12, '2026.1', 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0',
+   'JSON', now(), 12, '2026.1', '951b949dbf43cbdfe35b828717ce8250cc4cc085cdf25005cdd237cfee0fcc19',
    'validated', 'official_verified', 95.00, 98.00, 96.00, 100.00,
    'Verified major state welfare schemes with central scheme demarcation and funding patterns'),
 
@@ -365,7 +370,8 @@ INSERT INTO system.dataset_registry (
    'a0000001-0000-0000-0000-000000000005',
    'Tamil Nadu e-Sevai Citizen Services Catalog',
    'tnega_esevai_services_2026.json',
-   'JSON', now(), 10, '2026.1', 'f0e1d2c3b4a5968778695a4b3c2d1e0f0123456789abcdef0123456789abcdef',
+   'JSON', now(), 10, '2026.1', '454c9a9e54f659eb090fffc5fde02abf239f744ba6f35a1b5558444966fdb809',
    'validated', 'official_verified', 95.00, 95.00, 98.00, 100.00,
    'Audited revenue and vital statistics citizen services with official fee and turnaround standards')
 ON CONFLICT (source_id, checksum_sha256) DO NOTHING;
+

@@ -22,7 +22,10 @@ VALUES (1, 'TN', 'Tamil Nadu', 'தமிழ்நாடு')
 ON CONFLICT DO NOTHING;
 
 -- ── Districts (all 38 districts of Tamil Nadu) ─────────────────
-INSERT INTO administration.district (district_id, state_id, district_code, district_name, district_name_ta, headquarters) VALUES
+-- NOTE: 'headquarters' column is added by migration 002_provenance_and_audit_fixes.sql.
+-- This seed must be applied AFTER that migration when both columns are needed.
+-- If running on bare schema only, omit the 'headquarters' column and its values.
+INSERT INTO administration.district (district_id, state_id, district_code, district_name, name_ta, headquarters) VALUES
   (1,  1,'TN-CHN','Chennai',      'சென்னை',       'Chennai'),
   (2,  1,'TN-CBE','Coimbatore',   'கோயம்புத்தூர்', 'Coimbatore'),
   (3,  1,'TN-MDU','Madurai',      'மதுரை',         'Madurai'),

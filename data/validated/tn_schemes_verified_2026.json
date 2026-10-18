@@ -102,5 +102,58 @@
     "status": "active",
     "verification_status": "official_verified",
     "source_reference": "National Social Assistance Programme Guidelines"
+  },
+  {
+    "scheme_code": "TN-DISABILITY-PENSION",
+    "scheme_name": "Disability Pension Scheme (Differently Abled Welfare)",
+    "name_ta": "மாற்றுத்திறனாளிகள் மாதாந்திர பராமரிப்பு உதவித்தொகை",
+    "scheme_level": "state",
+    "funding_pattern": "100% State",
+    "department": "Social Welfare & Women Empowerment",
+    "target_group": "Persons with benchmark disability of 40% and above",
+    "official_url": "https://www.socialwelfare.tn.gov.in",
+    "status": "active",
+    "verification_status": "official_verified",
+    "source_reference": "Welfare of Differently Abled Persons Department Guidelines"
+  },
+  {
+    "scheme_code": "TN-AMMA-UNAVAGAM",
+    "scheme_name": "Amma Unavagam (Subsidized Canteens)",
+    "name_ta": "அம்மா உணவகம்",
+    "scheme_level": "state",
+    "funding_pattern": "100% State",
+    "department": "Municipal Administration and Water Supply",
+    "target_group": "Urban daily wage earners and underprivileged citizens",
+    "official_url": "https://www.tn.gov.in",
+    "status": "active",
+    "verification_status": "official_verified",
+    "source_reference": "Greater Chennai Corporation / MAWS Orders"
+  },
+  {
+    "scheme_code": "TN-PATTA-CHITTA",
+    "scheme_name": "Anytime Anywhere Land Records (e-Services)",
+    "name_ta": "நில ஆவண இணைய வழி சேவைகள் (பட்டா / சிட்டா)",
+    "scheme_level": "state",
+    "funding_pattern": "100% State",
+    "department": "Revenue and Disaster Management Department",
+    "target_group": "Landowners and property buyers in Tamil Nadu",
+    "official_url": "https://eservices.tn.gov.in",
+    "status": "active",
+    "verification_status": "official_verified",
+    "source_reference": "Directorate of Survey and Settlement"
+  },
+  {
+    "scheme_code": "TN-AMMA-BABY-CARE",
+    "scheme_name": "Amma Baby Care Kit",
+    "name_ta": "அம்மா குழந்தை பராமரிப்பு பெட்டகம்",
+    "scheme_level": "state",
+    "funding_pattern": "100% State",
+    "department": "Health and Family Welfare Department",
+    "target_group": "Newborn mothers delivering in government medical institutions",
+    "official_url": "https://www.tnhealth.tn.gov.in",
+    "status": "active",
+    "verification_status": "official_verified",
+    "source_reference": "Health and Family Welfare Department Orders"
   }
 ]
+

@@ -35,7 +35,9 @@ class GISService:
     async def get_districts(self) -> list:
         r = await self.db.execute(
             text("""
-                SELECT district_id, district_code, district_name, district_name_ta, headquarters
+                SELECT district_id, district_code, district_name,
+                       name_ta AS district_name_ta,
+                       headquarters
                 FROM administration.district ORDER BY district_name
             """)
         )
@@ -44,7 +46,14 @@ class GISService:
 
     async def get_taluks(self, district_id: int) -> list:
         r = await self.db.execute(
-            text("SELECT taluk_id, taluk_name, taluk_name_ta FROM administration.taluk WHERE district_id = :did ORDER BY taluk_name"),
+            text("""
+                SELECT taluk_id,
+                       name  AS taluk_name,
+                       name_ta AS taluk_name_ta
+                FROM administration.taluk
+                WHERE district_id = :did
+                ORDER BY name
+            """),
             {"did": district_id},
         )
         cols = list(r.keys())

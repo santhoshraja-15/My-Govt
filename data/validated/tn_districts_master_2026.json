@@ -24,7 +24,7 @@
   {"district_id": 23, "district_code": "TN-THN", "district_name": "Theni", "name_ta": "தேனி", "headquarters": "Theni", "lgd_code": 587, "revenue_divisions": 2, "taluks": 5},
   {"district_id": 24, "district_code": "TN-KRI", "district_name": "Krishnagiri", "name_ta": "கிருஷ்ணகிரி", "headquarters": "Krishnagiri", "lgd_code": 574, "revenue_divisions": 2, "taluks": 8},
   {"district_id": 25, "district_code": "TN-DPI", "district_name": "Dharmapuri", "name_ta": "தர்மபுரி", "headquarters": "Dharmapuri", "lgd_code": 566, "revenue_divisions": 2, "taluks": 7},
-  {"district_id": 26, "district_code": "TN-TVM", "district_name": "Tiruvannamalai", "name_ta": "திருவண்ணாமலை", "headquarters": "Tiruvannamalai", "lgd_code": 589, "revenue_divisions": 3, "taluks": 12},
+  {"district_id": 26, "district_code": "TN-TVM", "district_name": "Tiruvannamalai", "name_ta": "திருவண்ணாமலை", "headquarters": "Tiruvannamalai", "lgd_code": 583, "revenue_divisions": 3, "taluks": 12},
   {"district_id": 27, "district_code": "TN-NKL", "district_name": "Namakkal", "name_ta": "நாமக்கல்", "headquarters": "Namakkal", "lgd_code": 578, "revenue_divisions": 2, "taluks": 8},
   {"district_id": 28, "district_code": "TN-KRR", "district_name": "Karur", "name_ta": "கரூர்", "headquarters": "Karur", "lgd_code": 573, "revenue_divisions": 2, "taluks": 7},
   {"district_id": 29, "district_code": "TN-ARI", "district_name": "Ariyalur", "name_ta": "அரியலூர்", "headquarters": "Ariyalur", "lgd_code": 561, "revenue_divisions": 2, "taluks": 4},

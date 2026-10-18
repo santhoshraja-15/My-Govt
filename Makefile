@@ -26,15 +26,26 @@ migrate-down:
 migrate-status:
 	docker compose exec backend alembic current
 
-# Run schema directly (first-time setup)
+# Run base schema only (no provenance columns — do NOT seed yet)
 schema:
 	docker compose exec -T postgres psql -U postgres -d mygovt < database/schema/001_schema.sql
+
+# Apply raw SQL migrations (002 adds headquarters, lgd_code, verification_status etc.)
+migrate-sql:
+	docker compose exec -T postgres psql -U postgres -d mygovt < database/migrations/002_provenance_and_audit_fixes.sql
+
+# Full first-time database initialisation in correct dependency order:
+#   1. Base schema (001_schema.sql)      → tables, functions, triggers
+#   2. Migration 002                     → provenance columns seeds depend on
+#   3. Seed data (via scripts/seed.py)   → districts, departments, schemes, services
+db-init: schema migrate-sql seed
 
 seed:
 	docker compose exec backend python -m scripts.seed
 
 seed-synthetic:
 	docker compose exec backend python -m scripts.synth_data
+
 
 # ── AI / Data ────────────────────────────────────────────────
 embed:

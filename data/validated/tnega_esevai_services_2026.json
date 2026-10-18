@@ -94,5 +94,30 @@
     "sla_days": 15,
     "portal_url": "https://www.esevai.tn.gov.in",
     "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-BIRTH-CERT",
+    "service_name": "Birth Certificate Issuance",
+    "name_ta": "பிறப்பு சான்றிதழ் நகல் பெற",
+    "department": "Municipal Administration and Water Supply / CRS",
+    "category": "vital_statistics",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 3,
+    "portal_url": "https://www.crstn.org",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-DEATH-CERT",
+    "service_name": "Death Certificate Issuance",
+    "name_ta": "இறப்பு சான்றிதழ் நகல் பெற",
+    "department": "Municipal Administration and Water Supply / CRS",
+    "category": "vital_statistics",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 3,
+    "portal_url": "https://www.crstn.org",
+    "verification_status": "official_verified"
   }
 ]
+
