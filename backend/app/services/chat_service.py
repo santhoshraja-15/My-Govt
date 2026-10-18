@@ -30,6 +30,9 @@ _INTENT_PATTERNS = {
 
 def _classify_intent(message: str) -> str:
     msg_lower = message.lower()
+    # "am I eligible ..." is more specific than the generic scheme words that also match it, so it wins ties
+    if any(kw.lower() in msg_lower for kw in _INTENT_PATTERNS["eligibility_check"]):
+        return "eligibility_check"
     scores: dict[str, int] = {}
     for intent, keywords in _INTENT_PATTERNS.items():
         scores[intent] = sum(1 for kw in keywords if kw.lower() in msg_lower)
