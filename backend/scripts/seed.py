@@ -219,7 +219,7 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
         db_status = {r["scheme_code"]: r["verification_status"] for r in await conn.fetch(
             "SELECT scheme_code, verification_status FROM schemes.scheme")}
         bad = [s["scheme_code"] for s in schemes
-               if STATUS_RANK.get(db_status.get(s["scheme_code"]), -1) > STATUS_RANK.get(s["verification_status"], -1)]
+               if STATUS_RANK.get(db_status.get(s["scheme_code"], ""), -1) > STATUS_RANK.get(s["verification_status"], -1)]
         add("no scheme is more verified in the DB than in the validated JSON", not bad,
             f"over-claimed: {bad}" if bad else "")
 

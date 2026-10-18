@@ -56,8 +56,16 @@ seed-verify:
 db-verify:
 	docker compose exec backend sh -c 'python -m scripts.db_verify --admin-dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres'
 
+# Synthetic (fake) citizens/complaints for DEVELOPMENT ONLY. Refuses the real 'mygovt' database:
+# create a separate one first, e.g.  make synth-db SYNTH_DB=mygovt_dev
+SYNTH_DB ?= mygovt_dev
+synth-db:
+	docker compose exec -T postgres psql -U postgres -c "CREATE DATABASE $(SYNTH_DB)" || true
+	for f in database/schema/001_schema.sql database/migrations/[0-9][0-9][0-9]_*.sql; do docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d $(SYNTH_DB) < $$f || exit 1; done
+	docker compose exec backend sh -c 'python -m scripts.seed --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$(SYNTH_DB)'
+
 seed-synthetic:
-	docker compose exec backend python -m scripts.synth_data
+	docker compose exec backend sh -c 'python -m scripts.synth_data --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$(SYNTH_DB) --seed $${SEED:-42} --citizens $${CITIZENS:-50} --complaints $${COMPLAINTS:-200}'
 
 
 # ── AI / Data ────────────────────────────────────────────────
