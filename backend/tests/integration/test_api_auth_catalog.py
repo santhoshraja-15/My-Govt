@@ -144,9 +144,10 @@ async def test_service_catalogue(client):
     body = r.json()
     assert body["total"] == 10
     assert {i["verification_status"] for i in body["items"]} == {"provisional"}
+    assert all(i["charges_verified"] is False for i in body["items"])     # fees/timing unconfirmed until verified
     item = body["items"][0]
     d = (await client.get(f"{API}/services/{item['service_id']}")).json()
-    assert d["service_id"] == item["service_id"] and "requirements" in d
+    assert d["service_id"] == item["service_id"] and "requirements" in d and d["charges_verified"] is False
     assert (await client.get(f"{API}/services", params={"verification_status": "official_verified"})).json()["total"] == 0
     assert (await client.get(f"{API}/services/00000000-0000-0000-0000-000000000000")).status_code == 404
 

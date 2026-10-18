@@ -22,9 +22,17 @@ function ServiceCard({ svc }: { svc: any }) {
         {svc.description && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{svc.description}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
           {svc.department_name && <span className="badge badge-blue">{svc.department_name}</span>}
-          {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
-          {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
-          {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
+          {svc.charges_verified ? (
+            <>
+              {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
+              {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
+              {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
+            </>
+          ) : (
+            <span className="badge badge-yellow" data-testid="charges-unconfirmed" title="Fees and processing time for this service have not been verified against an official source">
+              Fees &amp; timing unconfirmed
+            </span>
+          )}
           <VerificationBadge status={svc.verification_status} />
         </div>
       </div>

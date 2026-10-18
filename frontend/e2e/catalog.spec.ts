@@ -56,6 +56,10 @@ test.describe("citizen services", () => {
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
     expect(statuses.length).toBeGreaterThan(0);
     for (const s of statuses) expect(s).toBe("provisional");
+    // fees / processing times are unverified, so they must NOT be shown as facts (previously "Free" / "15 days")
+    await expect(page.getByTestId("charges-unconfirmed").first()).toBeVisible();
+    const text = await page.getByTestId("service-card").first().innerText();
+    expect(text).not.toMatch(/Free|₹|days/);
     await page.getByPlaceholder("Search services…").fill("Ration Card");
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page.getByTestId("service-card")).toHaveCount(1);

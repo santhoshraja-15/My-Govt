@@ -31,6 +31,9 @@ class ServiceListItem(BaseModel):
     # Only 'official_verified' may be presented as verified information.
     verification_status: str = "provisional"
     source_document_ref: Optional[str] = None
+    # False until the service is official_verified: government_fee / service_charge / processing_time are then
+    # unconfirmed and must not be presented to citizens as facts (e.g. never shown as "Free").
+    charges_verified: bool = False
 
     class Config:
         from_attributes = True

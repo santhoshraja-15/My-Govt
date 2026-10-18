@@ -145,7 +145,8 @@ class ServiceService:
                        d.department_name, s.category, s.government_fee::float AS government_fee,
                        s.service_charge::float AS service_charge,
                        s.processing_time, s.status,
-                       s.verification_status, s.source_document_ref
+                       s.verification_status, s.source_document_ref,
+                       (s.verification_status = 'official_verified') AS charges_verified
                 FROM services.service s
                 LEFT JOIN administration.department d ON d.department_id = s.department_id
                 WHERE {where} ORDER BY s.service_name LIMIT :lim OFFSET :off
@@ -164,6 +165,7 @@ class ServiceService:
                        s.service_charge::float AS service_charge,
                        s.processing_time, s.status,
                        s.verification_status, s.source_document_ref,
+                       (s.verification_status = 'official_verified') AS charges_verified,
                        s.application_url, s.official_url AS official_source_url,
                        s.statutory_act_ref AS notes
                 FROM services.service s
