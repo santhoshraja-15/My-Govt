@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
+import { LangProvider } from "@/lib/i18n";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const metadata: Metadata = {
   title: {
@@ -30,7 +33,14 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
-      <body className="min-h-screen bg-slate-50">{children}</body>
+      <body className="min-h-screen bg-slate-50">
+        <LangProvider>
+          <AuthProvider>
+            <SiteHeader />
+            {children}
+          </AuthProvider>
+        </LangProvider>
+      </body>
     </html>
   );
 }

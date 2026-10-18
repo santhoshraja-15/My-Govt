@@ -35,6 +35,18 @@ async def test_admin_endpoints_work_for_state_admin(client, make_staff, path):
     assert r.status_code == 200, r.text
 
 
+async def test_overview_metrics_are_live_counts_excluding_synthetic(client, make_staff, conn):
+    _, h = await make_staff("state_admin")
+    body = (await client.get(f"{API}/admin/overview", headers=h)).json()
+    st = body["database_stats"]
+    assert st["schemes"] == 12 and st["services"] == 10 and st["districts"] == 38 and st["departments"] == 17
+    assert st["complaints_total"] == await conn.fetchval("SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic")
+    assert st["complaints_unassigned"] == await conn.fetchval(
+        "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND authority_id IS NULL AND status NOT IN ('resolved','closed','rejected')")
+    assert body["verification"]["schemes"].get("official_verified", 0) == 0
+    assert sum(body["verification"]["districts"].values()) == 38
+
+
 async def test_audit_log_retrieval_uses_real_columns(client, make_staff, conn):
     uid, h = await make_staff("state_admin")
     await conn.execute("INSERT INTO audit.audit_log (user_id, user_role, action, entity_type, entity_id, ip_address) "

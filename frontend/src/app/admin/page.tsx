@@ -8,12 +8,15 @@ import {
   Server, Cpu, HardDrive, Zap
 } from "lucide-react";
 import { admin as adminAPI } from "@/lib/api";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth";
+import { LoadingState } from "@/components/ui/AsyncState";
 
 // ── Sidebar items ──────────────────────────────────────────────
 const NAV_ITEMS = [
   { key: "overview",   icon: BarChart3, label: "Overview" },
   { key: "schemas",    icon: Database,  label: "Schema Explorer" },
-  { key: "query",      icon: Play,      label: "SQL Workspace" },
+  { key: "query",      icon: Play,      label: "SQL Workspace", systemOnly: true },
   { key: "datasets",   icon: HardDrive, label: "Datasets" },
   { key: "quality",    icon: Shield,    label: "Data Quality" },
   { key: "audit",      icon: Activity,  label: "Audit Logs" },
@@ -64,10 +67,24 @@ function OverviewPanel() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Records" value={stats.total_rows?.toLocaleString()} icon={Database} color="bg-brand-600" subtitle="Across all tables" />
-        <StatCard title="Active Schemes" value={stats.schemes_count} icon={BarChart3} color="bg-emerald-600" subtitle="Tamil Nadu" />
-        <StatCard title="Active Services" value={stats.services_count} icon={Zap} color="bg-amber-500" subtitle="e-Sevai" />
-        <StatCard title="Complaints" value={stats.complaints_count} icon={Activity} color="bg-rose-500" subtitle="All time" />
+        <StatCard title="Active Schemes" value={stats.schemes} icon={BarChart3} color="bg-emerald-600" subtitle="Live count" />
+        <StatCard title="Active Services" value={stats.services} icon={Zap} color="bg-amber-500" subtitle="Live count" />
+        <StatCard title="Complaints (real)" value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
+        <StatCard title="SLA target missed" value={stats.complaints_sla_breached} icon={AlertTriangle} color="bg-red-600" subtitle={`${stats.complaints_unassigned ?? "—"} without an authority`} />
+      </div>
+
+      <div className="card p-6" data-testid="verification-breakdown">
+        <h2 className="font-bold text-slate-900 mb-1">Verification status of catalogue records</h2>
+        <p className="text-xs text-slate-500 mb-4">Only <b>official_verified</b> records have a recorded source document. Everything else is provisional or external.</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+          {Object.entries(data?.verification || {}).map(([k, v]: any) => (
+            <div key={k}>
+              <p className="font-semibold capitalize">{k}</p>
+              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-400">unavailable</p>}
+            </div>
+          ))}
+        </div>
+        {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3">{stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.</p>}
       </div>
 
       {/* Service health */}
@@ -198,7 +215,7 @@ function SchemaExplorer() {
             <div className="card p-5">
               <h3 className="font-bold text-slate-900 mb-1">{selected}.{selectedTable}</h3>
               <p className="text-sm text-slate-500 mb-4">
-                {tableDetail.row_count_estimate?.toLocaleString()} rows · {tableDetail.columns?.length} columns
+                {tableDetail.estimated_rows?.toLocaleString()} rows (estimate) · {tableDetail.columns?.length} columns
               </p>
               <div className="overflow-x-auto">
                 <table className="data-table">
@@ -229,11 +246,11 @@ function SchemaExplorer() {
                     <tr>{sample.columns?.map((c: string) => <th key={c} className="whitespace-nowrap">{c}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {sample.rows.map((row: any[], ri: number) => (
+                    {sample.rows.map((row: Record<string, any>, ri: number) => (
                       <tr key={ri}>
-                        {row.map((cell, ci) => (
+                        {sample.columns.map((col: string, ci: number) => (
                           <td key={ci} className="max-w-xs truncate font-mono">
-                            {cell === null ? <span className="text-slate-300 italic">null</span> : String(cell)}
+                            {row[col] === null ? <span className="text-slate-300 italic">null</span> : String(row[col])}
                           </td>
                         ))}
                       </tr>
@@ -261,7 +278,7 @@ function SQLWorkspace() {
     setError("");
     try {
       const res = await adminAPI.query(sql);
-      setResult(res);
+      if (res.error) { setError(res.error); setResult(null); } else { setResult(res); }
     } catch (e: any) {
       setError(e.message || "Query failed");
       setResult(null);
@@ -271,7 +288,7 @@ function SQLWorkspace() {
 
   const EXAMPLES = [
     "SELECT count(*) FROM schemes.scheme WHERE status='active';",
-    "SELECT s.scheme_code, s.name, count(r.rule_id) as rule_count FROM schemes.scheme s LEFT JOIN schemes.eligibility_rule r ON r.scheme_id=s.scheme_id GROUP BY s.scheme_id ORDER BY rule_count DESC LIMIT 10;",
+    "SELECT s.scheme_code, s.scheme_name, count(r.rule_id) as rule_count FROM schemes.scheme s LEFT JOIN schemes.eligibility_rule r ON r.scheme_id=s.scheme_id GROUP BY s.scheme_id ORDER BY rule_count DESC LIMIT 10;",
     "SELECT c.status, count(*) FROM complaints.complaint c GROUP BY c.status;",
     "SELECT district_name, district_code FROM administration.district ORDER BY district_name;",
   ];
@@ -326,13 +343,13 @@ function SQLWorkspace() {
               <table className="data-table text-xs">
                 <thead><tr>{result.columns?.map((c: string) => <th key={c} className="whitespace-nowrap">{c}</th>)}</tr></thead>
                 <tbody>
-                  {result.rows.map((row: any[], i: number) => (
+                  {result.rows.map((row: Record<string, any>, i: number) => (
                     <tr key={i}>
-                      {row.map((cell, j) => (
+                      {result.columns.map((col: string, j: number) => { const cell = row[col]; return (
                         <td key={j} className="max-w-xs truncate font-mono">
                           {cell === null ? <span className="text-slate-300 italic">null</span> : String(cell)}
                         </td>
-                      ))}
+                      ); })}
                     </tr>
                   ))}
                 </tbody>
@@ -354,7 +371,7 @@ function AuditLogsPanel() {
 
   useEffect(() => {
     adminAPI.auditLogs(50, 0)
-      .then(res => setLogs(res.items || []))
+      .then(res => setLogs(res.rows || []))
       .catch(() => setLogs([]))
       .finally(() => setLoading(false));
   }, []);
@@ -377,13 +394,13 @@ function AuditLogsPanel() {
               </tr></thead>
               <tbody>
                 {logs.map((log: any) => (
-                  <tr key={log.audit_id}>
+                  <tr key={log.log_id}>
                     <td className="font-mono whitespace-nowrap">{new Date(log.created_at).toLocaleString("en-IN")}</td>
-                    <td className="font-mono">{log.actor_email || log.actor_id?.slice(0,8) || "system"}</td>
+                    <td className="font-mono">{log.actor_role ? `${log.actor_role} ` : ""}{log.actor_id?.slice(0,8) || (log.actor_role ? "" : "anonymous")}</td>
                     <td><span className="badge badge-blue">{log.action}</span></td>
-                    <td className="font-mono max-w-xs truncate">{log.resource_type} {log.resource_id?.slice(0,8)}</td>
+                    <td className="font-mono max-w-xs truncate">{log.entity_type} {log.entity_id?.slice(0,12)}</td>
                     <td>
-                      {log.outcome === "success"
+                      {log.outcome !== "failure"
                         ? <span className="badge badge-green">✓</span>
                         : <span className="badge badge-red">✗</span>}
                     </td>
@@ -502,7 +519,9 @@ function KnowledgeGraphPanel() {
 }
 
 // ── Main admin layout ──────────────────────────────────────────
-export default function AdminPage() {
+function AdminConsole() {
+  const { user } = useAuth();
+  const navItems = NAV_ITEMS.filter((n: any) => !n.systemOnly || user?.role === "system_admin");
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -539,7 +558,7 @@ export default function AdminPage() {
         </div>
 
         <nav className="flex-1 p-2 space-y-0.5">
-          {NAV_ITEMS.map(({ key, icon: Icon, label }) => (
+          {navItems.map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActive(key)}
               className={`admin-sidebar-item w-full ${active === key ? "active" : ""} ${collapsed ? "justify-center px-2" : ""}`}
               title={collapsed ? label : undefined}>
@@ -550,10 +569,10 @@ export default function AdminPage() {
         </nav>
 
         <div className="p-2 border-t border-slate-100">
-          <a href="/" className={`admin-sidebar-item w-full ${collapsed ? "justify-center px-2" : ""}`}>
+          <Link href="/" className={`admin-sidebar-item w-full ${collapsed ? "justify-center px-2" : ""}`}>
             <ChevronRight size={18} className="rotate-180 shrink-0" />
             {!collapsed && <span>Exit Admin</span>}
-          </a>
+          </Link>
         </div>
       </aside>
 
@@ -570,4 +589,27 @@ export default function AdminPage() {
       </main>
     </div>
   );
+}
+
+/** Route guard: only state/system administrators see the console; everyone else gets an explanation. */
+export default function AdminPage() {
+  const { user, loading, isAdmin } = useAuth();
+  if (loading) return <LoadingState />;
+  if (!user) {
+    return (
+      <main className="max-w-md mx-auto px-4 py-16 text-center" data-testid="admin-login-required">
+        <h1 className="text-xl font-bold mb-3">Administrator sign-in required</h1>
+        <Link href="/login?next=/admin" className="btn-primary">Sign in</Link>
+      </main>
+    );
+  }
+  if (!isAdmin) {
+    return (
+      <main className="max-w-md mx-auto px-4 py-16 text-center" data-testid="admin-forbidden">
+        <h1 className="text-xl font-bold mb-3">Access denied</h1>
+        <p className="text-slate-600">Your account does not have administrator permission.</p>
+      </main>
+    );
+  }
+  return <AdminConsole />;
 }

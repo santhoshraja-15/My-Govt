@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     MAX_RETRIEVAL_CHUNKS: int = 50
     MAX_CONTEXT_TOKENS: int = 6000
 
+    # Abuse protection (per client IP, per process)
+    RATE_LIMIT_LOGIN_PER_MIN: int = 10
+    RATE_LIMIT_REGISTER_PER_HOUR: int = 5
+    RATE_LIMIT_CHAT_PER_MIN: int = 30
+
     # Features
     FEATURE_VOICE: bool = False
     FEATURE_GRAPH: bool = True

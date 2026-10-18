@@ -28,6 +28,7 @@ interface Message {
   degraded?: boolean;
   intent?: string;
   suggested_actions?: string[];
+  contains_unverified?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -106,7 +107,12 @@ function MessageBubble({ msg }: { msg: Message }) {
               </div>
             )}
 
-            <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            {msg.contains_unverified && (
+              <div role="note" data-testid="unverified-notice" className="mb-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2.5 py-1.5">
+                Some of the sources below are provisional or external and have not been verified against an official document. Please confirm with the department.
+              </div>
+            )}
+            <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap" data-testid="assistant-answer">{msg.content}</p>
 
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <TrustIndicator score={msg.trust_score} />
@@ -175,6 +181,7 @@ export default function AssistantPage() {
         degraded: res.degraded,
         intent: res.intent,
         suggested_actions: res.suggested_actions,
+        contains_unverified: res.contains_unverified,
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
@@ -281,6 +288,7 @@ export default function AssistantPage() {
           <div className="flex gap-3 items-end">
             <textarea
               ref={inputRef}
+              aria-label="Ask a question"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -295,7 +303,7 @@ export default function AssistantPage() {
               }}
               disabled={loading}
             />
-            <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
+            <button onClick={() => sendMessage()} disabled={loading || !input.trim()} aria-label="Send message"
               className="btn-primary h-11 w-11 p-0 justify-center rounded-xl shrink-0 disabled:opacity-40">
               {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>

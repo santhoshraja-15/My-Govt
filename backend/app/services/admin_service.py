@@ -1,5 +1,6 @@
 """Admin service — database intelligence console backend."""
 import re
+import time
 from typing import Optional
 
 import structlog
@@ -29,6 +30,8 @@ class AdminService:
         self.db = db
 
     async def get_overview(self) -> dict:
+        """Platform overview. Every figure is a live COUNT; synthetic (generated) complaints and
+        citizens are excluded from business metrics and reported separately."""
         queries = {
             "schemas": "SELECT count(*) FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast')",
             "tables": "SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema','pg_toast') AND table_type='BASE TABLE'",
@@ -37,13 +40,41 @@ class AdminService:
             "datasets": "SELECT count(*) FROM system.dataset_registry",
             "sources": "SELECT count(*) FROM system.source_registry",
         }
-        overview = {}
+        overview: dict = {}
         for key, sql in queries.items():
             try:
                 r = await self.db.execute(text(sql))
                 overview[key] = r.scalar() or 0
             except Exception:
                 overview[key] = None
+        biz = {
+            "schemes": "SELECT count(*) FROM schemes.scheme WHERE status='active'",
+            "services": "SELECT count(*) FROM services.service WHERE status='active'",
+            "departments": "SELECT count(*) FROM administration.department WHERE status='active'",
+            "districts": "SELECT count(*) FROM administration.district",
+            "documents": "SELECT count(*) FROM documents.document",
+            "complaints_total": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic",
+            "complaints_open": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND status NOT IN ('resolved','closed','rejected')",
+            "complaints_sla_breached": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND due_date < now() AND status NOT IN ('resolved','closed','rejected')",
+            "complaints_unassigned": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND authority_id IS NULL AND status NOT IN ('resolved','closed','rejected')",
+            "synthetic_complaints": "SELECT count(*) FROM complaints.complaint WHERE is_synthetic",
+        }
+        stats: dict = {}
+        for key, sql in biz.items():
+            try:
+                stats[key] = (await self.db.execute(text(sql))).scalar() or 0
+            except Exception:
+                stats[key] = None
+        verification: dict = {}
+        for label, tbl in (("schemes", "schemes.scheme"), ("services", "services.service"),
+                           ("departments", "administration.department"), ("districts", "administration.district")):
+            try:
+                rows = (await self.db.execute(text(f"SELECT verification_status, count(*) FROM {tbl} GROUP BY 1"))).fetchall()
+                verification[label] = {r[0]: r[1] for r in rows}
+            except Exception:
+                verification[label] = None
+        overview["database_stats"] = stats
+        overview["verification"] = verification
         return overview
 
     async def get_connection_status(self) -> dict:
@@ -247,6 +278,7 @@ class AdminService:
             # Defence in depth beyond the keyword filter: a READ ONLY transaction rejects writes.
             await self.db.execute(text("SET TRANSACTION READ ONLY"))
             await self.db.execute(text("SET LOCAL statement_timeout = '10s'"))
+            started = time.perf_counter()
             result = await self.db.execute(text(sql))
             rows = result.fetchmany(500)
             columns = list(result.keys()) if rows else []
@@ -255,7 +287,8 @@ class AdminService:
                  for col, v in zip(columns, row)}
                 for row in rows
             ]
-            return {"columns": columns, "rows": serialized, "row_count": len(serialized)}
+            return {"columns": columns, "rows": serialized, "row_count": len(serialized),
+                    "execution_time_ms": round((time.perf_counter() - started) * 1000, 1)}
         except Exception as e:
             return {"error": str(e)}
         finally:
@@ -308,7 +341,8 @@ class AdminService:
                        entity_type,
                        entity_id,
                        occurred_at AS created_at,
-                       ip_address
+                       new_value ->> 'outcome' AS outcome,
+                       ip_address::text AS ip_address
                 FROM audit.audit_log
                 ORDER BY occurred_at DESC
                 LIMIT :lim OFFSET :off
@@ -326,7 +360,7 @@ class AdminService:
     async def get_data_quality_report(self) -> dict:
         try:
             result = await self.db.execute(text("""
-                SELECT dataset_name,
+                SELECT dataset_id, dataset_name, file_name,
                        quality_completeness,
                        quality_accuracy,
                        quality_consistency,

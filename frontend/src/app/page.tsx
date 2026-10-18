@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { publicStats } from "@/lib/api";
+import { AuthNav } from "@/components/layout/AuthNav";
+import { LangToggle } from "@/components/layout/LangToggle";
 import { useState, useEffect } from "react";
 import {
   Search, MessageSquare, FileText, MapPin, ClipboardList,
@@ -85,10 +88,8 @@ function Navbar() {
 
           {/* Auth buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/login" className="btn-ghost text-blue-100 hover:bg-white/10 hover:text-white">Sign In</Link>
-            <Link href="/register" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shadow-saffron-500/30">
-              Register Free
-            </Link>
+            <LangToggle />
+            <AuthNav />
           </div>
 
           {/* Mobile menu */}
@@ -118,12 +119,13 @@ function Navbar() {
 }
 
 // ── Stats ─────────────────────────────────────────────────────
-const STATS = [
-  { value: "30+", label: "Government Schemes", icon: Award },
-  { value: "38", label: "Districts Covered", icon: MapPin },
-  { value: "20+", label: "Citizen Services", icon: Building2 },
-  { value: "75M+", label: "Citizens Served", icon: Users },
-];
+// Counts come from GET /api/v1/public/stats (live database counts); nothing here is hardcoded.
+const STAT_DEFS = [
+  { key: "schemes", label: "Government Schemes", icon: Award },
+  { key: "districts", label: "Districts Covered", icon: MapPin },
+  { key: "services", label: "Citizen Services", icon: Building2 },
+  { key: "departments", label: "Departments", icon: Users },
+] as const;
 
 // ── Quick actions ─────────────────────────────────────────────
 const QUICK_ACTIONS = [
@@ -131,14 +133,13 @@ const QUICK_ACTIONS = [
   { href: "/assistant", icon: MessageSquare, title: "AI Assistant", desc: "Ask anything about government services", color: "from-purple-500 to-purple-700" },
   { href: "/complaints", icon: ClipboardList, title: "File Complaint", desc: "Report civic issues & track resolution", color: "from-rose-500 to-rose-700" },
   { href: "/services", icon: FileText, title: "Get Certificates", desc: "Apply for nativity, income, community & more", color: "from-emerald-500 to-emerald-700" },
-  { href: "/locations", icon: MapPin, title: "Find Offices", desc: "Locate nearest e-Sevai & government offices", color: "from-amber-500 to-amber-700" },
   { href: "/documents", icon: Globe, title: "Policy Documents", desc: "Access GOs, policies and official documents", color: "from-indigo-500 to-indigo-700" },
 ];
 
 // ── Feature cards ─────────────────────────────────────────────
 const FEATURES = [
   { icon: Shield, title: "Source-Grounded Answers", desc: "Answers come only from the records we hold, each labelled Verified, Provisional or External — no invented facts." },
-  { icon: Zap, title: "Real-time AI Eligibility", desc: "Get instant, deterministic eligibility checks for 30+ Tamil Nadu schemes based on your profile." },
+  { icon: Zap, title: "Real-time AI Eligibility", desc: "Eligibility checks run only on rules recorded for a scheme; where rules are missing we say so instead of guessing." },
   { icon: Globe, title: "Bilingual — English & Tamil", desc: "Ask questions and read answers in English or Tamil. Full UI available in both languages." },
   { icon: TrendingUp, title: "End-to-End Complaint Tracking", desc: "File, track, and escalate civic complaints with SLA timelines and real-time status updates." },
 ];
@@ -156,6 +157,8 @@ const POPULAR_SCHEMES = [
 // ── Main page ─────────────────────────────────────────────────
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [liveStats, setLiveStats] = useState<Record<string, number> | null>(null);
+  useEffect(() => { publicStats.get().then(setLiveStats).catch(() => setLiveStats(null)); }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +191,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg md:text-xl text-blue-200 max-w-2xl mx-auto mb-10 font-medium animate-fade-in">
-            Discover 30+ government schemes, get instant eligibility checks, track complaints, and access all Tamil Nadu citizen services — powered by AI.
+            Browse Tamil Nadu government schemes, check eligibility where rules are recorded, track complaints, and access all Tamil Nadu citizen services — powered by AI.
           </p>
 
           {/* Search bar */}
@@ -225,10 +228,10 @@ export default function HomePage() {
         {/* Stats band */}
         <div className="relative z-10 w-full max-w-5xl mx-auto px-4 mt-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {STATS.map(({ value, label, icon: Icon }) => (
-              <div key={label} className="glass rounded-2xl p-5 text-center animate-fade-in">
+            {STAT_DEFS.map(({ key, label, icon: Icon }) => (
+              <div key={label} className="glass rounded-2xl p-5 text-center animate-fade-in" data-testid={`stat-${key}`}>
                 <Icon size={24} className="text-saffron-400 mx-auto mb-2" />
-                <div className="text-3xl font-black text-white">{value}</div>
+                <div className="text-3xl font-black text-white">{liveStats ? liveStats[key] : "—"}</div>
                 <div className="text-blue-200 text-xs font-medium mt-1">{label}</div>
               </div>
             ))}

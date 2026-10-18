@@ -43,7 +43,9 @@ def rate_limit(limiter: SlidingWindowLimiter, scope: str):
     return _dep
 
 
-# Production-sensible defaults; tests replace/reset these.
-login_limiter = SlidingWindowLimiter(limit=10, window_seconds=60)
-register_limiter = SlidingWindowLimiter(limit=5, window_seconds=3600)
-chat_limiter = SlidingWindowLimiter(limit=30, window_seconds=60)
+# Limits come from settings (RATE_LIMIT_*); tests reset the windows.
+from app.core.config import settings  # noqa: E402
+
+login_limiter = SlidingWindowLimiter(limit=settings.RATE_LIMIT_LOGIN_PER_MIN, window_seconds=60)
+register_limiter = SlidingWindowLimiter(limit=settings.RATE_LIMIT_REGISTER_PER_HOUR, window_seconds=3600)
+chat_limiter = SlidingWindowLimiter(limit=settings.RATE_LIMIT_CHAT_PER_MIN, window_seconds=60)
