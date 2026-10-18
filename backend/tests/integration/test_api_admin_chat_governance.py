@@ -241,6 +241,8 @@ async def test_upgrade_path_demotes_and_logs_previous_official_verified(admin_ds
             await c.execute("INSERT INTO schemes.scheme (scheme_code, scheme_name, scheme_level, verification_status) "
                             "VALUES ('OLD-S','Old scheme','state','official_verified')")
             for m in db_verify.MIGRATIONS[2:]:             # 004: structure only, constraints NOT VALID
+                if not has_postgis and "postgis" in m.name:
+                    continue
                 await c.execute(m.read_text(encoding="utf-8"))
             # old rows still claim verification and the constraint does not (yet) police them
             assert await c.fetchval("SELECT count(*) FROM schemes.scheme WHERE verification_status='official_verified'") == 1

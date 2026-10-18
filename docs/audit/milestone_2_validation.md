@@ -2,7 +2,7 @@
 
 **Branch:** `audit/tn-data-verification` (not pushed, not merged)
 **Review date:** 2026-10-18
-**Status: PARTIALLY COMPLETE.** Backend reliability, verification governance and the automated
+**Status: PARTIALLY COMPLETE (at the time of writing; PostGIS gate since passed — see §6).** Backend reliability, verification governance and the automated
 test suite are done and verified against a real PostgreSQL 16 + pgvector server. Two items are
 **BLOCKED** by the environment and are explicitly *not* claimed as passing: all PostGIS spatial
 behaviour, and official-source evidence for any record's `official_verified` status.
@@ -167,21 +167,12 @@ there are no load or concurrency tests; coverage % was not measured.
 
 ---
 
-## 6. PostGIS — BLOCKED (not claimed)
+## 6. PostGIS — superseded
 
-`tests/integration/test_postgis_spatial.py` contains real assertions for:
-* `administration.resolve_jurisdiction` (inside / outside a polygon),
-* the `trg_complaint_location` trigger (geometry + jurisdiction fill),
-* creation of all seven GIST indexes (`idx_*_geom`),
-* `GET /gis/resolve-jurisdiction` and `GET /gis/facilities` (distance ordering, radius filter).
-
-They are skipped with reason *BLOCKED: needs real PostGIS* and have **never been executed**. With
-the stub (geometry → `text`, three `ST_*` functions returning NULL/false) the relational schema,
-the complaint flow and `resolve_jurisdiction`'s *non-spatial* behaviour are exercised, but
-nothing spatial is verified. To close: run against `postgis/postgis:16-3.4` with
-`TEST_ADMIN_DSN=… TEST_POSTGIS=1 pytest -m postgis` and record the output here.
-
----
+At the time of this milestone PostGIS was unavailable and the spatial tests were BLOCKED. The gate
+was later run against a real PostGIS 3.6.2 instance; see [`postgis_validation.md`](postgis_validation.md)
+(266 tests pass; four spatial defects found and fixed in migration 005). Geographic correctness of
+real boundaries remains unverified.
 
 ## 7. Remaining defects and limitations
 

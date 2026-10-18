@@ -66,6 +66,8 @@ async def test_db_dsn(admin_dsn, has_postgis):
             schema_sql = db_verify.strip_postgis(schema_sql)
         await conn.execute(schema_sql)
         for mig in db_verify.MIGRATIONS:
+            if not has_postgis and "postgis" in mig.name:
+                continue  # spatial migration needs the real extension
             await conn.execute(mig.read_text(encoding="utf-8"))
         await seed.apply_seed(conn)
     finally:

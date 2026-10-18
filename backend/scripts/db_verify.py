@@ -134,6 +134,9 @@ async def main() -> int:
 
         # 2. migration (twice)
         for mig_file in MIGRATIONS:
+            if args.no_postgis and "postgis" in mig_file.name:
+                print(f"[SKIP] {mig_file.name} - requires PostGIS (not applied in --no-postgis mode)")
+                continue
             mig = mig_file.read_text(encoding="utf-8")
             await conn.execute(mig)
             await conn.execute(mig)
