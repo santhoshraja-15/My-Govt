@@ -278,3 +278,75 @@ async def test_upgrade_path_demotes_and_logs_previous_official_verified(admin_ds
     finally:
         await admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
         await admin.close()
+
+
+# -- operations endpoints --------------------------------------------------------------------------
+async def test_operations_endpoints_require_admin(client, make_citizen, make_staff):
+    c = await make_citizen()
+    _, officer = await make_staff("officer")
+    for path in ("/admin/complaints", "/admin/department-performance", "/admin/verification-queue"):
+        assert (await client.get(f"{API}{path}")).status_code == 401
+        assert (await client.get(f"{API}{path}", headers=c["headers"])).status_code == 403
+        assert (await client.get(f"{API}{path}", headers=officer)).status_code == 403
+
+
+async def test_admin_complaint_backlog_filters_and_legal_transitions(client, make_citizen, make_staff, conn):
+    _, admin = await make_staff("state_admin")
+    h = (await make_citizen())["headers"]
+    cat = await conn.fetchval("SELECT category_id FROM complaints.complaint_category WHERE category_code='CAT-WAT'")
+    routed = (await client.post(f"{API}/complaints", headers=h, json={"title": "Routed one", "description": "Has a routing target", "category_id": cat})).json()
+    unrouted = (await client.post(f"{API}/complaints", headers=h, json={"title": "Unrouted one", "description": "Awaiting triage entirely"})).json()
+    await conn.execute("UPDATE complaints.complaint SET due_date = now() - interval '2 hours' WHERE complaint_ref=$1", routed["reference_number"])
+
+    allr = (await client.get(f"{API}/admin/complaints", headers=admin, params={"limit": 200})).json()
+    refs = {i["reference_number"]: i for i in allr["items"]}
+    assert routed["reference_number"] in refs and unrouted["reference_number"] in refs
+    assert refs[routed["reference_number"]]["allowed_next"] == ["assigned", "rejected"]          # state machine, from 'classified'
+    assert refs[unrouted["reference_number"]]["allowed_next"] == ["classified"]                  # from 'needs_triage'
+    assert refs[routed["reference_number"]]["sla_breached"] is True
+    assert allr["items"][0]["sla_breached"] is True                                                # breached sorted first
+
+    over = (await client.get(f"{API}/admin/complaints", headers=admin, params={"overdue": True, "limit": 200})).json()
+    assert routed["reference_number"] in {i["reference_number"] for i in over["items"]}
+    assert unrouted["reference_number"] not in {i["reference_number"] for i in over["items"]}
+    un = (await client.get(f"{API}/admin/complaints", headers=admin, params={"unassigned": True, "limit": 200})).json()
+    assert unrouted["reference_number"] in {i["reference_number"] for i in un["items"]}
+    assert routed["reference_number"] not in {i["reference_number"] for i in un["items"]}
+    st = (await client.get(f"{API}/admin/complaints", headers=admin, params={"status": "needs_triage", "limit": 200})).json()
+    assert {i["status"] for i in st["items"]} == {"needs_triage"}
+
+
+async def test_admin_complaint_list_excludes_synthetic(client, make_staff, conn, test_db_dsn):
+    from scripts import synth_data
+
+    _, admin = await make_staff("state_admin")
+    await synth_data.main(["--dsn", test_db_dsn, "--seed", "77", "--citizens", "3", "--complaints", "9"])
+    try:
+        body = (await client.get(f"{API}/admin/complaints", headers=admin, params={"limit": 200})).json()
+        assert not any(i["title"].startswith("[SYNTHETIC]") for i in body["items"])
+        assert (await client.get(f"{API}/admin/overview", headers=admin)).json()["database_stats"]["synthetic_complaints"] >= 9
+    finally:
+        await conn.execute("DELETE FROM complaints.complaint WHERE is_synthetic")
+        await conn.execute("DELETE FROM identity.citizen WHERE is_synthetic")
+        await conn.execute("DELETE FROM identity.app_user WHERE is_synthetic")
+
+
+async def test_department_performance_counts_real_complaints_only(client, make_staff, conn):
+    _, admin = await make_staff("state_admin")
+    rows = (await client.get(f"{API}/admin/department-performance", headers=admin)).json()
+    assert isinstance(rows, list)
+    total = sum(r["total"] for r in rows)
+    assert total <= await conn.fetchval("SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND department_id IS NOT NULL")
+    assert all({"department_name", "total", "resolved", "sla_breached", "without_authority", "avg_resolution_hours"} <= set(r) for r in rows)
+
+
+async def test_verification_queue_lists_unverified_records_and_recent_changes(client, make_staff):
+    _, admin = await make_staff("state_admin")
+    q = (await client.get(f"{API}/admin/verification-queue", headers=admin)).json()
+    kinds = {i["kind"] for i in q["queue"]}
+    assert kinds == {"scheme", "service", "department", "district"}
+    assert all(i["verification_status"] != "official_verified" for i in q["queue"])
+    assert len([i for i in q["queue"] if i["kind"] == "district"]) == 38
+    scheme = next(i for i in q["queue"] if i["code"] == "TN-CM-BREAKFAST")
+    assert scheme["source_document_ref"]            # asserted by the dataset, listed for human follow-up
+    assert q["recent_changes"] and {"table_name", "record_key", "new_status", "reason", "changed_at"} <= set(q["recent_changes"][0])

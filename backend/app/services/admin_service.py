@@ -1,7 +1,7 @@
 """Admin service — database intelligence console backend."""
 import re
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 from sqlalchemy import text
@@ -375,3 +375,71 @@ class AdminService:
             return {"datasets": [dict(zip(cols, r, strict=True)) for r in result.fetchall()]}
         except Exception as e:
             return {"datasets": [], "error": str(e)}
+
+    # ── operations: backlog, department performance, verification queue ─────────────────────────
+    async def get_complaints(self, status: Optional[str] = None, overdue: bool = False, unassigned: bool = False,
+                             limit: int = 50, offset: int = 0) -> dict:
+        """Staff view of real (non-synthetic) complaints with the legal next statuses for each."""
+        from app.services import complaint_rules as rules
+
+        cond = ["NOT c.is_synthetic"]
+        params: dict[str, Any] = {}
+        if status:
+            cond.append("c.status = :status")
+            params["status"] = status
+        if overdue:
+            cond.append("c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected')")
+        if unassigned:
+            cond.append("c.authority_id IS NULL AND c.status NOT IN ('resolved','closed','rejected')")
+        where = " AND ".join(cond)
+        total = (await self.db.execute(text(f"SELECT count(*) FROM complaints.complaint c WHERE {where}"), params)).scalar() or 0
+        rows = (await self.db.execute(text(f"""
+            SELECT c.complaint_id::text AS complaint_id, c.complaint_ref AS reference_number, c.title, c.status, c.priority,
+                   cat.category_name, d.department_name, a.authority_name, c.created_at, c.due_date,
+                   (c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected')) AS sla_breached,
+                   CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                        WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
+            FROM complaints.complaint c
+            LEFT JOIN complaints.complaint_category cat ON cat.category_id = c.category_id
+            LEFT JOIN administration.department d ON d.department_id = c.department_id
+            LEFT JOIN administration.authority a ON a.authority_id = c.authority_id
+            WHERE {where}
+            ORDER BY (c.due_date < now()) DESC NULLS LAST, c.created_at DESC
+            LIMIT :lim OFFSET :off"""), {**params, "lim": limit, "off": offset})).fetchall()
+        items = []
+        for r in rows:
+            m = dict(r._mapping)
+            m["allowed_next"] = list(rules.TRANSITIONS.get(m["status"], ()))
+            items.append(m)
+        return {"total": total, "items": items, "limit": limit, "offset": offset}
+
+    async def get_department_performance(self) -> list:
+        """Per-department workload from real complaints (synthetic excluded)."""
+        r = await self.db.execute(text("""
+            SELECT d.department_id, d.department_name,
+                   count(c.complaint_id)::int AS total,
+                   count(*) FILTER (WHERE c.status IN ('resolved','closed'))::int AS resolved,
+                   count(*) FILTER (WHERE c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected'))::int AS sla_breached,
+                   count(*) FILTER (WHERE c.authority_id IS NULL AND c.status NOT IN ('resolved','closed','rejected'))::int AS without_authority,
+                   round(extract(epoch FROM avg(c.resolved_at - c.created_at) FILTER (WHERE c.resolved_at IS NOT NULL)) / 3600.0, 1)::float AS avg_resolution_hours
+            FROM administration.department d
+            JOIN complaints.complaint c ON c.department_id = d.department_id AND NOT c.is_synthetic
+            GROUP BY d.department_id, d.department_name
+            ORDER BY sla_breached DESC, total DESC"""))
+        return [dict(row._mapping) for row in r.fetchall()]
+
+    async def get_verification_queue(self, limit: int = 200) -> dict:
+        """Everything not yet official_verified, with its asserted (unconfirmed) reference, and recent status changes."""
+        queue: list[dict] = []
+        for label, tbl, key, name in (("scheme", "schemes.scheme", "scheme_code", "scheme_name"),
+                                      ("service", "services.service", "service_code", "service_name"),
+                                      ("department", "administration.department", "department_code", "department_name"),
+                                      ("district", "administration.district", "district_code", "district_name")):
+            rows = (await self.db.execute(text(
+                f"SELECT '{label}' AS kind, {key} AS code, {name} AS name, verification_status, source_document_ref "
+                f"FROM {tbl} WHERE verification_status <> 'official_verified' ORDER BY {key} LIMIT :n"), {"n": limit})).fetchall()
+            queue.extend(dict(r._mapping) for r in rows)
+        log = (await self.db.execute(text(
+            "SELECT table_name, record_key, old_status, new_status, reason, changed_at FROM system.verification_status_log "
+            "ORDER BY log_id DESC LIMIT 20"))).fetchall()
+        return {"queue": queue, "recent_changes": [dict(r._mapping) for r in log]}

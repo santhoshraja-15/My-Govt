@@ -160,3 +160,26 @@ async def data_quality(
 ):
     svc = AdminService(db)
     return await svc.get_data_quality_report()
+
+# ── Operations ────────────────────────────────────────────────
+@router.get("/complaints")
+async def admin_complaints(
+    status: Optional[str] = Query(None),
+    overdue: bool = Query(False),
+    unassigned: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(admin_dep),
+):
+    return await AdminService(db).get_complaints(status, overdue, unassigned, limit, offset)
+
+
+@router.get("/department-performance")
+async def department_performance(db: AsyncSession = Depends(get_db), _=Depends(admin_dep)):
+    return await AdminService(db).get_department_performance()
+
+
+@router.get("/verification-queue")
+async def verification_queue(db: AsyncSession = Depends(get_db), _=Depends(admin_dep)):
+    return await AdminService(db).get_verification_queue()
