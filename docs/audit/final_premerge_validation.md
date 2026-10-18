@@ -1,3 +1,10 @@
+> **SUPERSEDED (2026-10-19).** This report predates later findings and its recommendation no longer stands. It stated
+> `READY_FOR_PR_REVIEW` and described the backend as "Complete & Fixed"; later testing against a real database showed 26 of 65
+> SQL statements did not match the schema, that LGD codes and "official_verified" classifications were unsupported, and that
+> several claims below (e.g. the Tiruvannamalai LGD "583" correction, GO references, fees) have not been verified against
+> official sources. Current state: [master_implementation_status.md](master_implementation_status.md) (recommendation
+> `BLOCKED`), [final_build_validation.md](final_build_validation.md), [milestone_2_validation.md](milestone_2_validation.md).
+
 # Independent Data Audit Validation and Pre-Merge Review
 
 **Target Commit**: `e8257c12763bfb5712f66ae2555a6321731f8a6a` (with Critical Remediation Applied)  
