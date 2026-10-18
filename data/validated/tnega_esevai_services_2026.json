@@ -1,0 +1,98 @@
+[
+  {
+    "service_code": "SVC-COMM-CERT",
+    "service_name": "Community Certificate",
+    "name_ta": "சாதி சான்றிதழ்",
+    "department": "Revenue and Disaster Management Department",
+    "category": "certificate",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 15,
+    "portal_url": "https://www.esevai.tn.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-NATIVITY",
+    "service_name": "Nativity Certificate",
+    "name_ta": "பிறப்பிட சான்றிதழ்",
+    "department": "Revenue and Disaster Management Department",
+    "category": "certificate",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 7,
+    "portal_url": "https://www.esevai.tn.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-INCOME-CERT",
+    "service_name": "Income Certificate",
+    "name_ta": "வருமான சான்றிதழ்",
+    "department": "Revenue and Disaster Management Department",
+    "category": "certificate",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 7,
+    "portal_url": "https://www.esevai.tn.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-FIRST-GRAD",
+    "service_name": "First Generation Graduate Certificate",
+    "name_ta": "முதல் பட்டதாரி சான்றிதழ்",
+    "department": "Revenue and Disaster Management Department",
+    "category": "certificate",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 15,
+    "portal_url": "https://www.esevai.tn.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-PATTA-TRANSFER",
+    "service_name": "Patta Transfer (Mutation of Land Title)",
+    "name_ta": "பட்டா மாறுதல்",
+    "department": "Survey and Settlement Department",
+    "category": "land_record",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 30,
+    "portal_url": "https://eservices.tn.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-ENCUMB-CERT",
+    "service_name": "Encumbrance Certificate (EC)",
+    "name_ta": "வில்லங்கச் சான்றிதழ்",
+    "department": "Registration Department",
+    "category": "land_record",
+    "statutory_fee": 100,
+    "esevai_service_charge": 60,
+    "sla_days": 3,
+    "portal_url": "https://tnreginet.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-RATION-SMART",
+    "service_name": "Smart Ration Card Services",
+    "name_ta": "புதிய மின்னணு குடும்ப அட்டை",
+    "department": "Food and Consumer Protection Department",
+    "category": "civil_supplies",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 30,
+    "portal_url": "https://www.tnpds.gov.in",
+    "verification_status": "official_verified"
+  },
+  {
+    "service_code": "SVC-LEGAL-HEIR",
+    "service_name": "Legal Heir Certificate",
+    "name_ta": "வாரிசு சான்றிதழ்",
+    "department": "Revenue and Disaster Management Department",
+    "category": "certificate",
+    "statutory_fee": 0,
+    "esevai_service_charge": 60,
+    "sla_days": 15,
+    "portal_url": "https://www.esevai.tn.gov.in",
+    "verification_status": "official_verified"
+  }
+]

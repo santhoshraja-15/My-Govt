@@ -7,13 +7,13 @@
 -- ── Source registry ───────────────────────────────────────────
 INSERT INTO system.source_registry (source_id, source_code, source_name, source_type, url, jurisdiction, reliability_score, license, status)
 VALUES
-  (gen_random_uuid(), 'TN_GOV_PORTAL',    'Tamil Nadu Government Portal',         'government_portal', 'https://www.tn.gov.in',              'Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TNRD',             'Tamil Nadu Rural Development',          'government_portal', 'https://www.tnrd.gov.in',            'Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TN_WELFARE',       'TN Social Welfare & Women Empowerment', 'government_portal', 'https://www.socialwelfare.tn.gov.in','Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TN_AGRI',          'TN Department of Agriculture',          'government_portal', 'https://www.tnau.ac.in',             'Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TN_EDUC',          'TN School Education Department',        'government_portal', 'https://www.tnschools.gov.in',       'Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TN_HEALTH',        'TN Health & Family Welfare',            'government_portal', 'https://www.tnhealth.tn.gov.in',     'Tamil Nadu', 1.00, 'government_open',  'active'),
-  (gen_random_uuid(), 'TN_REVENUE',       'TN Revenue Department (e-Sevai)',       'government_portal', 'https://www.esevai.gov.in',          'Tamil Nadu', 1.00, 'government_open',  'active')
+  (gen_random_uuid(), 'TN_GOV_PORTAL',    'Tamil Nadu Government Portal',         'official', 'https://www.tn.gov.in',              'Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TNRD',             'Tamil Nadu Rural Development',          'official', 'https://www.tnrd.gov.in',            'Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TN_WELFARE',       'TN Social Welfare & Women Empowerment', 'official', 'https://www.socialwelfare.tn.gov.in','Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TN_AGRI',          'TN Department of Agriculture',          'official', 'https://www.agri.tn.gov.in',        'Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TN_EDUC',          'TN School Education Department',        'official', 'https://www.tnschools.gov.in',       'Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TN_HEALTH',        'TN Health & Family Welfare',            'official', 'https://www.tnhealth.tn.gov.in',     'Tamil Nadu', 1.00, 'government_open',  'active'),
+  (gen_random_uuid(), 'TN_REVENUE',       'TN Revenue Department (e-Sevai)',       'official', 'https://www.esevai.gov.in',          'Tamil Nadu', 1.00, 'government_open',  'active')
 ON CONFLICT DO NOTHING;
 
 -- ── State ──────────────────────────────────────────────────────
@@ -23,44 +23,44 @@ ON CONFLICT DO NOTHING;
 
 -- ── Districts (all 38 districts of Tamil Nadu) ─────────────────
 INSERT INTO administration.district (district_id, state_id, district_code, district_name, district_name_ta, headquarters) VALUES
-  (1,  1,'TN-CHE','Chennai',      'சென்னை',       'Chennai'),
-  (2,  1,'TN-COI','Coimbatore',   'கோயம்புத்தூர்', 'Coimbatore'),
-  (3,  1,'TN-MAD','Madurai',      'மதுரை',         'Madurai'),
-  (4,  1,'TN-TRI','Tiruchirappalli','திருச்சிராப்பள்ளி','Tiruchirappalli'),
-  (5,  1,'TN-SAL','Salem',        'சேலம்',         'Salem'),
-  (6,  1,'TN-TIR','Tirunelveli',  'திருநெல்வேலி',  'Tirunelveli'),
+  (1,  1,'TN-CHN','Chennai',      'சென்னை',       'Chennai'),
+  (2,  1,'TN-CBE','Coimbatore',   'கோயம்புத்தூர்', 'Coimbatore'),
+  (3,  1,'TN-MDU','Madurai',      'மதுரை',         'Madurai'),
+  (4,  1,'TN-TRY','Tiruchirappalli','திருச்சிராப்பள்ளி','Tiruchirappalli'),
+  (5,  1,'TN-SLM','Salem',        'சேலம்',         'Salem'),
+  (6,  1,'TN-TNV','Tirunelveli',  'திருநெல்வேலி',  'Tirunelveli'),
   (7,  1,'TN-VEL','Vellore',      'வேலூர்',        'Vellore'),
-  (8,  1,'TN-EDE','Erode',        'ஈரோடு',         'Erode'),
-  (9,  1,'TN-THA','Thane',        'தஞ்சாவூர்',     'Thanjavur'),
-  (10, 1,'TN-DIN','Dindigul',     'திண்டுக்கல்',   'Dindigul'),
-  (11, 1,'TN-KAN','Kancheepuram', 'காஞ்சிபுரம்',   'Kancheepuram'),
-  (12, 1,'TN-TKR','Thiruvallur',  'திருவள்ளூர்',   'Thiruvallur'),
+  (8,  1,'TN-ERD','Erode',        'ஈரோடு',         'Erode'),
+  (9,  1,'TN-TNJ','Thanjavur',    'தஞ்சாவூர்',     'Thanjavur'),
+  (10, 1,'TN-DGL','Dindigul',     'திண்டுக்கல்',   'Dindigul'),
+  (11, 1,'TN-KPM','Kanchipuram',  'காஞ்சிபுரம்',   'Kanchipuram'),
+  (12, 1,'TN-TVL','Thiruvallur',  'திருவள்ளூர்',   'Thiruvallur'),
   (13, 1,'TN-CUD','Cuddalore',    'கடலூர்',        'Cuddalore'),
-  (14, 1,'TN-VIL','Villupuram',   'விழுப்புரம்',   'Villupuram'),
-  (15, 1,'TN-NAG','Nagapattinam', 'நாகப்பட்டினம்', 'Nagapattinam'),
-  (16, 1,'TN-THI','Thiruvarur',   'திருவாரூர்',    'Thiruvarur'),
-  (17, 1,'TN-PUD','Pudukkottai',  'புதுக்கோட்டை',  'Pudukkottai'),
-  (18, 1,'TN-SIV','Sivaganga',    'சிவகங்கை',      'Sivaganga'),
+  (14, 1,'TN-VPM','Villupuram',   'விழுப்புரம்',   'Villupuram'),
+  (15, 1,'TN-NGP','Nagapattinam', 'நாகப்பட்டினம்', 'Nagapattinam'),
+  (16, 1,'TN-TVR','Thiruvarur',   'திருவாரூர்',    'Thiruvarur'),
+  (17, 1,'TN-PDK','Pudukkottai',  'புதுக்கோட்டை',  'Pudukkottai'),
+  (18, 1,'TN-SVG','Sivaganga',    'சிவகங்கை',      'Sivaganga'),
   (19, 1,'TN-RAM','Ramanathapuram','ராமநாதபுரம்',  'Ramanathapuram'),
   (20, 1,'TN-TUT','Thoothukudi',  'தூத்துக்குடி',  'Thoothukudi'),
-  (21, 1,'TN-KAN','Kanniyakumari', 'கன்னியாகுமரி', 'Nagercoil'),
-  (22, 1,'TN-VIR','Virudhunagar', 'விருதுநகர்',    'Virudhunagar'),
-  (23, 1,'TN-THE','Theni',        'தேனி',           'Theni'),
+  (21, 1,'TN-KKI','Kanniyakumari', 'கன்னியாகுமரி', 'Nagercoil'),
+  (22, 1,'TN-VRD','Virudhunagar', 'விருதுநகர்',    'Virudhunagar'),
+  (23, 1,'TN-THN','Theni',        'தேனி',           'Theni'),
   (24, 1,'TN-KRI','Krishnagiri',  'கிருஷ்ணகிரி',   'Krishnagiri'),
-  (25, 1,'TN-DHE','Dharmapuri',   'தர்மபுரி',      'Dharmapuri'),
-  (26, 1,'TN-TIV','Tiruvannamalai','திருவண்ணாமலை', 'Tiruvannamalai'),
-  (27, 1,'TN-NMK','Namakkal',     'நாமக்கல்',      'Namakkal'),
-  (28, 1,'TN-KAR','Karur',        'கரூர்',          'Karur'),
+  (25, 1,'TN-DPI','Dharmapuri',   'தர்மபுரி',      'Dharmapuri'),
+  (26, 1,'TN-TVM','Tiruvannamalai','திருவண்ணாமலை', 'Tiruvannamalai'),
+  (27, 1,'TN-NKL','Namakkal',     'நாமக்கல்',      'Namakkal'),
+  (28, 1,'TN-KRR','Karur',        'கரூர்',          'Karur'),
   (29, 1,'TN-ARI','Ariyalur',     'அரியலூர்',      'Ariyalur'),
-  (30, 1,'TN-PER','Perambalur',   'பெரம்பலூர்',    'Perambalur'),
-  (31, 1,'TN-TIV','Tirupur',      'திருப்பூர்',    'Tirupur'),
-  (32, 1,'TN-NID','Nilgiris',     'நீலகிரி',        'Udhagamandalam'),
-  (33, 1,'TN-MAY','Mayiladuthurai','மயிலாடுதுறை',  'Mayiladuthurai'),
-  (34, 1,'TN-CAL','Kallakurichi', 'கள்ளக்குறிச்சி','Kallakurichi'),
-  (35, 1,'TN-TEN','Tenkasi',      'தென்காசி',      'Tenkasi'),
-  (36, 1,'TN-CHE','Chengalpattu', 'செங்கல்பட்டு',  'Chengalpattu'),
-  (37, 1,'TN-RAN','Ranipet',      'ராணிப்பேட்டை',  'Ranipet'),
-  (38, 1,'TN-TIR','Tirupattur',   'திருப்பத்தூர்', 'Tirupattur')
+  (30, 1,'TN-PBL','Perambalur',   'பெரம்பலூர்',    'Perambalur'),
+  (31, 1,'TN-TPR','Tiruppur',     'திருப்பூர்',    'Tiruppur'),
+  (32, 1,'TN-NLG','Nilgiris',     'நீலகிரி',        'Udhagamandalam'),
+  (33, 1,'TN-MYD','Mayiladuthurai','மயிலாடுதுறை',  'Mayiladuthurai'),
+  (34, 1,'TN-KLK','Kallakurichi', 'கள்ளக்குறிச்சி','Kallakurichi'),
+  (35, 1,'TN-TKS','Tenkasi',      'தென்காசி',      'Tenkasi'),
+  (36, 1,'TN-CGL','Chengalpattu', 'செங்கல்பட்டு',  'Chengalpattu'),
+  (37, 1,'TN-RPT','Ranipet',      'ராணிப்பேட்டை',  'Ranipet'),
+  (38, 1,'TN-TPT','Tirupattur',   'திருப்பத்தூர்', 'Tirupattur')
 ON CONFLICT DO NOTHING;
 
 -- ── Departments (15 key departments) ──────────────────────────
@@ -108,7 +108,7 @@ INSERT INTO schemes.scheme (scheme_id, scheme_code, name, name_ta, description, 
 SELECT
   gen_random_uuid(),
   s.code, s.name, s.name_ta, s.description, s.dept_id,
-  'state', s.category, 'active', '2024-01-01',
+  CASE WHEN s.code = 'TN-PM-KISAN' THEN 'central' ELSE 'state' END, s.category, 'active', '2024-01-01',
   now(), s.app_url, s.src_url,
   (SELECT source_id FROM system.source_registry LIMIT 1)
 FROM (VALUES
