@@ -126,3 +126,9 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*", "scripts*", "etl*", "knowledge_graph*"]
+
+[tool.coverage.run]
+# SQLAlchemy's async layer runs on greenlets; without this, code executed inside them is reported as uncovered.
+concurrency = ["greenlet", "thread"]
+source = ["app", "etl", "knowledge_graph", "scripts", "ai"]
+omit = ["*/tests/*", "scripts/db_verify.py"]

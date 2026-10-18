@@ -67,3 +67,4 @@ frontend/.next/
 
 # Ingested source documents (fetched copies of official PDFs; reproducible from the pipeline)
 data/raw/ingested/
+backend/pytest-report.xml
