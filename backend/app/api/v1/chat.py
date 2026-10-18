@@ -29,7 +29,7 @@ async def chat_message(
         return response
     except Exception as e:
         logger.error("Chat processing error", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to process message")
+        raise HTTPException(status_code=500, detail="Failed to process message") from e
 
 
 @router.get("/conversations", response_model=list[ConversationOut])

@@ -77,7 +77,7 @@ async def get_complaint(
     try:
         complaint = await service.get_complaint(complaint_id, current_user)
     except ComplaintForbidden as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return complaint

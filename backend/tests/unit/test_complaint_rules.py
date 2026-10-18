@@ -42,7 +42,7 @@ def test_illegal_transitions(old, new):
 
 
 def test_terminal_states_have_no_exit():
-    assert r.TERMINAL == {"closed", "rejected"}
+    assert {"closed", "rejected"} == r.TERMINAL
 
 
 def test_escalatable_statuses_are_exactly_those_that_may_escalate():

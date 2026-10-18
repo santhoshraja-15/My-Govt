@@ -173,5 +173,8 @@ async def test_docs_hidden_in_production(monkeypatch):
     prod = Settings(APP_ENV="production", JWT_SECRET_KEY="x" * 48, POSTGRES_PASSWORD="strong-db-password",
                     NEO4J_PASSWORD="strong-neo4j-pw", MINIO_SECRET_KEY="strong-minio-secret")
     assert prod.APP_ENV == "production"      # the main module reads settings.APP_ENV at import time
-    src = open(__import__("app.main", fromlist=["x"]).__file__, encoding="utf-8").read()
+    import app.main
+
+    with open(app.main.__file__, encoding="utf-8") as fh:
+        src = fh.read()
     assert 'docs_url=None if settings.APP_ENV.lower() == "production"' in src

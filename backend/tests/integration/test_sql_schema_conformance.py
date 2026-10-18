@@ -52,7 +52,7 @@ def test_harvest_finds_sql():
 
 @pytest.mark.db
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.parametrize("path,line,sql", CASES, ids=[f"{p}:{l}" for p, l, _ in CASES])
+@pytest.mark.parametrize("path,line,sql", CASES, ids=[f"{p}:{ln}" for p, ln, _ in CASES])
 async def test_sql_prepares_against_schema(conn, has_postgis, path, line, sql):
     if not has_postgis and re.search(r"\bST_\w+", sql):
         pytest.skip("BLOCKED: statement uses PostGIS functions and the test server has no PostGIS")

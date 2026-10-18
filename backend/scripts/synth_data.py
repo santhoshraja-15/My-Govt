@@ -212,7 +212,7 @@ async def apply(conn: asyncpg.Connection, batch: str, citizens, complaints, repl
                 "VALUES ($1,$2,$3,$4,$5,$6,1.0,$7,$8,$9,$10,$11,$12,$13,$14,true,$15)",
                 k.complaint_id, k.ref, cit.citizen_id, f"[SYNTHETIC] {k.title}", BODY, k.category_id, dept, auth,
                 cat["default_priority"], k.path[0], k.district_id, k.created_at, due, esc_due, batch)
-            for old, new in zip(k.path, k.path[1:]):
+            for old, new in zip(k.path, k.path[1:], strict=False):
                 assert rules.can_transition(old, new), (old, new)
                 await conn.execute("UPDATE complaints.complaint SET status=$2 WHERE complaint_id=$1", k.complaint_id, new)
             if k.path[-1] == "resolved" or k.path[-1] == "closed":
@@ -220,7 +220,7 @@ async def apply(conn: asyncpg.Connection, batch: str, citizens, complaints, repl
                 await conn.execute("UPDATE complaints.complaint SET resolved_at=$2 WHERE complaint_id=$1", k.complaint_id, rt)
             # rewrite the trigger-generated history timestamps so the timeline is plausible
             hist = await conn.fetch("SELECT history_id FROM complaints.complaint_history WHERE complaint_id=$1 ORDER BY history_id", k.complaint_id)
-            for h, ts in zip(hist, k.step_times):
+            for h, ts in zip(hist, k.step_times, strict=True):
                 await conn.execute("UPDATE complaints.complaint_history SET changed_at=$2 WHERE history_id=$1", h["history_id"], ts)
             await conn.execute("UPDATE complaints.complaint SET created_at=$2, updated_at=$3 WHERE complaint_id=$1",
                                k.complaint_id, k.created_at, k.step_times[-1])

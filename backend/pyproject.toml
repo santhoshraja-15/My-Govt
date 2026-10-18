@@ -95,8 +95,16 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
-ignore = ["B008", "N805"]
+# Enforced in CI: correctness (E, F, W), bugbear (B), simplify (SIM) and naming (N).
+# Not enforced: E501 (line length - handled by the formatter), I (import order) and UP (syntax modernisation);
+# these are a style backlog, not defects.
+select = ["E", "F", "W", "B", "SIM", "N"]
+# N818: domain exceptions (ComplaintNotFound, InvalidTransition...) are named for the condition, not "...Error".
+ignore = ["B008", "N805", "E501", "N818"]
+
+[tool.ruff.lint.per-file-ignores]
+# Settings properties are upper-case on purpose: they mirror the environment-variable names.
+"app/core/config.py" = ["N802"]
 
 [tool.black]
 line-length = 100

@@ -242,7 +242,10 @@ async def test_failures_are_isolated_reported_and_logged(conn, site, client, cle
 
 @pytest.mark.db
 async def test_image_only_and_corrupt_pdfs_are_recorded_but_not_searchable(conn, site, client, clean_docs):
-    blank = pymupdf.open(); blank.new_page(); blank_bytes = blank.tobytes(); blank.close()
+    blank = pymupdf.open()
+    blank.new_page()
+    blank_bytes = blank.tobytes()
+    blank.close()
     site.routes["/docs/scan.pdf"] = pdf_response(blank_bytes)
     site.routes["/docs/corrupt.pdf"] = pdf_response(b"%PDF-1.4 this is not really a pdf at all")
     rep = await ingest(conn, client, [f"{BASE}/scan.pdf", f"{BASE}/corrupt.pdf"])

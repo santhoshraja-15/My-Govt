@@ -207,7 +207,7 @@ class ComplaintService:
             """),
             {"cid": complaint_id},
         )
-        return [ComplaintHistoryItem(**dict(zip(_HISTORY_COLS, h))) for h in hr.fetchall()]
+        return [ComplaintHistoryItem(**dict(zip(_HISTORY_COLS, h, strict=True))) for h in hr.fetchall()]
 
     async def track_by_reference(self, reference: str) -> Optional[ComplaintTrack]:
         r = await self.db.execute(

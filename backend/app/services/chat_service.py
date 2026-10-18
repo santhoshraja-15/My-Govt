@@ -56,9 +56,7 @@ def _detect_language(message: str) -> str:
 
 
 _STOPWORDS = frozenset(
-    "a an and are as at be by can do does for from get give has have how i in is it me my of on or "
-    "please tell the to what when where which who why will with you your about any there their "
-    "this that these those should would could tamil nadu government govt state".split()
+    ["a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does", "for", "from", "get", "give", "has", "have", "how", "i", "in", "is", "it", "me", "my", "of", "on", "or", "please", "tell", "the", "to", "what", "when", "where", "which", "who", "why", "will", "with", "you", "your", "about", "any", "there", "their", "this", "that", "these", "those", "should", "would", "could", "tamil", "nadu", "government", "govt", "state"]
 )
 
 # Weight applied to a source's reliability when computing answer trust.

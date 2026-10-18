@@ -233,7 +233,7 @@ class SchemeService:
 
         group_results: list[str] = []  # PASS | FAIL | UNKNOWN per group
 
-        for group_id, group_rules in groups.items():
+        for group_rules in groups.values():
             g_outcomes = []
             for rule in group_rules:
                 outcome = evaluate_rule(rule, profile_dict)

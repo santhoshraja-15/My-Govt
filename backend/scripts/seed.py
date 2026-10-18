@@ -232,9 +232,8 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
         mism = []
         for r in rows:
             f = ddir / (r["file_name"] or "")
-            if f.is_file():
-                if hashlib.sha256(f.read_bytes()).hexdigest() != r["checksum_sha256"]:
-                    mism.append(r["file_name"])
+            if f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest() != r["checksum_sha256"]:
+                mism.append(r["file_name"])
         add("dataset checksums match files on disk", not mism, f"mismatch: {mism}" if mism else "")
 
     # serial sequences must sit past the explicit ids the seed inserted

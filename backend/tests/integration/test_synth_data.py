@@ -45,7 +45,7 @@ def test_every_planned_path_is_legal_and_times_monotonic():
     _, _, comps = sd.plan(3, 10, 400, CATS, DISTS)
     assert {k.scenario for k in comps} == set(sd.SCENARIOS)           # all scenarios are exercised
     for k in comps:
-        assert all(rules.can_transition(a, b) for a, b in zip(k.path, k.path[1:])), k.scenario
+        assert all(rules.can_transition(a, b) for a, b in zip(k.path, k.path[1:], strict=False)), k.scenario
         assert k.step_times == sorted(k.step_times) and len(k.step_times) == len(k.path)
 
 

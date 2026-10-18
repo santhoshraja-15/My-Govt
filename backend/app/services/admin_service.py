@@ -218,7 +218,7 @@ class AdminService:
                 serialized.append({
                     col: ("[REDACTED]" if col in _SENSITIVE_COLUMNS
                           else str(val) if not isinstance(val, (str, int, float, bool, type(None))) else val)
-                    for col, val in zip(columns, row)
+                    for col, val in zip(columns, row, strict=True)
                 })
 
             return {"total": total, "columns": columns, "rows": serialized,
@@ -284,7 +284,7 @@ class AdminService:
             columns = list(result.keys()) if rows else []
             serialized = [
                 {col: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
-                 for col, v in zip(columns, row)}
+                 for col, v in zip(columns, row, strict=True)}
                 for row in rows
             ]
             return {"columns": columns, "rows": serialized, "row_count": len(serialized),
@@ -316,7 +316,7 @@ class AdminService:
                 ORDER BY download_date DESC NULLS LAST
             """))
             cols = list(result.keys())
-            return [dict(zip(cols, row)) for row in result.fetchall()]
+            return [dict(zip(cols, row, strict=True)) for row in result.fetchall()]
 
     async def list_sources(self) -> list:
         result = await self.db.execute(text("""
@@ -327,7 +327,7 @@ class AdminService:
             ORDER BY source_name
         """))
         cols = list(result.keys())
-        return [dict(zip(cols, row)) for row in result.fetchall()]
+        return [dict(zip(cols, row, strict=True)) for row in result.fetchall()]
 
     async def get_audit_logs(self, limit: int = 50, offset: int = 0) -> dict:
         try:
@@ -350,7 +350,7 @@ class AdminService:
             cols = list(result.keys())
             rows = [
                 {col: (str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v)
-                 for col, v in zip(cols, row)}
+                 for col, v in zip(cols, row, strict=True)}
                 for row in result.fetchall()
             ]
             return {"total": total, "rows": rows, "limit": limit, "offset": offset}
@@ -372,6 +372,6 @@ class AdminService:
                 ORDER BY dataset_name
             """))
             cols = list(result.keys())
-            return {"datasets": [dict(zip(cols, r)) for r in result.fetchall()]}
+            return {"datasets": [dict(zip(cols, r, strict=True)) for r in result.fetchall()]}
         except Exception as e:
             return {"datasets": [], "error": str(e)}

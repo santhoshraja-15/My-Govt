@@ -1,4 +1,5 @@
 """Admin authorization & audit log, AI chat grounding/ownership, documents, verification governance."""
+import contextlib
 import uuid
 
 import asyncpg
@@ -181,10 +182,8 @@ async def test_db_rejects_verified_without_document_reference(conn):
 
 
 async def test_promotion_with_reference_is_logged_with_reason(conn):
-    try:
+    with contextlib.suppress(_Rollback):
         await _promotion_body(conn)
-    except _Rollback:
-        pass
 
 
 async def _promotion_body(conn):
