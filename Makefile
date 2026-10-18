@@ -1,4 +1,4 @@
-.PHONY: up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
+.PHONY: ingest e2e synth-db seed-synthetic eval up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
 
 # ── Docker ───────────────────────────────────────────────────
 up:
@@ -18,13 +18,13 @@ logs-backend:
 
 # ── Database ─────────────────────────────────────────────────
 migrate:
-	docker compose exec backend alembic upgrade head
+	@echo "Alembic has no revisions yet. The SQL migrations are the source of truth: run 'make migrate-sql'."; exit 1
 
 migrate-down:
-	docker compose exec backend alembic downgrade -1
+	@echo "No automated downgrade: SQL migrations are forward-only (restore from backup instead)."; exit 1
 
 migrate-status:
-	docker compose exec backend alembic current
+	@docker compose exec -T postgres psql -U postgres -d mygovt -c "SELECT count(*) AS migration_columns_present FROM information_schema.columns WHERE table_schema='documents' AND table_name='document' AND column_name='retrieved_at'"
 
 # Step 1: baseline schema (no provenance columns — do NOT seed yet). Fails fast on any SQL error.
 schema:
@@ -72,35 +72,43 @@ seed-synthetic:
 embed:
 	docker compose exec backend python -m app.ai.embeddings.run --all
 
+# Fetch PDFs from an approved official source (see system.source_registry). Example:
+#   make ingest SOURCE=TN_GOV_PORTAL PAGE=https://www.tn.gov.in/ LIMIT=5
+SOURCE ?= TN_GOV_PORTAL
+PAGE ?= https://www.tn.gov.in/
+LIMIT ?= 5
+ingest:
+	docker compose exec backend sh -c 'python -m etl.pipeline --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB --source $(SOURCE) --page $(PAGE) --limit $(LIMIT) --data-dir /data'
+
 graph-rebuild:
 	docker compose exec backend python -m knowledge_graph.rebuild
 
 # ── Testing ──────────────────────────────────────────────────
 test:
-	docker compose exec backend pytest -q --cov=app --cov-report=term-missing
+	docker compose exec backend sh -c 'TEST_ADMIN_DSN=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres TEST_POSTGIS=1 pytest -q -rs --cov=app --cov-report=term-missing'
 
 test-unit:
 	docker compose exec backend pytest tests/unit -q
 
 test-integration:
-	docker compose exec backend pytest tests/integration -q
+	docker compose exec backend sh -c 'TEST_ADMIN_DSN=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres TEST_POSTGIS=1 pytest tests/integration -q -rs'
 
 eval:
 	docker compose exec backend python -m ai.eval.run_all
 
 e2e:
-	cd frontend && npx playwright test
+	@test -n "$(E2E_ADMIN_DSN)" || (echo "set E2E_ADMIN_DSN (superuser DSN of a DISPOSABLE PostgreSQL), E2E_PG_PORT, E2E_PG_PASSWORD"; exit 1)
+	cd backend && python -m scripts.e2e_env --admin-dsn "$(E2E_ADMIN_DSN)"
+	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8010 npm run build && npx playwright test
 
 # ── Code Quality ─────────────────────────────────────────────
 lint:
-	docker compose exec backend ruff check . && \
-	docker compose exec backend black --check . && \
-	docker compose exec backend mypy app && \
-	cd frontend && npm run lint && npx tsc --noEmit
+	docker compose exec backend ruff check app scripts etl knowledge_graph ai tests
+	docker compose exec backend mypy app scripts etl knowledge_graph ai
+	cd frontend && npx tsc --noEmit && npx next lint
 
 format:
-	docker compose exec backend ruff check --fix . && \
-	docker compose exec backend black .
+	docker compose exec backend ruff check --fix app scripts etl knowledge_graph ai tests
 
 # ── Shell Access ─────────────────────────────────────────────
 shell-db:

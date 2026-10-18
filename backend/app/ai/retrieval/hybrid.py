@@ -22,6 +22,7 @@ logger = structlog.get_logger(__name__)
 _provider_cache: dict[str, EmbeddingProvider] = {}
 
 REL_KEYWORD_CUTOFF = 0.3                       # keyword hit must reach 30% of the best hit of its type
+REL_SEMANTIC_CUTOFF = 0.85                     # semantic hit must reach 85% of the best semantic score for the question
 QUOTAS = {"document_chunk": 4, "scheme": 3, "service": 3}
 
 
@@ -164,12 +165,14 @@ async def search(db: AsyncSession, query_tsquery: Optional[str], question: str, 
     qv = await query_vector(db, question, embedder, info)
     model = info.get("model")
     pool: list[dict] = []
+    per_kind = {kind: await _candidates(db, kind, query_tsquery, qv, model, limit * 3) for kind in kinds}
+    best_sem = max((v["sem"] for c in per_kind.values() for v in c.values() if v.get("sem") is not None), default=0.0)
+    sem_floor = max(settings.RETRIEVAL_MIN_SIMILARITY, REL_SEMANTIC_CUTOFF * best_sem)
     for kind in kinds:
-        cands = await _candidates(db, kind, query_tsquery, qv, model, limit * 3)
-        for v in cands.values():
+        for v in per_kind[kind].values():
             kw, sem = v.get("kw"), v.get("sem")
             if info["semantic"] and sem is not None:
-                keep = sem >= settings.RETRIEVAL_MIN_SIMILARITY       # the vector engine judged it: a stray keyword cannot rescue it
+                keep = sem >= sem_floor       # the vector engine judged it: a stray keyword cannot rescue it, and near-misses of a clear winner are dropped
             else:                                                     # never embedded / no vectors: keyword evidence only
                 keep = kw is not None and kw >= REL_KEYWORD_CUTOFF
             if not keep:
