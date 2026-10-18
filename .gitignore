@@ -64,3 +64,6 @@ frontend/playwright-report/
 frontend/e2e/results.json
 frontend/tsconfig.tsbuildinfo
 frontend/.next/
+
+# Ingested source documents (fetched copies of official PDFs; reproducible from the pipeline)
+data/raw/ingested/
