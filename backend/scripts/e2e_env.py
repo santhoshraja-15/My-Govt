@@ -47,6 +47,14 @@ async def main() -> int:
                 continue
             await conn.execute(m.read_text(encoding="utf-8"))
         await seed.apply_seed(conn)
+        # One clearly-labelled FIXTURE document so the UI's document-citation path can be tested end to end.
+        # It is not an official document: title says so, it has no source URL and stays 'unverified'.
+        did = await conn.fetchval(
+            "INSERT INTO documents.document (title,document_type,file_hash,status,extraction_status,verification_status,retrieved_at,page_count) "
+            "VALUES ('[E2E TEST FIXTURE] Zorblax scholarship notice','Notice','e2e-fixture-1','active','ok','unverified',now(),2) RETURNING document_id")
+        await conn.execute(
+            "INSERT INTO documents.document_chunk (document_id,chunk_number,content,page_number) VALUES ($1,0,$2,2)", did,
+            "The Zorblax scholarship test notice describes a fictional monthly grant used only by automated tests.")
         for email, role in (("e2e-admin@example.com", "state_admin"), ("e2e-sysadmin@example.com", "system_admin"), ("e2e-officer@example.com", "officer")):
             await conn.execute("INSERT INTO identity.app_user (email,password_hash,role) VALUES ($1,$2,$3)",
                                email, hash_password(password), role)

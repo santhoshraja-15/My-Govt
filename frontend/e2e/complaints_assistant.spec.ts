@@ -129,6 +129,16 @@ test.describe("AI citizen assistant", () => {
     await expect(page.getByText(/provisional/i).first()).toBeVisible();
   });
 
+  test("cites an ingested document passage with its page and labels it unverified", async ({ page }) => {
+    await page.goto("/assistant");
+    await page.getByLabel("Ask a question").fill("What does the Zorblax scholarship notice describe?");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText(/\[E2E TEST FIXTURE\] Zorblax scholarship notice · p\.2/)).toBeVisible();
+    await expect(page.getByTestId("unverified-notice")).toBeVisible();
+    await expect(page.getByTestId("assistant-answer")).toContainText("fictional monthly grant");
+    await expect(page.getByTestId("assistant-answer")).not.toContainText("You are eligible");
+  });
+
   test("abstains instead of inventing an answer when nothing matches", async ({ page }) => {
     await page.goto("/assistant");
     await page.getByLabel("Ask a question").fill("zzqqxx vvwwyy");

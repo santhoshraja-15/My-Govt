@@ -15,6 +15,10 @@ interface Citation {
   source_url?: string;
   verified_at?: string;
   verification_status?: string;
+  page?: number | null;
+  excerpt?: string | null;
+  outdated?: boolean;
+  chunk_id?: string | null;
 }
 
 interface Message {
@@ -29,6 +33,7 @@ interface Message {
   intent?: string;
   suggested_actions?: string[];
   contains_unverified?: boolean;
+  evidence_notes?: string[];
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -64,7 +69,8 @@ function CitationCard({ citations }: { citations: Citation[] }) {
         {citations.map((c) => (
           <a key={c.index} href={c.source_url || "#"} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 px-2.5 py-1 rounded-full border border-brand-100 transition-all">
-            [{c.index}] {c.title}
+            [{c.index}] {c.title}{c.page ? ` · p.${c.page}` : ""}
+            {c.outdated && <span className="text-[10px] uppercase tracking-wide text-red-700">outdated</span>}
             {c.verification_status && c.verification_status !== "official_verified" && (
               <span className="text-[10px] uppercase tracking-wide text-amber-700">{c.verification_status.replace("_", " ")}</span>
             )}
@@ -113,6 +119,11 @@ function MessageBubble({ msg }: { msg: Message }) {
               </div>
             )}
             <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap" data-testid="assistant-answer">{msg.content}</p>
+            {msg.evidence_notes?.length ? (
+              <ul data-testid="evidence-notes" className="mt-2 text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+                {msg.evidence_notes.map((n) => <li key={n}>{n}</li>)}
+              </ul>
+            ) : null}
 
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <TrustIndicator score={msg.trust_score} />
@@ -182,6 +193,7 @@ export default function AssistantPage() {
         intent: res.intent,
         suggested_actions: res.suggested_actions,
         contains_unverified: res.contains_unverified,
+        evidence_notes: res.evidence_notes,
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
