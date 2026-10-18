@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Inter, Noto_Sans_Tamil } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import { LangProvider } from "@/lib/i18n";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -22,17 +23,17 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://mygovt.tn.gov.in"),
 };
 
+// Self-hosted at build time (no request to Google when a citizen loads a page).
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const notoTamil = Noto_Sans_Tamil({ subsets: ["tamil"], variable: "--font-tamil", display: "swap" });
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-      </head>
+    <html lang="en" className={`${inter.variable} ${notoTamil.variable}`}>
       <body className="min-h-screen bg-slate-50">
         <LangProvider>
           <AuthProvider>

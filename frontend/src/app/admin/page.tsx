@@ -558,7 +558,7 @@ function AdminConsole() {
               </div>
             </>
           )}
-          <button onClick={() => setCollapsed(c => !c)}
+          <button onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={`ml-auto btn-ghost p-1.5 ${collapsed ? "mx-auto" : ""}`}>
             <ChevronRight size={16} className={`transition-transform ${collapsed ? "" : "rotate-180"}`} />
           </button>

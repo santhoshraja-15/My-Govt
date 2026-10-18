@@ -52,3 +52,25 @@ test.describe("language", () => {
     await expect(page.getByText("முதலமைச்சரின் காலை உணவுத் திட்டம்")).toBeVisible();
   });
 });
+
+test.describe("privacy", () => {
+  test("pages make no requests to third-party hosts (fonts are self-hosted)", async ({ page }) => {
+    const foreign: string[] = [];
+    page.on("request", (r) => {
+      const host = new URL(r.url()).hostname;
+      if (host !== "localhost" && host !== "127.0.0.1") foreign.push(r.url());
+    });
+    for (const path of ["/", "/schemes", "/services", "/complaints", "/assistant", "/login"]) {
+      await page.goto(path);
+      await page.waitForLoadState("load");
+    }
+    expect(foreign).toEqual([]);
+  });
+
+  test("Tamil text renders with the self-hosted Tamil font available", async ({ page }) => {
+    await page.goto("/schemes");
+    await expect(page.getByText("முதலமைச்சரின் காலை உணவுத் திட்டம்")).toBeVisible();
+    const family = await page.getByText("முதலமைச்சரின் காலை உணவுத் திட்டம்").first().evaluate((e) => getComputedStyle(e).fontFamily);
+    expect(family).toContain("Noto Sans Tamil");
+  });
+});

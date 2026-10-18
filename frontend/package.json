@@ -1,7 +1,7 @@
 {
   "name": "mygovt-frontend",
   "version": "1.0.0",
-  "description": "MyGovt \u2014 AI-Powered Citizen Intelligence & State Governance Platform",
+  "description": "MyGovt — AI-Powered Citizen Intelligence & State Governance Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -42,6 +42,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.45.3",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.3",

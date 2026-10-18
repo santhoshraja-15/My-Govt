@@ -93,7 +93,7 @@ function Navbar() {
           </div>
 
           {/* Mobile menu */}
-          <button onClick={() => setOpen(!open)} className="md:hidden text-white p-2">
+          <button onClick={() => setOpen(!open)} className="md:hidden text-white p-2" aria-label="Toggle navigation menu" aria-expanded={open}>
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>

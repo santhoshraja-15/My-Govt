@@ -225,7 +225,7 @@ export default function SchemesPage() {
                 placeholder="Search schemes…" className="flex-1 bg-transparent text-white placeholder-blue-300 text-sm outline-none" />
             </div>
             <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">Search</button>
-            <button type="button" onClick={() => setShowFilters(s => !s)}
+            <button type="button" onClick={() => setShowFilters(s => !s)} aria-label="Toggle filters" aria-expanded={showFilters}
               className="btn-ghost bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl">
               <SlidersHorizontal size={18} />
             </button>

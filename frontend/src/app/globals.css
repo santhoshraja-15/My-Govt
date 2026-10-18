@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Tamil:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -19,10 +18,10 @@ html { scroll-behavior: smooth; }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
 }
 
-.font-tamil { font-family: 'Noto Sans Tamil', sans-serif; }
+.font-tamil { font-family: var(--font-tamil), 'Noto Sans Tamil', sans-serif; }
 
 /* ── Glass morphism ─────────────────────────────────────────── */
 .glass {
