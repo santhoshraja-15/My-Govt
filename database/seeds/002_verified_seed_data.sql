@@ -497,3 +497,24 @@ ALTER TABLE services.service              VALIDATE CONSTRAINT chk_service_verifi
 ALTER TABLE complaints.complaint_category VALIDATE CONSTRAINT chk_complaint_category_verified_has_source;
 
 SELECT set_config('app.verification_reason', '', false);
+
+-- ── 12. Complaint routing targets ───────────────────────────────────────────────
+-- Department-level ROUTING PLACEHOLDERS, not offices: one state-level authority per department
+-- and one routing rule per complaint category (from complaint_category.default_department_id).
+-- No officer, office address or district hierarchy is invented. Real district/taluk authorities
+-- must be added from official sources; until then complaints route to the department level and
+-- the API reports assignment_state = 'department_level'.
+INSERT INTO administration.authority
+  (department_id, authority_type, authority_name, jurisdiction_level, verification_status, is_routing_placeholder, notes)
+SELECT d.department_id, 'department_office', d.department_name || ' (department-level routing)', 'state',
+       'provisional', true,
+       'Platform-created routing target for complaints; not a verified office or officer.'
+FROM administration.department d
+ON CONFLICT (department_id, jurisdiction_level) WHERE is_routing_placeholder DO NOTHING;
+
+INSERT INTO complaints.routing_rule
+  (category_id, jurisdiction_level, department_id, authority_type, priority_order, verification_status)
+SELECT c.category_id, 'state', c.default_department_id, 'department_office', 1, 'provisional'
+FROM complaints.complaint_category c
+WHERE c.default_department_id IS NOT NULL
+ON CONFLICT (category_id, jurisdiction_level, priority_order) DO NOTHING;

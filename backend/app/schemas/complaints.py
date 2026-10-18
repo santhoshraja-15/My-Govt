@@ -31,6 +31,8 @@ class ComplaintOut(BaseModel):
     department_name: Optional[str] = None
     created_at: datetime
     due_date: Optional[datetime] = None
+    # authority_assigned | department_level | department_only | unassigned
+    assignment_state: str = "unassigned"
 
     class Config:
         from_attributes = True
@@ -78,6 +80,7 @@ class ComplaintTrack(BaseModel):
     authority_name: Optional[str] = None
     created_at: datetime
     due_date: Optional[datetime] = None
+    assignment_state: str = "unassigned"
     timeline: List[ComplaintHistoryItem] = []
     sla_breached: bool = False
 

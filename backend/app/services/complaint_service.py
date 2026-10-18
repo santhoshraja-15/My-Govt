@@ -87,7 +87,7 @@ class ComplaintService:
             except Exception as e:  # noqa: BLE001
                 logger.warning("jurisdiction_resolution_failed", error=str(e))
 
-        department_id, authority_id = await self._route_complaint(
+        department_id, authority_id, placeholder = await self._route_complaint(
             data.category_id, district_id, category.default_department_id if category else None
         )
         resolution_h, escalation_h = await self._sla_hours(
@@ -143,6 +143,7 @@ class ComplaintService:
             department_name=dept_name,
             created_at=new.created_at,
             due_date=due_date,
+            assignment_state=rules.assignment_state(authority_id, placeholder, department_id),
         )
 
     async def _route_complaint(self, category_id, district_id, default_department_id):
@@ -153,7 +154,7 @@ class ComplaintService:
         either may be None when no rule/authority is configured (no guessing).
         """
         if category_id is None:
-            return None, None
+            return None, None, False
         r = await self.db.execute(
             text("""
                 SELECT department_id FROM complaints.routing_rule
@@ -163,19 +164,21 @@ class ComplaintService:
         )
         department_id = r.scalar() or default_department_id
         if department_id is None:
-            return None, None
+            return None, None, False
         a = await self.db.execute(
             text("""
-                SELECT authority_id FROM administration.authority
+                SELECT authority_id, is_routing_placeholder FROM administration.authority
                 WHERE department_id = :dep
                   AND ((jurisdiction_level = 'district' AND jurisdiction_id = :dist)
                        OR jurisdiction_level = 'state')
-                ORDER BY CASE WHEN jurisdiction_level = 'district' THEN 0 ELSE 1 END, authority_id
+                ORDER BY CASE WHEN jurisdiction_level = 'district' THEN 0 ELSE 1 END,
+                         is_routing_placeholder, authority_id
                 LIMIT 1
             """),
             {"dep": department_id, "dist": district_id},
         )
-        return department_id, a.scalar()
+        row = a.fetchone()
+        return department_id, (row.authority_id if row else None), bool(row and row.is_routing_placeholder)
 
     async def _sla_hours(self, category_id, priority, department_id, default_hours):
         if category_id is None:
@@ -211,7 +214,9 @@ class ComplaintService:
             text("""
                 SELECT c.complaint_id, c.complaint_ref AS reference_number, c.title, c.status,
                        cc.category_name, d.department_name, a.authority_name,
-                       c.created_at, c.due_date
+                       c.created_at, c.due_date,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
                 LEFT JOIN administration.department d ON d.department_id = c.department_id
@@ -227,6 +232,7 @@ class ComplaintService:
             reference_number=row.reference_number, title=row.title, status=row.status,
             category_name=row.category_name, department_name=row.department_name,
             authority_name=row.authority_name, created_at=row.created_at, due_date=row.due_date,
+            assignment_state=row.assignment_state,
             timeline=await self._history(row.complaint_id),
             sla_breached=rules.is_sla_breached(row.due_date, row.status, datetime.now(timezone.utc)),
         )
@@ -245,10 +251,13 @@ class ComplaintService:
         r = await self.db.execute(
             text(f"""
                 SELECT c.complaint_id, c.complaint_ref AS reference_number, c.title, c.status,
-                       cc.category_name, d.department_name, c.created_at, c.due_date
+                       cc.category_name, d.department_name, c.created_at, c.due_date,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
                 LEFT JOIN administration.department d ON d.department_id = c.department_id
+                LEFT JOIN administration.authority a ON a.authority_id = c.authority_id
                 WHERE {where}
                 ORDER BY c.created_at DESC
                 LIMIT :lim OFFSET :off
@@ -269,7 +278,9 @@ class ComplaintService:
                        c.latitude, c.longitude, c.address, c.priority,
                        a.authority_name, o.name AS officer_name,
                        c.created_at, c.due_date, c.escalation_due_at,
-                       c.category_confidence::float AS ai_confidence, NULL::text AS ai_category
+                       c.category_confidence::float AS ai_confidence, NULL::text AS ai_category,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
                 LEFT JOIN administration.department d ON d.department_id = c.department_id

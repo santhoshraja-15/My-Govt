@@ -33,6 +33,19 @@ DEFAULT_RESOLUTION_HOURS = 72
 DEFAULT_ESCALATION_HOURS = 48
 
 
+def assignment_state(authority_id, authority_is_placeholder: bool, department_id) -> str:
+    """How far routing got - reported to citizens so an unrouted complaint is never hidden.
+
+    authority_assigned : routed to a (non-placeholder) authority
+    department_level   : routed to the department's platform routing target (no specific office yet)
+    department_only    : a department was identified but no authority exists for it
+    unassigned         : no department or authority (e.g. awaiting triage)
+    """
+    if authority_id is not None:
+        return "department_level" if authority_is_placeholder else "authority_assigned"
+    return "department_only" if department_id is not None else "unassigned"
+
+
 def can_transition(old: str, new: str) -> bool:
     return new in TRANSITIONS.get(old, ())
 

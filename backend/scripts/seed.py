@@ -111,6 +111,7 @@ async def preflight(conn: asyncpg.Connection) -> list[str]:
         ("complaints", "sla_rule", "sla_source_type"),
         ("complaints", "complaint", "address"),
         ("administration", "district", "source_document_ref"),
+        ("administration", "authority", "is_routing_placeholder"),
     ]
     for schema, table, col in needed:
         ok = await conn.fetchval(
@@ -253,6 +254,16 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
     add("every scheme has a source_id", n == 0, f"{n} without source")
     n = await count("SELECT count(*) FROM system.source_registry WHERE source_type='synthetic'")
     add("no synthetic sources in verified seed", n == 0, f"{n} synthetic sources")
+
+    # complaint routing targets (migration 006 + seed section 12)
+    n = await count("SELECT count(*) FROM administration.department d WHERE NOT EXISTS "
+                    "(SELECT 1 FROM administration.authority a WHERE a.department_id=d.department_id)")
+    add("every department has a routing authority", n == 0, f"{n} departments without one")
+    n = await count("SELECT count(*) FROM complaints.complaint_category c WHERE c.default_department_id IS NOT NULL "
+                    "AND NOT EXISTS (SELECT 1 FROM complaints.routing_rule r WHERE r.category_id=c.category_id)")
+    add("every category with a default department has a routing rule", n == 0, f"{n} categories unrouted")
+    n = await count("SELECT count(*) FROM administration.authority WHERE is_routing_placeholder AND verification_status='official_verified'")
+    add("routing placeholders are never marked official_verified", n == 0, f"{n} violate")
 
     # verification governance (migration 004)
     tables = (("administration", "district"), ("administration", "department"), ("schemes", "scheme"),
