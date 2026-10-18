@@ -1,7 +1,6 @@
 """JWT token creation, verification, and password hashing."""
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
-from uuid import UUID
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext

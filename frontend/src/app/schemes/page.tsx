@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Filter, ChevronRight, Award, CheckCircle2, XCircle, AlertCircle, ArrowLeft, X, Loader2, SlidersHorizontal } from "lucide-react";
 import { schemes as schemesAPI } from "@/lib/api";
+import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
 const CATEGORIES = [
   "All","education","health_insurance","social_security","agriculture","women_welfare",
@@ -42,11 +43,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
         {scheme.scheme_level && (
           <span className="badge badge-green capitalize">{scheme.scheme_level}</span>
         )}
-        {scheme.verified_at && (
-          <span className="badge badge-purple flex items-center gap-1">
-            <CheckCircle2 size={10} /> Verified
-          </span>
-        )}
+        <VerificationBadge status={scheme.verification_status} />
       </div>
     </Link>
   );

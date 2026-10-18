@@ -137,7 +137,7 @@ const QUICK_ACTIONS = [
 
 // ── Feature cards ─────────────────────────────────────────────
 const FEATURES = [
-  { icon: Shield, title: "Verified Information Only", desc: "Every answer is grounded in official government sources — no hallucinations, no invented facts." },
+  { icon: Shield, title: "Source-Grounded Answers", desc: "Answers come only from the records we hold, each labelled Verified, Provisional or External — no invented facts." },
   { icon: Zap, title: "Real-time AI Eligibility", desc: "Get instant, deterministic eligibility checks for 30+ Tamil Nadu schemes based on your profile." },
   { icon: Globe, title: "Bilingual — English & Tamil", desc: "Ask questions and read answers in English or Tamil. Full UI available in both languages." },
   { icon: TrendingUp, title: "End-to-End Complaint Tracking", desc: "File, track, and escalate civic complaints with SLA timelines and real-time status updates." },
@@ -327,7 +327,7 @@ export default function HomePage() {
               Ask anything about<br />Tamil Nadu Government
             </h2>
             <p className="text-blue-200 text-lg mb-8 max-w-xl mx-auto">
-              Get instant, verified answers about schemes, services, eligibility criteria, deadlines and more — in English or Tamil.
+              Get instant answers, with sources and verification status, about schemes, services, eligibility criteria, deadlines and more — in English or Tamil.
             </p>
             <Link href="/assistant" className="inline-flex items-center gap-3 bg-white text-brand-700 font-bold px-8 py-4 rounded-2xl hover:bg-blue-50 transition-all shadow-2xl text-lg">
               <MessageSquare size={22} />
@@ -373,7 +373,7 @@ export default function HomePage() {
           </div>
           <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-xs">© 2024 Government of Tamil Nadu. All rights reserved.</p>
-            <p className="text-xs">Information is sourced from official government portals and verified regularly.</p>
+            <p className="text-xs">Records are labelled by verification status. Provisional items have not yet been verified against an official document; confirm with the department before acting.</p>
           </div>
         </div>
       </footer>

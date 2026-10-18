@@ -5,6 +5,10 @@
 -- Resolves all schema alignment errors, duplicate codes, and provenance gaps.
 -- =====================================================================
 
+-- Every verification_status written below is logged to system.verification_status_log
+-- (migration 004) with this reason. Reset at the end of the file.
+SELECT set_config('app.verification_reason', 'seed load: curated record, no official document evidence recorded', false);
+
 -- ── 1. Source Registry ──────────────────────────────────────────────
 INSERT INTO system.source_registry (
   source_id, source_code, source_name, department, source_type,
@@ -47,48 +51,48 @@ VALUES (1, 'TN', 'Tamil Nadu', 'தமிழ்நாடு')
 ON CONFLICT (state_code) DO UPDATE SET
   state_name_ta = EXCLUDED.state_name_ta;
 
--- ── 3. Districts (All 38 verified districts with unique codes) ───────
+-- ── 3. Districts (38 districts; provisional until evidence recorded) ───────
 INSERT INTO administration.district (
   district_id, state_id, district_code, district_name, name_ta, headquarters, verification_status
 ) VALUES
-  (1,  1, 'TN-CHN', 'Chennai',          'சென்னை',         'Chennai',          'official_verified'),
-  (2,  1, 'TN-CBE', 'Coimbatore',       'கோயம்புத்தூர்',   'Coimbatore',       'official_verified'),
-  (3,  1, 'TN-MDU', 'Madurai',          'மதுரை',           'Madurai',          'official_verified'),
-  (4,  1, 'TN-TRY', 'Tiruchirappalli',  'திருச்சிராப்பள்ளி','Tiruchirappalli',  'official_verified'),
-  (5,  1, 'TN-SLM', 'Salem',            'சேலம்',           'Salem',            'official_verified'),
-  (6,  1, 'TN-TNV', 'Tirunelveli',      'திருநெல்வேலி',    'Tirunelveli',      'official_verified'),
-  (7,  1, 'TN-VEL', 'Vellore',          'வேலூர்',          'Vellore',          'official_verified'),
-  (8,  1, 'TN-ERD', 'Erode',            'ஈரோடு',           'Erode',            'official_verified'),
-  (9,  1, 'TN-TNJ', 'Thanjavur',        'தஞ்சாவூர்',       'Thanjavur',        'official_verified'),
-  (10, 1, 'TN-DGL', 'Dindigul',         'திண்டுக்கல்',     'Dindigul',         'official_verified'),
-  (11, 1, 'TN-KPM', 'Kanchipuram',      'காஞ்சிபுரம்',     'Kanchipuram',      'official_verified'),
-  (12, 1, 'TN-TVL', 'Thiruvallur',      'திருவள்ளூர்',     'Thiruvallur',      'official_verified'),
-  (13, 1, 'TN-CUD', 'Cuddalore',        'கடலூர்',          'Cuddalore',        'official_verified'),
-  (14, 1, 'TN-VPM', 'Villupuram',       'விழுப்புரம்',     'Villupuram',       'official_verified'),
-  (15, 1, 'TN-NGP', 'Nagapattinam',     'நாகப்பட்டினம்',   'Nagapattinam',     'official_verified'),
-  (16, 1, 'TN-TVR', 'Thiruvarur',       'திருவாரூர்',      'Thiruvarur',       'official_verified'),
-  (17, 1, 'TN-PDK', 'Pudukkottai',      'புதுக்கோட்டை',    'Pudukkottai',      'official_verified'),
-  (18, 1, 'TN-SVG', 'Sivaganga',        'சிவகங்கை',        'Sivaganga',        'official_verified'),
-  (19, 1, 'TN-RAM', 'Ramanathapuram',   'ராமநாதபுரம்',    'Ramanathapuram',   'official_verified'),
-  (20, 1, 'TN-TUT', 'Thoothukudi',      'தூத்துக்குடி',    'Thoothukudi',      'official_verified'),
-  (21, 1, 'TN-KKI', 'Kanniyakumari',    'கன்னியாகுமரி',    'Nagercoil',        'official_verified'),
-  (22, 1, 'TN-VRD', 'Virudhunagar',     'விருதுநகர்',      'Virudhunagar',     'official_verified'),
-  (23, 1, 'TN-THN', 'Theni',            'தேனி',             'Theni',            'official_verified'),
-  (24, 1, 'TN-KRI', 'Krishnagiri',      'கிருஷ்ணகிரி',     'Krishnagiri',      'official_verified'),
-  (25, 1, 'TN-DPI', 'Dharmapuri',       'தர்மபுரி',        'Dharmapuri',       'official_verified'),
-  (26, 1, 'TN-TVM', 'Tiruvannamalai',   'திருவண்ணாமலை',   'Tiruvannamalai',   'official_verified'),
-  (27, 1, 'TN-NKL', 'Namakkal',         'நாமக்கல்',        'Namakkal',         'official_verified'),
-  (28, 1, 'TN-KRR', 'Karur',            'கரூர்',            'Karur',            'official_verified'),
-  (29, 1, 'TN-ARI', 'Ariyalur',         'அரியலூர்',        'Ariyalur',         'official_verified'),
-  (30, 1, 'TN-PBL', 'Perambalur',       'பெரம்பலூர்',      'Perambalur',       'official_verified'),
-  (31, 1, 'TN-TPR', 'Tiruppur',         'திருப்பூர்',      'Tiruppur',         'official_verified'),
-  (32, 1, 'TN-NLG', 'Nilgiris',         'நீலகிரி',          'Udhagamandalam',   'official_verified'),
-  (33, 1, 'TN-MYD', 'Mayiladuthurai',   'மயிலாடுதுறை',    'Mayiladuthurai',   'official_verified'),
-  (34, 1, 'TN-KLK', 'Kallakurichi',     'கள்ளக்குறிச்சி',  'Kallakurichi',     'official_verified'),
-  (35, 1, 'TN-TKS', 'Tenkasi',          'தென்காசி',        'Tenkasi',          'official_verified'),
-  (36, 1, 'TN-CGL', 'Chengalpattu',     'செங்கல்பட்டு',    'Chengalpattu',     'official_verified'),
-  (37, 1, 'TN-RPT', 'Ranipet',          'ராணிப்பேட்டை',    'Ranipet',          'official_verified'),
-  (38, 1, 'TN-TPT', 'Tirupattur',       'திருப்பத்தூர்',   'Tirupattur',       'official_verified')
+  (1,  1, 'TN-CHN', 'Chennai',          'சென்னை',         'Chennai',          'provisional'),
+  (2,  1, 'TN-CBE', 'Coimbatore',       'கோயம்புத்தூர்',   'Coimbatore',       'provisional'),
+  (3,  1, 'TN-MDU', 'Madurai',          'மதுரை',           'Madurai',          'provisional'),
+  (4,  1, 'TN-TRY', 'Tiruchirappalli',  'திருச்சிராப்பள்ளி','Tiruchirappalli',  'provisional'),
+  (5,  1, 'TN-SLM', 'Salem',            'சேலம்',           'Salem',            'provisional'),
+  (6,  1, 'TN-TNV', 'Tirunelveli',      'திருநெல்வேலி',    'Tirunelveli',      'provisional'),
+  (7,  1, 'TN-VEL', 'Vellore',          'வேலூர்',          'Vellore',          'provisional'),
+  (8,  1, 'TN-ERD', 'Erode',            'ஈரோடு',           'Erode',            'provisional'),
+  (9,  1, 'TN-TNJ', 'Thanjavur',        'தஞ்சாவூர்',       'Thanjavur',        'provisional'),
+  (10, 1, 'TN-DGL', 'Dindigul',         'திண்டுக்கல்',     'Dindigul',         'provisional'),
+  (11, 1, 'TN-KPM', 'Kanchipuram',      'காஞ்சிபுரம்',     'Kanchipuram',      'provisional'),
+  (12, 1, 'TN-TVL', 'Thiruvallur',      'திருவள்ளூர்',     'Thiruvallur',      'provisional'),
+  (13, 1, 'TN-CUD', 'Cuddalore',        'கடலூர்',          'Cuddalore',        'provisional'),
+  (14, 1, 'TN-VPM', 'Villupuram',       'விழுப்புரம்',     'Villupuram',       'provisional'),
+  (15, 1, 'TN-NGP', 'Nagapattinam',     'நாகப்பட்டினம்',   'Nagapattinam',     'provisional'),
+  (16, 1, 'TN-TVR', 'Thiruvarur',       'திருவாரூர்',      'Thiruvarur',       'provisional'),
+  (17, 1, 'TN-PDK', 'Pudukkottai',      'புதுக்கோட்டை',    'Pudukkottai',      'provisional'),
+  (18, 1, 'TN-SVG', 'Sivaganga',        'சிவகங்கை',        'Sivaganga',        'provisional'),
+  (19, 1, 'TN-RAM', 'Ramanathapuram',   'ராமநாதபுரம்',    'Ramanathapuram',   'provisional'),
+  (20, 1, 'TN-TUT', 'Thoothukudi',      'தூத்துக்குடி',    'Thoothukudi',      'provisional'),
+  (21, 1, 'TN-KKI', 'Kanniyakumari',    'கன்னியாகுமரி',    'Nagercoil',        'provisional'),
+  (22, 1, 'TN-VRD', 'Virudhunagar',     'விருதுநகர்',      'Virudhunagar',     'provisional'),
+  (23, 1, 'TN-THN', 'Theni',            'தேனி',             'Theni',            'provisional'),
+  (24, 1, 'TN-KRI', 'Krishnagiri',      'கிருஷ்ணகிரி',     'Krishnagiri',      'provisional'),
+  (25, 1, 'TN-DPI', 'Dharmapuri',       'தர்மபுரி',        'Dharmapuri',       'provisional'),
+  (26, 1, 'TN-TVM', 'Tiruvannamalai',   'திருவண்ணாமலை',   'Tiruvannamalai',   'provisional'),
+  (27, 1, 'TN-NKL', 'Namakkal',         'நாமக்கல்',        'Namakkal',         'provisional'),
+  (28, 1, 'TN-KRR', 'Karur',            'கரூர்',            'Karur',            'provisional'),
+  (29, 1, 'TN-ARI', 'Ariyalur',         'அரியலூர்',        'Ariyalur',         'provisional'),
+  (30, 1, 'TN-PBL', 'Perambalur',       'பெரம்பலூர்',      'Perambalur',       'provisional'),
+  (31, 1, 'TN-TPR', 'Tiruppur',         'திருப்பூர்',      'Tiruppur',         'provisional'),
+  (32, 1, 'TN-NLG', 'Nilgiris',         'நீலகிரி',          'Udhagamandalam',   'provisional'),
+  (33, 1, 'TN-MYD', 'Mayiladuthurai',   'மயிலாடுதுறை',    'Mayiladuthurai',   'provisional'),
+  (34, 1, 'TN-KLK', 'Kallakurichi',     'கள்ளக்குறிச்சி',  'Kallakurichi',     'provisional'),
+  (35, 1, 'TN-TKS', 'Tenkasi',          'தென்காசி',        'Tenkasi',          'provisional'),
+  (36, 1, 'TN-CGL', 'Chengalpattu',     'செங்கல்பட்டு',    'Chengalpattu',     'provisional'),
+  (37, 1, 'TN-RPT', 'Ranipet',          'ராணிப்பேட்டை',    'Ranipet',          'provisional'),
+  (38, 1, 'TN-TPT', 'Tirupattur',       'திருப்பத்தூர்',   'Tirupattur',       'provisional')
 ON CONFLICT (district_code) DO UPDATE SET
   district_name = EXCLUDED.district_name,
   name_ta = EXCLUDED.name_ta,
@@ -141,45 +145,45 @@ FROM (VALUES
 ) AS v(district_code, lgd_code)
 WHERE d.district_code = v.district_code;
 
--- ── 4. Departments (17 departments with verified URLs) ─────────
+-- ── 4. Departments (17 departments with portal URLs) ─────────
 INSERT INTO administration.department (
   department_id, department_code, department_name, name_ta, short_name,
   description, website_url, status, verification_status, verified_by
 ) VALUES
   (1,  'REVT', 'Revenue Department', 'வருவாய் துறை', 'Revenue',
-   'Land administration, certifications, disaster management', 'https://www.esevai.tn.gov.in', 'active', 'official_verified', 'TNeGA Portal Directory'),
+   'Land administration, certifications, disaster management', 'https://www.esevai.tn.gov.in', 'active', 'provisional', 'TNeGA Portal Directory'),
   (2,  'HLTH', 'Health and Family Welfare Department', 'சுகாதாரம் மற்றும் குடும்ப நலத்துறை', 'Health',
-   'Public health, hospitals, primary health care, and insurance', 'https://www.tnhealth.tn.gov.in', 'active', 'official_verified', 'TN Health Secretariat'),
+   'Public health, hospitals, primary health care, and insurance', 'https://www.tnhealth.tn.gov.in', 'active', 'provisional', 'TN Health Secretariat'),
   (3,  'EDUC', 'School Education Department', 'பள்ளிக் கல்வி துறை', 'Education',
-   'Elementary, secondary, and higher secondary education', 'https://www.tnschools.gov.in', 'active', 'official_verified', 'TN School Education Directory'),
+   'Elementary, secondary, and higher secondary education', 'https://www.tnschools.gov.in', 'active', 'provisional', 'TN School Education Directory'),
   (4,  'AGRI', 'Department of Agriculture & Farmers Welfare', 'வேளாண்மை மற்றும் உழவர் நலத்துறை', 'Agriculture',
-   'Crop welfare, farm subsidies, seeds, and soil testing', 'https://www.agri.tn.gov.in', 'active', 'official_verified', 'Commissionerate of Agriculture'),
+   'Crop welfare, farm subsidies, seeds, and soil testing', 'https://www.agri.tn.gov.in', 'active', 'provisional', 'Commissionerate of Agriculture'),
   (5,  'SWWF', 'Social Welfare and Women Empowerment', 'சமூக நலன் மற்றும் மகளிர் உரிமையாண்மை', 'SocialWelfare',
-   'Women, child welfare, senior citizens, and pension schemes', 'https://www.socialwelfare.tn.gov.in', 'active', 'official_verified', 'Social Welfare Secretariat'),
+   'Women, child welfare, senior citizens, and pension schemes', 'https://www.socialwelfare.tn.gov.in', 'active', 'provisional', 'Social Welfare Secretariat'),
   (6,  'HRCE', 'Hindu Religious and Charitable Endowments', 'இந்து சமய அறநிலையத் துறை', 'HR&CE',
-   'Administration of temples and charitable trusts', 'https://www.tnhrce.gov.in', 'active', 'official_verified', 'HR&CE Commissionerate'),
+   'Administration of temples and charitable trusts', 'https://www.tnhrce.gov.in', 'active', 'provisional', 'HR&CE Commissionerate'),
   (7,  'MAWS', 'Municipal Administration and Water Supply', 'நகராட்சி நிர்வாகம் மற்றும் குடிநீர் வழங்கல்', 'Municipal',
-   'Corporations, municipalities, water supply, and drainage', 'https://www.tnmaws.tn.gov.in', 'active', 'official_verified', 'MAWS Secretariat'),
+   'Corporations, municipalities, water supply, and drainage', 'https://www.tnmaws.tn.gov.in', 'active', 'provisional', 'MAWS Secretariat'),
   (8,  'RDPR', 'Rural Development and Panchayat Raj', 'ஊரக வளர்ச்சி மற்றும் ஊராட்சித் துறை', 'RuralDev',
-   'Village panchayats, rural livelihoods, and rural roads', 'https://tnrd.tn.gov.in', 'active', 'official_verified', 'RDPR Secretariat'),
+   'Village panchayats, rural livelihoods, and rural roads', 'https://tnrd.tn.gov.in', 'active', 'provisional', 'RDPR Secretariat'),
   (9,  'LABO', 'Labour Welfare and Skill Development', 'தொழிலாளர் நலன் மற்றும் திறன் மேம்பாட்டுத் துறை', 'Labour',
-   'Unorganised worker welfare, labour enforcement, training', 'https://www.labour.tn.gov.in', 'active', 'official_verified', 'Labour Commissionerate'),
+   'Unorganised worker welfare, labour enforcement, training', 'https://www.labour.tn.gov.in', 'active', 'provisional', 'Labour Commissionerate'),
   (10, 'HOUS', 'Housing and Urban Development', 'வீட்டு வசதி மற்றும் நகர்ப்புற வளர்ச்சித் துறை', 'Housing',
-   'TNHB, urban planning, affordable housing schemes', 'https://www.tnhb.gov.in', 'active', 'official_verified', 'Housing Secretariat'),
+   'TNHB, urban planning, affordable housing schemes', 'https://www.tnhb.gov.in', 'active', 'provisional', 'Housing Secretariat'),
   (11, 'FISH', 'Fisheries and Fishermen Welfare', 'மீன்வளம் மற்றும் மீனவர் நலத்துறை', 'Fisheries',
-   'Marine, inland fisheries, relief assistance, insurance', 'https://www.fisheries.tn.gov.in', 'active', 'official_verified', 'Fisheries Directorate'),
+   'Marine, inland fisheries, relief assistance, insurance', 'https://www.fisheries.tn.gov.in', 'active', 'provisional', 'Fisheries Directorate'),
   (12, 'FORE', 'Environment, Climate Change and Forests', 'சுற்றுச்சூழல், காலநிலை மாற்றம் மற்றும் வனத்துறை', 'Forests',
-   'Forest conservation, wildlife protection, climate action', 'https://www.forests.tn.gov.in', 'active', 'official_verified', 'Forest Department HQ'),
+   'Forest conservation, wildlife protection, climate action', 'https://www.forests.tn.gov.in', 'active', 'provisional', 'Forest Department HQ'),
   (13, 'ELEC', 'Energy Department (TANGEDCO)', 'மின்சாரத் துறை', 'Energy',
-   'Power generation, transmission, and distribution', 'https://www.tangedco.gov.in', 'active', 'official_verified', 'TANGEDCO Portal'),
+   'Power generation, transmission, and distribution', 'https://www.tangedco.gov.in', 'active', 'provisional', 'TANGEDCO Portal'),
   (14, 'HHSS', 'Highways and Minor Ports Department', 'நெடுஞ்சாலைகள் மற்றும் சிறு துறைமுகங்கள் துறை', 'Highways',
-   'State highway maintenance and port infrastructure', 'https://www.highways.tn.gov.in', 'active', 'official_verified', 'Highways Secretariat'),
+   'State highway maintenance and port infrastructure', 'https://www.highways.tn.gov.in', 'active', 'provisional', 'Highways Secretariat'),
   (15, 'ADTR', 'Adi Dravidar and Tribal Welfare', 'ஆதிதிராவிடர் மற்றும் பழங்குடியினர் நலத்துறை', 'AdiDravidar',
-   'Hostels, scholarships, and housing for SC/ST citizens', 'https://www.adidravidar.gov.in', 'active', 'official_verified', 'ADTW Directorate'),
+   'Hostels, scholarships, and housing for SC/ST citizens', 'https://www.adidravidar.gov.in', 'active', 'provisional', 'ADTW Directorate'),
   (16, 'CTRG', 'Commercial Taxes and Registration Department', 'வணிக வரிகள் மற்றும் பதிவுத் துறை', 'Registration',
-   'Property registration, stamps, encumbrance certificates', 'https://tnreginet.gov.in', 'active', 'official_verified', 'Registration Dept'),
+   'Property registration, stamps, encumbrance certificates', 'https://tnreginet.gov.in', 'active', 'provisional', 'Registration Dept'),
   (17, 'FCPD', 'Food, Civil Supplies and Consumer Protection', 'உணவு மற்றும் நுகர்வோர் பாதுகாப்புத் துறை', 'CivilSupplies',
-   'Public distribution system, smart ration cards, consumer rights', 'https://www.tnpds.gov.in', 'active', 'official_verified', 'Civil Supplies Dept')
+   'Public distribution system, smart ration cards, consumer rights', 'https://www.tnpds.gov.in', 'active', 'provisional', 'Civil Supplies Dept')
 ON CONFLICT (department_code) DO UPDATE SET
   department_name = EXCLUDED.department_name,
   name_ta = EXCLUDED.name_ta,
@@ -191,16 +195,16 @@ INSERT INTO complaints.complaint_category (
   category_id, category_code, category_name, name_ta, description,
   default_department_id, default_priority, default_sla_hours, is_active, verification_status
 ) VALUES
-  (1,  'CAT-POW', 'Power Outage / Electricity Fault',   'மின்தடை மற்றும் மின் கோளாறு',       'Power supply interruption or transformer breakdown', 13, 'high',   24, true, 'official_verified'),
-  (2,  'CAT-WAT', 'Water Supply Disruption',             'குடிநீர் விநியோகத் தடை',            'Drinking water supply contamination or stoppage',     7, 'high',   24, true, 'official_verified'),
-  (3,  'CAT-ROA', 'Road Damage / Potholes',              'சாலை சேதம் மற்றும் குழிகள்',          'Pothole hazards, damaged roads or broken pavements',  7, 'medium', 72, true, 'official_verified'),
-  (4,  'CAT-GAR', 'Garbage / Solid Waste Collection',    'திடக்கழிவு மற்றும் குப்பை அகற்றம்',  'Uncollected garbage, overflowing bins or street waste', 7, 'medium', 48, true, 'official_verified'),
-  (5,  'CAT-HOS', 'Hospital / Medical Services',         'மருத்துவமனை சேவை குறைபாடுகள்',      'PHC/hospital doctor absence, medicine shortages',    2, 'high',   24, true, 'official_verified'),
-  (6,  'CAT-SCH', 'School Infrastructure & Midday Meal', 'பள்ளி உள்கட்டமைப்பு மற்றும் சத்துணவு','Classroom damage, drinking water, noon meal issues', 3, 'medium', 72, true, 'official_verified'),
-  (7,  'CAT-REV', 'Certificate / e-Sevai Delivery Delay', 'சான்றிதழ் வழங்கல் தாமதம்',          'Delay in issuance of revenue certificates via e-Sevai',1, 'medium', 72, true, 'official_verified'),
-  (8,  'CAT-RUR', 'Panchayat / Rural Infrastructure',    'ஊராட்சி உள்கட்டமைப்பு பிரச்சனை',     'Village drainage, streetlights, or community hall',   8, 'medium', 72, true, 'official_verified'),
-  (9,  'CAT-AGR', 'Agricultural Support & Inputs',       'வேளாண் உதவி மற்றும் விதைகள்',         'Seed distribution, fertilizer shortage, crop subsidy', 4, 'medium', 72, true, 'official_verified'),
-  (10, 'CAT-WEL', 'Social Welfare Pension / Benefit Delay','சமூக நல ஓய்வூதிய தாமதம்',         'Monthly pension or welfare transfer not credited',     5, 'high',   48, true, 'official_verified')
+  (1,  'CAT-POW', 'Power Outage / Electricity Fault',   'மின்தடை மற்றும் மின் கோளாறு',       'Power supply interruption or transformer breakdown', 13, 'high',   24, true, 'provisional'),
+  (2,  'CAT-WAT', 'Water Supply Disruption',             'குடிநீர் விநியோகத் தடை',            'Drinking water supply contamination or stoppage',     7, 'high',   24, true, 'provisional'),
+  (3,  'CAT-ROA', 'Road Damage / Potholes',              'சாலை சேதம் மற்றும் குழிகள்',          'Pothole hazards, damaged roads or broken pavements',  7, 'medium', 72, true, 'provisional'),
+  (4,  'CAT-GAR', 'Garbage / Solid Waste Collection',    'திடக்கழிவு மற்றும் குப்பை அகற்றம்',  'Uncollected garbage, overflowing bins or street waste', 7, 'medium', 48, true, 'provisional'),
+  (5,  'CAT-HOS', 'Hospital / Medical Services',         'மருத்துவமனை சேவை குறைபாடுகள்',      'PHC/hospital doctor absence, medicine shortages',    2, 'high',   24, true, 'provisional'),
+  (6,  'CAT-SCH', 'School Infrastructure & Midday Meal', 'பள்ளி உள்கட்டமைப்பு மற்றும் சத்துணவு','Classroom damage, drinking water, noon meal issues', 3, 'medium', 72, true, 'provisional'),
+  (7,  'CAT-REV', 'Certificate / e-Sevai Delivery Delay', 'சான்றிதழ் வழங்கல் தாமதம்',          'Delay in issuance of revenue certificates via e-Sevai',1, 'medium', 72, true, 'provisional'),
+  (8,  'CAT-RUR', 'Panchayat / Rural Infrastructure',    'ஊராட்சி உள்கட்டமைப்பு பிரச்சனை',     'Village drainage, streetlights, or community hall',   8, 'medium', 72, true, 'provisional'),
+  (9,  'CAT-AGR', 'Agricultural Support & Inputs',       'வேளாண் உதவி மற்றும் விதைகள்',         'Seed distribution, fertilizer shortage, crop subsidy', 4, 'medium', 72, true, 'provisional'),
+  (10, 'CAT-WEL', 'Social Welfare Pension / Benefit Delay','சமூக நல ஓய்வூதிய தாமதம்',         'Monthly pension or welfare transfer not credited',     5, 'high',   48, true, 'provisional')
 ON CONFLICT (category_code) DO UPDATE SET
   category_name = EXCLUDED.category_name,
   name_ta = EXCLUDED.name_ta,
@@ -238,7 +242,7 @@ INSERT INTO schemes.scheme (
    'Pioneering statewide universal breakfast scheme improving nutritional outcomes, school attendance, and learning readiness in all government primary schools.',
    3, 1, 'state', 'education_nutrition', 'Hot freshly prepared breakfast daily during school term',
    'https://www.tnschools.gov.in', 'https://www.tnschools.gov.in', 'active', '2022-09-15', now(), 'TN Education Dept / TNeGA',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000009'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000009'),
 
   ('b0000001-0000-0000-0000-000000000002', 'TN-KALAIGNAR-MAGALIR-URIMAI', 'Kalaignar Magalir Urimai Thogai',
    'கலைஞர் மகளிர் உரிமைத் திட்டம்',
@@ -246,7 +250,7 @@ INSERT INTO schemes.scheme (
    'Direct benefit transfer of Rs.1,000 per month deposited directly into Aadhaar-linked bank accounts of eligible women heads of households.',
    5, 1, 'state', 'women_empowerment', 'Rs.1,000 direct bank transfer per month',
    'https://www.socialwelfare.tn.gov.in', 'https://www.socialwelfare.tn.gov.in', 'active', '2023-09-15', now(), 'GO Ms No 1 Social Welfare',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000007'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000007'),
 
   ('b0000001-0000-0000-0000-000000000003', 'TN-CM-HEALTH-INS', 'Chief Minister Comprehensive Health Insurance (CMCHIS)',
    'முதலமைச்சரின் விரிவான மருத்துவக் காப்பீட்டுத் திட்டம்',
@@ -254,7 +258,7 @@ INSERT INTO schemes.scheme (
    'Universal health protection program providing cashless hospital care across empaneled public and private hospitals for 1,000+ medical and surgical procedures. Converged with Ayushman Bharat (AB-PMJAY) for eligible families (60:40 central:state share); state-only expanded families are 100% state funded.',
    2, 1, 'state', 'health_insurance', 'Up to Rs.5,00,000 cashless insurance per family/year',
    'https://www.cmchistn.com', 'https://www.cmchistn.com', 'active', '2012-01-11', now(), 'Health Dept / United India',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000011'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000011'),
 
   ('b0000001-0000-0000-0000-000000000004', 'TN-MOOVALUR-RAMAMIRTHAM', 'Pudhumai Penn (Moovalur Ramamirtham Higher Education)',
    'புதுமைப் பெண் திட்டம் (மூவலூர் இராமாமிர்தம் அம்மையார் திட்டம்)',
@@ -262,7 +266,7 @@ INSERT INTO schemes.scheme (
    'Incentivizes higher education among female students from government schools, reducing dropout rates and encouraging collegiate graduation.',
    5, 1, 'state', 'education_women', 'Rs.1,000 monthly stipend credited during degree duration',
    'https://www.socialwelfare.tn.gov.in', 'https://www.socialwelfare.tn.gov.in', 'active', '2022-09-05', now(), 'Social Welfare Secretariat',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000007'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000007'),
 
   ('b0000001-0000-0000-0000-000000000005', 'TN-MAKKALAI-THEDI', 'Makkalai Thedi Maruthuvam',
    'மக்களைத் தேடி மருத்துவம்',
@@ -270,7 +274,7 @@ INSERT INTO schemes.scheme (
    'Community healthcare program delivering diagnosis and essential maintenance medication directly to the homes of citizens aged 45+.',
    2, 1, 'state', 'public_health', 'Doorstep non-communicable disease screening and free medicine kits',
    'https://www.tnhealth.tn.gov.in', 'https://www.tnhealth.tn.gov.in', 'active', '2021-08-05', now(), 'Directorate of Public Health',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000010'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000010'),
 
   ('b0000001-0000-0000-0000-000000000006', 'TN-FREE-BUS-PASS', 'Vidiyal Payanam (Zero-Fare Bus Travel for Women)',
    'விடியல் பயணம் (மகளிர் கட்டணமில்லாப் பேருந்துப் பயணம்)',
@@ -278,7 +282,7 @@ INSERT INTO schemes.scheme (
    'Promotes women labor workforce participation and mobility by providing free fare in ordinary town buses across Tamil Nadu.',
    14, 1, 'state', 'transport_equity', 'Free travel in government ordinary white-board city/town buses',
    'https://www.tn.gov.in', 'https://www.tn.gov.in', 'active', '2021-05-08', now(), 'Transport Department Secretariat',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000001'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000001'),
 
   ('b0000001-0000-0000-0000-000000000007', 'TN-PM-KISAN', 'Pradhan Mantri Kisan Samman Nidhi (PM-Kisan)',
    'பிரதம மந்திரி கிசான் சம்மான் நிதி (மத்திய அரசுத் திட்டம்)',
@@ -294,7 +298,7 @@ INSERT INTO schemes.scheme (
    'Jointly funded social safety net program combining fixed Central NSAP allocation (Rs.200/month for age 60-79, Rs.500/month for age 80+) with Tamil Nadu state treasury top-up (Rs.800/Rs.500) to deliver Rs.1,000/month total pension.',
    5, 1, 'state', 'social_security', 'Rs.1,000 monthly pension deposited to beneficiary account',
    'https://www.socialwelfare.tn.gov.in', 'https://www.socialwelfare.tn.gov.in', 'active', '2007-11-19', now(), 'Social Welfare / NSAP Guidelines',
-   'Centrally Sponsored (60:40)', 'official_verified', 'a0000001-0000-0000-0000-000000000007'),
+   'Centrally Sponsored (60:40)', 'provisional', 'a0000001-0000-0000-0000-000000000007'),
 
   ('b0000001-0000-0000-0000-000000000009', 'TN-DISABILITY-PENSION', 'Disability Pension Scheme (Differently Abled Welfare)',
    'மாற்றுத்திறனாளிகள் மாதாந்திர பராமரிப்பு உதவித்தொகை',
@@ -302,7 +306,7 @@ INSERT INTO schemes.scheme (
    'State pension scheme to ensure financial dignity and healthcare maintenance for differently-abled citizens.',
    5, 1, 'state', 'social_security', 'Rs.1,500 monthly assistance credited to bank account',
    'https://www.socialwelfare.tn.gov.in', 'https://www.socialwelfare.tn.gov.in', 'active', '2011-04-01', now(), 'Welfare of Differently Abled Dept',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000007'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000007'),
 
   ('b0000001-0000-0000-0000-000000000010', 'TN-AMMA-UNAVAGAM', 'Amma Unavagam (Subsidized Canteens)',
    'அம்மா உணவகம்',
@@ -310,7 +314,7 @@ INSERT INTO schemes.scheme (
    'Urban food security initiative serving daily affordable meals to daily wage workers and urban underprivileged populations.',
    7, 1, 'state', 'food_security', 'Idli at Rs.1, Sambar rice / Variety rice at Rs.5, Curd rice at Rs.3',
    'https://www.tn.gov.in', 'https://www.tn.gov.in', 'active', '2013-02-19', now(), 'GCC / Municipal Administration',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000001'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000001'),
 
   ('b0000001-0000-0000-0000-000000000011', 'TN-PATTA-CHITTA', 'Anytime Anywhere Land Records (e-Services)',
    'நில ஆவண இணைய வழி சேவைகள் (பட்டா / சிட்டா)',
@@ -318,7 +322,7 @@ INSERT INTO schemes.scheme (
    'Statewide computerized revenue land record management system enabling instant digital download without physical tahsildar visits.',
    1, 1, 'state', 'land_records', 'Free online view; Rs.50 for certified digital sign download',
    'https://eservices.tn.gov.in', 'https://eservices.tn.gov.in', 'active', '2014-06-01', now(), 'Survey & Settlement Directorate',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000005'),
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000005'),
 
   ('b0000001-0000-0000-0000-000000000012', 'TN-AMMA-BABY-CARE', 'Amma Baby Care Kit',
    'அம்மா குழந்தை பராமரிப்பு பெட்டகம்',
@@ -326,7 +330,7 @@ INSERT INTO schemes.scheme (
    'Promotes infant healthcare, hygiene, and maternal recovery through 16 essential child-rearing items.',
    2, 1, 'state', 'maternal_child_health', '16-item care kit including towel, dress, baby oil, soap, mosquito net',
    'https://www.tnhealth.tn.gov.in', 'https://www.tnhealth.tn.gov.in', 'active', '2015-09-08', now(), 'Health Dept Order 2015',
-   '100% State', 'official_verified', 'a0000001-0000-0000-0000-000000000010')
+   '100% State', 'provisional', 'a0000001-0000-0000-0000-000000000010')
 ON CONFLICT (scheme_code) DO UPDATE SET
   scheme_name = EXCLUDED.scheme_name,
   name_ta = EXCLUDED.name_ta,
@@ -366,43 +370,43 @@ INSERT INTO services.service (
 ) VALUES
   ('c0000001-0000-0000-0000-000000000001', 'SVC-COMM-CERT', 'Community Certificate',
    'சாதி சான்றிதழ்', 'Statutory certificate certifying BC, MBC, SC, or ST caste category for education and government employment.',
-   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'official_verified', 'TNeGA Service Catalog'),
+   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'provisional', 'TNeGA Service Catalog'),
 
   ('c0000001-0000-0000-0000-000000000002', 'SVC-NATIVITY', 'Nativity Certificate',
    'பிறப்பிட சான்றிதழ்', 'Statutory certificate proving continuous domicile/nativity within Tamil Nadu for academic admissions.',
-   1, 'certificate', 0.00, 60.00, '7 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'official_verified', 'TNeGA Service Catalog'),
+   1, 'certificate', 0.00, 60.00, '7 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'provisional', 'TNeGA Service Catalog'),
 
   ('c0000001-0000-0000-0000-000000000003', 'SVC-INCOME-CERT', 'Income Certificate',
    'வருமான சான்றிதழ்', 'Annual family gross income assessment issued by the Zonal Tahsildar for scholarships and scheme qualification.',
-   1, 'certificate', 0.00, 60.00, '7 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'official_verified', 'TNeGA Service Catalog'),
+   1, 'certificate', 0.00, 60.00, '7 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'provisional', 'TNeGA Service Catalog'),
 
   ('c0000001-0000-0000-0000-000000000004', 'SVC-FIRST-GRAD', 'First Generation Graduate Certificate',
    'முதல் பட்டதாரி சான்றிதழ்', 'Certifies that no member of the applicant’s family has graduated, qualifying student for tuition fee waiver.',
-   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'official_verified', 'TNeGA Service Catalog'),
+   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'provisional', 'TNeGA Service Catalog'),
 
   ('c0000001-0000-0000-0000-000000000005', 'SVC-PATTA-TRANSFER', 'Application for Patta Transfer (Mutation of Land)',
    'பட்டா மாறுதல் விண்ணப்பம்', 'Transfer of revenue land title following registration, sale deed, inheritance, or partition.',
-   1, 'land_record', 0.00, 60.00, '30 days', 'active', 'https://eservices.tn.gov.in', 'https://eservices.tn.gov.in', 'official_verified', 'Survey Directorate'),
+   1, 'land_record', 0.00, 60.00, '30 days', 'active', 'https://eservices.tn.gov.in', 'https://eservices.tn.gov.in', 'provisional', 'Survey Directorate'),
 
   ('c0000001-0000-0000-0000-000000000006', 'SVC-ENCUMB-CERT', 'Encumbrance Certificate (EC)',
    'வில்லங்கச் சான்றிதழ்', 'Official report of registered property transactions and liabilities over a defined period.',
-   16, 'land_record', 100.00, 60.00, '3 days', 'active', 'https://tnreginet.gov.in', 'https://tnreginet.gov.in', 'official_verified', 'Registration Dept'),
+   16, 'land_record', 100.00, 60.00, '3 days', 'active', 'https://tnreginet.gov.in', 'https://tnreginet.gov.in', 'provisional', 'Registration Dept'),
 
   ('c0000001-0000-0000-0000-000000000007', 'SVC-RATION-SMART', 'Smart Ration Card Application',
    'புதிய மின்னணு குடும்ப அட்டை', 'Apply for newly married/split household digital NFSA Smart Family Card.',
-   17, 'civil_supplies', 0.00, 60.00, '30 days', 'active', 'https://www.tnpds.gov.in', 'https://www.tnpds.gov.in', 'official_verified', 'Civil Supplies Dept'),
+   17, 'civil_supplies', 0.00, 60.00, '30 days', 'active', 'https://www.tnpds.gov.in', 'https://www.tnpds.gov.in', 'provisional', 'Civil Supplies Dept'),
 
   ('c0000001-0000-0000-0000-000000000008', 'SVC-BIRTH-CERT', 'Birth Certificate Issuance',
    'பிறப்பு சான்றிதழ் நகல் பெற', 'Official birth extract issuance from civil registration system maintained by local body.',
-   7, 'vital_statistics', 0.00, 60.00, 'Instant to 3 days', 'active', 'https://www.crstn.org', 'https://www.crstn.org', 'official_verified', 'Civil Registration System'),
+   7, 'vital_statistics', 0.00, 60.00, 'Instant to 3 days', 'active', 'https://www.crstn.org', 'https://www.crstn.org', 'provisional', 'Civil Registration System'),
 
   ('c0000001-0000-0000-0000-000000000009', 'SVC-DEATH-CERT', 'Death Certificate Issuance',
    'இறப்பு சான்றிதழ் நகல் பெற', 'Official death extract issuance from municipal / panchayat civil registers.',
-   7, 'vital_statistics', 0.00, 60.00, 'Instant to 3 days', 'active', 'https://www.crstn.org', 'https://www.crstn.org', 'official_verified', 'Civil Registration System'),
+   7, 'vital_statistics', 0.00, 60.00, 'Instant to 3 days', 'active', 'https://www.crstn.org', 'https://www.crstn.org', 'provisional', 'Civil Registration System'),
 
   ('c0000001-0000-0000-0000-000000000010', 'SVC-LEGAL-HEIR', 'Legal Heir Certificate',
    'வாரிசு சான்றிதழ்', 'Issued by Revenue Tahsildar establishing the legal successors of a deceased person.',
-   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'official_verified', 'TNeGA Service Catalog')
+   1, 'certificate', 0.00, 60.00, '15 days', 'active', 'https://www.esevai.tn.gov.in', 'https://www.esevai.tn.gov.in', 'provisional', 'TNeGA Service Catalog')
 ON CONFLICT (service_code, department_id) DO UPDATE SET
   service_name = EXCLUDED.service_name,
   name_ta = EXCLUDED.name_ta,
@@ -423,7 +427,7 @@ INSERT INTO system.dataset_registry (
    'Tamil Nadu Administrative Districts Master 2026',
    'tn_districts_master_2026.json',
    'JSON', now(), 38, '2026.1', 'f90ade2ac448d001edd0c872b702866366f30f862565aa6ffe188a52db9863d6',
-   'validated', 'official_verified', 100.00, 100.00, 100.00, 100.00,
+   'validated', 'provisional', 100.00, 100.00, 100.00, 100.00,
    'Audited complete list of 38 Tamil Nadu districts with headquarters and bilingual Tamil naming'),
 
   ('d0000001-0000-0000-0000-000000000002',
@@ -431,7 +435,7 @@ INSERT INTO system.dataset_registry (
    'Tamil Nadu Official Schemes & Welfare Registry',
    'tn_schemes_verified_2026.json',
    'JSON', now(), 12, '2026.1', '951b949dbf43cbdfe35b828717ce8250cc4cc085cdf25005cdd237cfee0fcc19',
-   'validated', 'official_verified', 95.00, 98.00, 96.00, 100.00,
+   'validated', 'provisional', 95.00, 98.00, 96.00, 100.00,
    'Verified major state welfare schemes with central scheme demarcation and funding patterns'),
 
   ('d0000001-0000-0000-0000-000000000003',
@@ -439,7 +443,7 @@ INSERT INTO system.dataset_registry (
    'Tamil Nadu e-Sevai Citizen Services Catalog',
    'tnega_esevai_services_2026.json',
    'JSON', now(), 10, '2026.1', '454c9a9e54f659eb090fffc5fde02abf239f744ba6f35a1b5558444966fdb809',
-   'validated', 'official_verified', 95.00, 95.00, 98.00, 100.00,
+   'validated', 'provisional', 95.00, 95.00, 98.00, 100.00,
    'Audited revenue and vital statistics citizen services with official fee and turnaround standards')
 ON CONFLICT (source_id, checksum_sha256) DO NOTHING;
 
@@ -459,3 +463,37 @@ SELECT setval(pg_get_serial_sequence('administration.department', 'department_id
 SELECT setval(pg_get_serial_sequence('complaints.complaint_category', 'category_id'),
               GREATEST((SELECT max(category_id) FROM complaints.complaint_category),
                        (SELECT last_value FROM complaints.complaint_category_category_id_seq)));
+
+-- ── 11. Verification governance ────────────────────────────────────────────────
+-- A record may be 'official_verified' only with a recorded source_document_ref AND a located
+-- official document confirming it. No such evidence is recorded for these curated rows, so they
+-- are provisional. Existing databases that loaded the earlier (unsupported) 'official_verified'
+-- classification are demoted here; every change is logged with old/new status, reason, time.
+-- To promote a record: add its source_document_ref and evidence, update this block, re-seed.
+SELECT set_config('app.verification_reason',
+  'baseline evidence review 2026-10-18: no official document located confirming this record; demoted from official_verified', false);
+
+UPDATE administration.district   SET verification_status = 'provisional' WHERE verification_status = 'official_verified';
+UPDATE administration.department SET verification_status = 'provisional', verified_at = NULL, verified_by = NULL
+ WHERE verification_status = 'official_verified';
+UPDATE schemes.scheme            SET verification_status = 'provisional', verified_at = NULL, verified_by = NULL
+ WHERE verification_status = 'official_verified';
+UPDATE services.service         SET verification_status = 'provisional', verified_at = NULL, verified_by = NULL
+ WHERE verification_status = 'official_verified';
+UPDATE complaints.complaint_category SET verification_status = 'provisional' WHERE verification_status = 'official_verified';
+
+-- Rows loaded as provisional still carry the seed timestamp / curator label from the INSERTs above.
+UPDATE administration.department SET verified_at = NULL, verified_by = NULL WHERE verification_status <> 'official_verified';
+UPDATE schemes.scheme            SET verified_at = NULL, verified_by = NULL WHERE verification_status <> 'official_verified';
+UPDATE services.service         SET verified_at = NULL, verified_by = NULL WHERE verification_status <> 'official_verified';
+
+-- The dataset checksums prove file integrity only, not that the records are official.
+UPDATE system.dataset_registry SET validation_status = 'provisional' WHERE validation_status = 'official_verified';
+
+ALTER TABLE administration.district       VALIDATE CONSTRAINT chk_district_verified_has_source;
+ALTER TABLE administration.department     VALIDATE CONSTRAINT chk_department_verified_has_source;
+ALTER TABLE schemes.scheme                VALIDATE CONSTRAINT chk_scheme_verified_has_source;
+ALTER TABLE services.service              VALIDATE CONSTRAINT chk_service_verified_has_source;
+ALTER TABLE complaints.complaint_category VALIDATE CONSTRAINT chk_complaint_category_verified_has_source;
+
+SELECT set_config('app.verification_reason', '', false);

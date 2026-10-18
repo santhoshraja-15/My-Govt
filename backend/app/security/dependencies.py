@@ -1,6 +1,5 @@
 """FastAPI security dependencies — authentication and authorization."""
-from typing import Optional
-from uuid import UUID
+from typing import Any, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,7 +15,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def _get_user_from_token(
     credentials: Optional[HTTPAuthorizationCredentials],
     db: AsyncSession,
-) -> Optional[object]:
+) -> Optional[Any]:
     if not credentials:
         return None
     payload = decode_token(credentials.credentials)
@@ -67,7 +66,7 @@ async def get_current_user(
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
-) -> Optional[object]:
+) -> Optional[Any]:
     return await _get_user_from_token(credentials, db)
 
 

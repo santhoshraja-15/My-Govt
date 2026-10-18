@@ -1,7 +1,7 @@
 """Scheme service — eligibility engine + search."""
 import json
 import math
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
@@ -10,8 +10,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.schemes import (
-    EligibilityRequest, EligibilityResult, RuleResult,
-    SchemeDetail, SchemeListItem, SchemeListResponse,
+    BenefitOut, DocumentRequirementOut, EligibilityRequest, EligibilityResult, EligibilityRuleOut,
+    RuleResult, SchemeDetail, SchemeListItem, SchemeListResponse,
 )
 
 logger = structlog.get_logger(__name__)
@@ -174,7 +174,7 @@ class SchemeService:
             """),
             {"sid": scheme_id},
         )
-        scheme.benefits = [dict(b._mapping) for b in br.fetchall()]
+        scheme.benefits = [BenefitOut(**b._mapping) for b in br.fetchall()]
 
         # Eligibility rules
         er = await self.db.execute(
@@ -189,7 +189,7 @@ class SchemeService:
             """),
             {"sid": scheme_id},
         )
-        scheme.eligibility_rules = [dict(e._mapping) for e in er.fetchall()]
+        scheme.eligibility_rules = [EligibilityRuleOut(**e._mapping) for e in er.fetchall()]
 
         # Document requirements
         dr = await self.db.execute(
@@ -200,7 +200,7 @@ class SchemeService:
             """),
             {"sid": scheme_id},
         )
-        scheme.required_documents = [dict(d._mapping) for d in dr.fetchall()]
+        scheme.required_documents = [DocumentRequirementOut(**d._mapping) for d in dr.fetchall()]
 
         return scheme
 
@@ -215,7 +215,7 @@ class SchemeService:
         if not scheme:
             raise LookupError("Scheme not found")
 
-        rules = scheme.eligibility_rules
+        rules = [r.model_dump() for r in scheme.eligibility_rules]
         profile_dict = profile.model_dump(exclude_none=False)
 
         # Compute age from DOB if not provided directly
@@ -255,7 +255,7 @@ class SchemeService:
                     if outcome == "UNKNOWN":
                         missing_attrs.append(attr)
                     elif outcome == "FAIL":
-                        failing_rules.append(rule.get("human_readable", attr))
+                        failing_rules.append(rule.get("human_readable") or attr)
 
             # Group: any FAIL → FAIL; any UNKNOWN (or nothing evaluated) → UNKNOWN; else PASS
             if not g_outcomes:

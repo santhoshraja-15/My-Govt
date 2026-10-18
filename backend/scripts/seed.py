@@ -44,6 +44,8 @@ PLACEHOLDER_CHECKSUMS = {
     "f0e1d2c3" * 8,
 }
 VERIFIED = "official_verified"
+# Higher = stronger claim of verification
+STATUS_RANK = {"deprecated": 0, "unverified": 1, "provisional": 2, "externally_referenced": 3, "official_verified": 4}
 
 
 # ── paths & connection ─────────────────────────────────────────────────────────
@@ -108,6 +110,7 @@ async def preflight(conn: asyncpg.Connection) -> list[str]:
         ("services", "service", "verification_status"),
         ("complaints", "sla_rule", "sla_source_type"),
         ("complaints", "complaint", "address"),
+        ("administration", "district", "source_document_ref"),
     ]
     for schema, table, col in needed:
         ok = await conn.fetchval(
@@ -211,10 +214,13 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
             "SELECT scheme_code, source_document_ref FROM schemes.scheme")}
         bad = [s["scheme_code"] for s in schemes if db.get(s["scheme_code"]) != s["source_reference"]]
         add("scheme source refs match validated JSON", not bad, f"mismatched: {bad}" if bad else "")
+        # The DB may be MORE cautious than the curated JSON, never more confident.
+        db_status = {r["scheme_code"]: r["verification_status"] for r in await conn.fetch(
+            "SELECT scheme_code, verification_status FROM schemes.scheme")}
         bad = [s["scheme_code"] for s in schemes
-               if (await conn.fetchval("SELECT verification_status FROM schemes.scheme WHERE scheme_code=$1",
-                                       s["scheme_code"])) != s["verification_status"]]
-        add("scheme verification_status matches validated JSON", not bad, f"mismatched: {bad}" if bad else "")
+               if STATUS_RANK.get(db_status.get(s["scheme_code"]), -1) > STATUS_RANK.get(s["verification_status"], -1)]
+        add("no scheme is more verified in the DB than in the validated JSON", not bad,
+            f"over-claimed: {bad}" if bad else "")
 
     # dataset registry: checksum format, placeholders, on-disk match
     rows = await conn.fetch("SELECT file_name, checksum_sha256, record_count FROM system.dataset_registry")
@@ -248,16 +254,30 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
     n = await count("SELECT count(*) FROM system.source_registry WHERE source_type='synthetic'")
     add("no synthetic sources in verified seed", n == 0, f"{n} synthetic sources")
 
-    # provenance gaps: official_verified rows with no document reference.
-    # WARN only (the data is as curated); --strict turns these into failures.
-    for schema, table in (("schemes", "scheme"), ("services", "service"), ("administration", "department")):
+    # verification governance (migration 004)
+    tables = (("administration", "district"), ("administration", "department"), ("schemes", "scheme"),
+              ("services", "service"), ("complaints", "complaint_category"))
+    for schema, table in tables:
+        cname = f"chk_{table}_verified_has_source"
+        validated = await conn.fetchval(
+            "SELECT convalidated FROM pg_constraint WHERE conname=$1 AND conrelid=$2::regclass",
+            cname, f"{schema}.{table}")
+        add(f"constraint {cname} exists and is validated", bool(validated),
+            "missing" if validated is None else "not validated" if not validated else "")
         n = await count(
             f"SELECT count(*) FROM {schema}.{table} WHERE verification_status='{VERIFIED}' "
-            "AND (source_document_ref IS NULL OR btrim(source_document_ref)='')"
-        )
-        tot = await count(f"SELECT count(*) FROM {schema}.{table} WHERE verification_status='{VERIFIED}'")
-        add(f"provenance: {schema}.{table} official_verified rows have source_document_ref",
-            n == 0, f"{n} of {tot} lack a document reference", warn=True)
+            "AND btrim(coalesce(source_document_ref,''))=''")
+        add(f"provenance: every official_verified {schema}.{table} row has source_document_ref", n == 0, f"{n} lack one")
+    for schema, table in (("administration", "department"), ("schemes", "scheme"), ("services", "service")):
+        n = await count(
+            f"SELECT count(*) FROM {schema}.{table} WHERE verification_status<>'{VERIFIED}' "
+            "AND (verified_at IS NOT NULL OR verified_by IS NOT NULL)")
+        add(f"{schema}.{table}: non-verified rows carry no verified_at/verified_by", n == 0, f"{n} rows claim verification")
+    n_ver = sum([await count(f"SELECT count(*) FROM {s}.{t} WHERE verification_status='{VERIFIED}'") for s, t in tables])
+    n_log = await count("SELECT count(*) FROM system.verification_status_log")
+    add("verification_status_log records status writes", n_log > 0, f"{n_log} log rows")
+    out.append(Check("official_verified records in database", "PASS",
+                     f"{n_ver} (records are provisional until official evidence is recorded)"))
     return out
 
 

@@ -124,6 +124,7 @@ class ComplaintService:
             },
         )
         new = ins.fetchone()
+        assert new is not None  # INSERT ... RETURNING always yields a row
         await self.db.commit()
 
         dept_name = None

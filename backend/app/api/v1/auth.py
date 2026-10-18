@@ -1,10 +1,7 @@
 """Authentication API endpoints."""
-from datetime import timedelta
-from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db

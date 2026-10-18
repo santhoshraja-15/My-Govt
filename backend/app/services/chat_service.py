@@ -2,8 +2,7 @@
 import json
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 from uuid import UUID
 
 import structlog
@@ -11,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.schemas.chat import ChatRequest, ChatResponse, Citation, ConversationOut
+from app.schemas.chat import ChatRequest, ChatResponse, Citation
 
 logger = structlog.get_logger(__name__)
 
@@ -31,7 +30,7 @@ def _classify_intent(message: str) -> str:
     scores: dict[str, int] = {}
     for intent, keywords in _INTENT_PATTERNS.items():
         scores[intent] = sum(1 for kw in keywords if kw.lower() in msg_lower)
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda k: scores[k])
     return best if scores[best] > 0 else "general_query"
 
 

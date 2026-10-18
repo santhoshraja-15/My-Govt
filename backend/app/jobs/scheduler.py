@@ -1,12 +1,10 @@
 """SLA escalation scheduler — runs as a background worker."""
 import asyncio
-import logging
 from datetime import datetime, timezone
 
 import structlog
 from sqlalchemy import text
 
-from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import setup_logging
 from app.services import complaint_rules as rules

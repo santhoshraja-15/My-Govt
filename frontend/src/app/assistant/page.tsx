@@ -14,6 +14,7 @@ interface Citation {
   department?: string;
   source_url?: string;
   verified_at?: string;
+  verification_status?: string;
 }
 
 interface Message {
@@ -63,6 +64,9 @@ function CitationCard({ citations }: { citations: Citation[] }) {
           <a key={c.index} href={c.source_url || "#"} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 px-2.5 py-1 rounded-full border border-brand-100 transition-all">
             [{c.index}] {c.title}
+            {c.verification_status && c.verification_status !== "official_verified" && (
+              <span className="text-[10px] uppercase tracking-wide text-amber-700">{c.verification_status.replace("_", " ")}</span>
+            )}
             {c.source_url && <ExternalLink size={10} />}
           </a>
         ))}

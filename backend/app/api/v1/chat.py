@@ -1,10 +1,8 @@
 """AI Chat / Assistant API endpoints."""
-from typing import Optional
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db

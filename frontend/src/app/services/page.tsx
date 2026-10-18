@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Search, FileText, ArrowLeft, ExternalLink, Download, Loader2, Filter } from "lucide-react";
 import { services as servicesAPI } from "@/lib/api";
+import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
 const CATEGORIES = ["All","certificate","land_record","welfare","utilities","transport","document","agriculture","locator"];
 
@@ -23,6 +24,7 @@ function ServiceCard({ svc }: { svc: any }) {
           {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
           {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
           {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
+          <VerificationBadge status={svc.verification_status} />
         </div>
       </div>
     </Link>

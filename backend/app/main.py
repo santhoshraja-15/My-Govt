@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import engine, check_db_health
+from app.core.database import check_db_health
 from app.core.logging import setup_logging
 from app.api.v1 import router as api_v1_router
 

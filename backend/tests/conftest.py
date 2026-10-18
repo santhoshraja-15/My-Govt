@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import os
 import secrets
-from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 import asyncpg

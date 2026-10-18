@@ -1,12 +1,11 @@
 """Admin service — database intelligence console backend."""
 import re
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.health import get_health_status
 
 logger = structlog.get_logger(__name__)
@@ -238,7 +237,7 @@ class AdminService:
             return {"error": "Mutating or unsafe SQL statements are not allowed in the query workspace."}
         if ";" in sql:
             return {"error": "Multiple statements are not allowed."}
-        if not re.match(r"(?is)^\s*(select|with|explain|show|table)", sql):
+        if not re.match(r"(?is)^\s*(select|with|explain|show|table)\b", sql):
             return {"error": "Only read-only SELECT queries are allowed."}
         if re.search(r"(?i)password_hash|token_hash", sql):
             return {"error": "Credential columns cannot be queried."}

@@ -294,7 +294,7 @@ class CitizenService:
         row = r.fetchone()
         return dict(row._mapping) if row else None
 
-    async def upsert_profile(self, citizen_id, data) -> dict:
+    async def upsert_profile(self, citizen_id, data) -> Optional[dict]:
         """Store the profile only while consent is granted; revoking consent clears the profile."""
         p = data.model_dump()
         current = await self.get_profile(citizen_id)
