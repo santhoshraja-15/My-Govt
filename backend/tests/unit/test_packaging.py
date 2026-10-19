@@ -92,3 +92,13 @@ def test_ci_image_matrix_covers_every_application_dockerfile():
         assert (ROOT / e["file"]).is_file() and (ROOT / e["context"]).is_dir()
     assert wf["jobs"]["images"]["strategy"]["fail-fast"] is False       # every image reports its own result
     assert wf["permissions"] == {"contents": "read"}                     # nothing is pushed or published
+
+
+def test_compose_does_not_pull_the_removed_dockerhub_minio_image_by_default():
+    """minio/minio no longer exists on Docker Hub (first hosted compose run: 'pull access denied'); the service is
+    opt-in via a profile so a plain `docker compose up` cannot fail on it."""
+    import yaml
+
+    svc = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["minio"]
+    assert not svc["image"].startswith("minio/minio")
+    assert svc.get("profiles") == ["storage"]
