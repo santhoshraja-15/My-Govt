@@ -21,6 +21,8 @@ async def test_blocking_minio_probe_does_not_stall_the_event_loop(monkeypatch):
             raise OSError("name resolution failed")
 
     monkeypatch.setitem(sys.modules, "minio", types.SimpleNamespace(Minio=SlowMinio))
+    monkeypatch.setitem(sys.modules, "urllib3", types.SimpleNamespace(      # not installed in the CI requirements
+        PoolManager=lambda **k: None, Timeout=lambda **k: None, Retry=lambda **k: None))
 
     gaps: list[float] = []
 
