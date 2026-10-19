@@ -9,8 +9,8 @@
 | Date | 2026-10-19 |
 | Environment | Windows 11, Python 3.11.9 (project targets 3.12), Node 25.6.0 (CI uses 22), GNU Make 4.4.1 (WSL2 Ubuntu). **No Docker** (not on Windows, not in WSL; WSL `sudo` needs a password). |
 | Branch | `audit/tn-data-verification` (never merged to `main`) |
-| HEAD at time of writing | `3c2a651` (report commit follows) |
-| Hosted CI result | **PASS — all 10 jobs green** for `3c2a651` (run 39226963350: Backend, Playwright, Frontend, Security, SQL provenance, 4 image builds, Compose stack). Earlier: 9/9 for `f046712` (run 39224287935, before the Compose job existed), 5/5 for `3e42db4`. Reproduced on GitHub, not locally. Earlier runs failed; causes in D. Counts per job were not retrieved; the workflow itself fails on any skipped test. |
+| HEAD at time of writing | `43c3067` (report commit follows) |
+| Hosted CI result | **PASS — all 10 jobs green** for `43c3067` (run 39240522682: Backend, Playwright, Frontend, Security, SQL provenance, 4 image builds, Compose stack incl. strict health assertion and the demo overlay checks). Earlier green runs: `3c2a651` (39226963350, before the strict health check and demo steps). Earlier: 9/9 for `f046712` (run 39224287935, before the Compose job existed), 5/5 for `3e42db4`. Reproduced on GitHub, not locally. Earlier runs failed; causes in D. Counts per job were not retrieved; the workflow itself fails on any skipped test. |
 
 Why blocked, independent of CI: no government record is `official_verified` (0 of 77), the Docker/Compose stack has never been
 built or started by anyone, and production security controls remain open (see E).
@@ -26,6 +26,7 @@ built or started by anyone, and production security controls remain open (see E)
 | Application image builds | `images` CI job (docker/build-push-action, `push: false`) for `docker/backend/Dockerfile`, `docker/frontend/Dockerfile`, `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` | **PASS on hosted CI (run 39224287935), all four.** Earlier **defect found and fixed**: invalid `build-backend` (guarded by `test_packaging.py`). Local build NOT RUN (no Docker). | run 39224287935 | Built ≠ verified runtime |
 | Image property checks | same job, post-build steps | **PASS on hosted CI**: prod backend non-root, no pytest/ruff, imports fastapi/async SQLAlchemy/greenlet/asyncpg/torch, `app/main.py` present, no `--reload`, HEALTHCHECK defined, no env file; prod frontend non-root, `server.js` + `.next/static` present, HEALTHCHECK, container answers `GET /` without 5xx; dev images import/`next` present | run 39224287935 | The frontend probe has no backend/DB; backend prod image was never started |
 | Postgres image build | `docker build docker/postgres` | **PASS on hosted CI (run 39220815138, image built in the Backend and E2E jobs)**. Failed in earlier runs `3ae63b9`, `be07fb5`, `5b5a9c0`, `13b49c8`. Cause (from the build's own annotation): `postgis/postgis:16-3.4` and `16-3.5` are Debian bullseye; `apt.postgresql.org bullseye-pgdg` returns 404 so `postgresql-16-pgvector` cannot install. Fixed by `780eb61` (base `postgres:16-bookworm` + pgdg `postgresql-16-postgis-3`, `-scripts`, `-pgvector`). | annotations of runs 39213304212/39213525821/39213844357 | Fix confirmed on hosted CI. Local image build still NOT RUN (no Docker) |
+| Strict health + demo overlay | `assert_health.py` (postgresql/neo4j/redis must be healthy; only minio may be unhealthy), then `make demo` and `check_demo.py` (21 live API checks: role logins, department scoping, assignment, state-machine refusal, eligibility, admin overview, verification statuses) | **PASS on hosted CI (run 39240522682)**. The first strict run FAILED and exposed a real backend defect (see D, `0441e60`). | run 39240522682 | Demo checks run against the dev images, not the production images |
 | Stack startup / health | `docker compose up -d --build` (postgres, neo4j, redis, backend, worker, frontend; minio now opt-in), wait for backend Docker health, then `curl /health`, `/api/v1/public/stats`, frontend `GET /` | **PASS on hosted CI (run 39226963350)**. Not covered: `make up`/`make health` themselves (the job calls compose/curl directly), worker behaviour, MinIO (not started), `/health` field values (only HTTP success), prod images inside Compose | run 39226963350 | Run services together with production images; assert `/health` services |
 | DB init / migrations | `make db-init`, `migrate-sql`, `db_verify` | Historical PASS locally; **hosted PASS** twice: Backend job (`db_verify`, schema/SQL conformance on the project image) and Compose job (`make db-init` = schema + all migrations + seed, then `make db-verify`) | `final_build_validation.md`, runs 39220815138, 39226963350 | — |
 | Seed idempotency | `scripts.seed` twice | Historical PASS (tests) + hosted: `make db-init` seeds once and `make seed-verify` re-checks integrity/provenance in the real stack (a second *seed* run inside Compose was not executed) | `milestone_2_validation.md`, run 39226963350 | — |
@@ -71,6 +72,9 @@ A successful local build, if one is later possible, would not prove the hosted r
 | `3e42db4` | `setuptools` pinned to 83.0.0 — 80.9.0 failed `pip-audit` (PYSEC-2026-3447), reproduced locally |
 | `a824e5c`, `7a2f468` | Production images `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` + static tests; LF endings for `Dockerfile.*`. Built on hosted CI by `f046712` |
 | `7e6c659`, `3c2a651` | CI `compose` job + `.github/scripts/make_ci_env.py` (throw-away `.env`); first run failed because `minio/minio` no longer exists on Docker Hub → MinIO moved to opt-in profile `storage` using `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` (**pull-unverified**, never started in CI) + test |
+| `0441e60` | **Backend defect found by the strict health check:** `check_minio` ran the blocking MinIO SDK on the event loop; with MinIO absent its retries stalled the loop and the Redis check reported "Timeout connecting to server" although a manual ping succeeded. MinIO probe now runs in a worker thread with short timeouts, Redis has explicit timeouts, every check is bounded; regression test fails on the old code. Also: `prefers-reduced-motion` CSS so axe scans do not depend on animation timing (the `/assistant` contrast scan was flaky on the hosted runner) |
+| `43c3067` | health isolation test fakes `urllib3` (not in the CI requirements) |
+| `6f1f2cb` … `4115cc5` | Frontend: Tailwind had **never been compiled** (no `postcss.config.js`) so every page shipped unstyled; added, component classes moved into `@layer components`, WCAG contrast fixed, dead footer links and misleading "official/verified" copy removed; citizen dashboard, officer console, department scoping, demo environment (see `docs/demo.md`) |
 | `f046712` | CI `images` job (4-image matrix, property checks, frontend start-up probe), matrix-coverage test, `pyyaml==6.0.3` in `requirements-ci.txt`, stale workflow header corrected |
 
 Consequence to watch: PostGIS version on the new image is whatever pgdg ships for bookworm (not 3.4); earlier PostGIS tests ran on 3.6.2.
@@ -79,7 +83,7 @@ Consequence to watch: PostGIS version on the new image is whatever pgdg ships fo
 
 * **Critical:** no officially verified government data; do not present as verified.
 * **High:** The backend production image has never been started (neither alone nor in Compose); the Compose job uses the dev images (reload, source mounts). Most Make targets (see matrix) never executed. MinIO has no working verified image reference.
-* **Medium:** the `/health` response content was not asserted in CI (only HTTP success); worker, Neo4j graph rebuild and embeddings paths are untested in Compose.
+* **Medium:** worker behaviour, Neo4j graph rebuild and embeddings paths are untested in Compose (health states of postgresql/neo4j/redis are now asserted).
 * **High:** production security controls (E list above); no TLS, backups, monitoring.
 * **Medium:** no real boundary data; evidence upload intentionally returns 503; no officer UI; Python 3.11 locally vs 3.12 target.
 * **Low:** Node 20 deprecation notice for `actions/checkout@v4`/`upload-artifact@v4`.
@@ -87,7 +91,7 @@ Consequence to watch: PostGIS version on the new image is whatever pgdg ships fo
 ## F. Ordered next steps
 
 1. Retrieve per-job counts (tests passed, Playwright count) for the green run, and compare with the historical 428 + 53.
-2. Extend the Compose job: assert `/health` service states, run the backend production image against the same database, execute `make test-unit`/`lint`/`graph-rebuild`.
+2. Run the backend production image against the Compose database and execute `make test-unit`/`lint`/`graph-rebuild` in the Compose job.
 3. Decide the object-storage image (verified MinIO source or another S3 store) before implementing evidence storage.
 4. Obtain human-validated official evidence for schemes, departments, services, districts; record `source_document_ref`; promote through reviewed seed changes.
 5. Load authoritative boundaries; re-run PostGIS tests on the project image.
