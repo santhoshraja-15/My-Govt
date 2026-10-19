@@ -7,6 +7,15 @@ is *not* officially verified.
 Legend — **Tested**: automated tests ran green on real infrastructure (see [final_build_validation.md](final_build_validation.md)).
 **Run-only**: executed once manually, no automated test. **Not run**: written but never executed.
 
+## 0. Update — 2026-10-19 (end of the demo/audit sprint)
+
+Superseding some statements below (kept for history): the Compose stack, the four application images, `make db-init / db-verify / seed-verify / demo` and the
+GitHub Actions workflow **have been run on hosted CI** (see [deployment_reproducibility_audit.md](deployment_reproducibility_audit.md)); there is now a citizen dashboard, an officer
+console with department scoping and assignment, service detail pages, a working eligibility checker, the Database Architecture Explorer, and a labelled demo environment ([../demo.md](../demo.md)).
+Counts: 525 backend tests (509 run locally, 16 need Neo4j and run on CI), 103 browser tests. The complete audit with every route, field, control, API operation and workflow is in
+[../complete_system_audit.md](../complete_system_audit.md) (22 defects found and fixed, 8 limitations open). **Recommendation:** ready for a university demonstration; still **BLOCKED for public release**
+(unverified government data, open public-deployment security items).
+
 ## 1. Status by component
 
 ### Implemented and tested

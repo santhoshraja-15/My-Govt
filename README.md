@@ -223,8 +223,8 @@ ingested from approved sources with `make ingest` (provenance, hash and retrieva
 
 ```bash
 cd backend && TEST_ADMIN_DSN=postgresql://postgres@localhost:5432/postgres TEST_POSTGIS=1 \
-  TEST_NEO4J_URI=bolt://localhost:7687 TEST_NEO4J_PASSWORD=... pytest tests -q -rs     # 459 tests
-cd frontend && npx playwright test                                                      # 61 browser tests (build with the API URL the config expects: see playwright.config.ts)
+  TEST_NEO4J_URI=bolt://localhost:7687 TEST_NEO4J_PASSWORD=... pytest tests -q -rs     # 525 tests (16 need Neo4j)
+cd frontend && npx playwright test                                                      # 103 browser tests (build with the API URL the config expects: see playwright.config.ts)
 ```
 `TEST_ADMIN_DSN` must point at a **disposable** server (tests create/drop `mygovt_test_*` databases). Without PostGIS /
 Neo4j configured the dependent tests are skipped and reported as such. Current results: [docs/audit/test_inventory.md](docs/audit/test_inventory.md).
