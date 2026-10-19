@@ -95,3 +95,11 @@ def test_relational_notation_marks_keys_and_example_joins_use_real_columns():
 
 def test_identifier_quoting_blocks_injection_in_generated_sql():
     assert arch.q('x"; DROP TABLE y; --') == '"x""; DROP TABLE y; --"'
+
+
+def test_postgres_display_name_is_short_on_every_platform():
+    linux = "PostgreSQL 16.4 (Debian 16.4-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit"
+    windows = "PostgreSQL 16.15, compiled by Visual C++ build 1944, 64-bit"
+    assert arch.pg_display_name(linux) == "PostgreSQL 16.4"
+    assert arch.pg_display_name(windows) == "PostgreSQL 16.15"
+    assert arch.pg_display_name("") == arch.pg_display_name(None) == arch.pg_display_name("something else") == "PostgreSQL"

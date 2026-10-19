@@ -347,12 +347,18 @@ async def sample_rows(db: AsyncSession, t: dict[str, Any], limit: int = 5) -> di
 
 
 # ───────────────────────────────────────── components ─────────────────────────────────────────
+def pg_display_name(version: str | None) -> str:
+    """'PostgreSQL 16.4' from either platform's long version() string (Linux builds append distribution and compiler)."""
+    m = re.match(r"\s*PostgreSQL\s+(\d+(?:\.\d+)*)", version or "")
+    return f"PostgreSQL {m.group(1)}" if m else "PostgreSQL"
+
+
 async def components(db: AsyncSession, catalog: dict[str, Any]) -> dict[str, Any]:
     health = await get_health_status()
     svc = health["services"]
     ext = {r[0]: r[1] for r in (await db.execute(text("SELECT extname, extversion FROM pg_extension"))).fetchall()}
     version = (await db.execute(text("SELECT version()"))).scalar() or ""
-    pg_short = version.split(",")[0] if version else None
+    pg_short = pg_display_name(version)
     spatial = [f"{t['key']}.{c['name']}" for t in catalog["tables"].values() for c in t["columns"] if c["type"].startswith(("geometry", "geography"))]
     vector = [f"{t['key']}.{c['name']}" for t in catalog["tables"].values() for c in t["columns"] if c["type"].startswith("vector")]
 

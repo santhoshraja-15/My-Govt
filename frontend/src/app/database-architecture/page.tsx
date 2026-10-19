@@ -49,7 +49,7 @@ export default function DatabaseArchitecturePage() {
           <ul className="flex flex-wrap gap-2 mt-4" aria-label="Data technologies" data-testid="technology-list">
             {o.technologies.map((t: any) => {
               const st = STATUS_STYLE[t.status] ?? STATUS_STYLE.unknown;
-              return <li key={t.name} className={`badge ${st.cls} gap-1`} title={t.role} data-status={t.status}>{t.name} · {st.label}</li>;
+              return <li key={t.name} className={`badge ${st.cls} gap-1 max-w-full truncate`} title={`${t.name} — ${t.role}`} data-status={t.status}>{t.name} · {st.label}</li>;
             })}
           </ul>
         )}
