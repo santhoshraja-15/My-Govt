@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API } from "./helpers";
+import { ADMIN_EMAIL, API, STAFF_PASSWORD, SYSADMIN_EMAIL, loginViaUI, registerViaUI } from "./helpers";
 
 test.use({ reducedMotion: "reduce" });
 
@@ -210,5 +210,46 @@ test.describe("labels, layout and error pages", () => {
     await page.goto("/database-architecture");
     await expect(page).toHaveURL(/\/login/);
     expect(protectedCalls).toEqual([]);
+  });
+});
+
+test.describe("admin data panels and form semantics", () => {
+  test("dataset quality scores are percentages between 0 and 100 and say they are recorded, not computed", async ({ page }) => {
+    await loginViaUI(page, ADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    for (const panel of ["Datasets", "Data Quality"]) {
+      await page.getByRole("button", { name: panel, exact: true }).click();
+      await page.waitForTimeout(700);
+      const text = await page.locator("main").last().innerText();
+      const values = [...text.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+      expect(values.length, panel).toBeGreaterThan(0);
+      expect(Math.max(...values), `${panel}: ${values.join(",")}`).toBeLessThanOrEqual(100);
+    }
+    await expect(page.getByTestId("quality-disclaimer")).toContainText("recorded in the dataset registry");
+  });
+
+  test("the SQL workspace textarea has an accessible name", async ({ page }) => {
+    await loginViaUI(page, SYSADMIN_EMAIL, STAFF_PASSWORD, "/admin");
+    await page.getByRole("button", { name: "SQL Workspace" }).click();
+    await expect(page.getByLabel(/SQL query/)).toBeVisible();
+  });
+
+  test("required complaint fields are exposed to assistive technology and validated with a clear message", async ({ page }) => {
+    await registerViaUI(page, "Form Semantics");
+    await page.goto("/complaints");
+    await page.getByRole("tab", { name: "File Complaint" }).click();
+    await expect(page.getByLabel(/Subject/)).toHaveAttribute("aria-required", "true");
+    await expect(page.getByLabel(/Description/)).toHaveAttribute("aria-required", "true");
+    await page.getByRole("button", { name: "Submit Complaint" }).click();
+    await expect(page.getByRole("alert").first()).toBeVisible();
+    await page.getByLabel(/Subject/).fill("ab");
+    await page.getByLabel(/Description/).fill("too short");
+    await page.getByRole("button", { name: "Submit Complaint" }).click();
+    await expect(page.getByRole("alert").first()).toBeVisible();
+    await page.getByLabel("Latitude").fill("123");
+    await page.getByLabel("Longitude").fill("80");
+    await page.getByLabel(/Subject/).fill("Streetlight is out on the main road");
+    await page.getByLabel(/Description/).fill("The streetlight near the bus stand has been dark for a week.");
+    await page.getByRole("button", { name: "Submit Complaint" }).click();
+    await expect(page.getByRole("alert").first()).toContainText(/Latitude/);
   });
 });

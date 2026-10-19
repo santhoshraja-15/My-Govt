@@ -13,6 +13,9 @@ import { useAuth } from "@/lib/auth";
 import { LoadingState } from "@/components/ui/AsyncState";
 import { ComplaintsPanel, DepartmentPerformancePanel, VerificationQueuePanel } from "@/components/admin/OperationsPanels";
 
+/** Quality scores are stored on a 0-100 scale in the dataset registry. */
+const pct = (v: unknown) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+
 // ── Sidebar items ──────────────────────────────────────────────
 const NAV_ITEMS = [
   { key: "overview",   icon: BarChart3, label: "Overview" },
@@ -132,9 +135,9 @@ function OverviewPanel() {
                     <td>
                       <div className="flex items-center gap-1.5">
                         <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full" style={{width: `${(d.quality_completeness||0)*100}%`}} />
+                          <div className="h-full bg-emerald-500 rounded-full" style={{width: `${pct(d.quality_completeness)}%`}} />
                         </div>
-                        <span className="text-xs text-slate-500">{Math.round((d.quality_completeness||0)*100)}%</span>
+                        <span className="text-xs text-slate-500">{pct(d.quality_completeness)}%</span>
                       </div>
                     </td>
                   </tr>
@@ -314,7 +317,7 @@ function SQLWorkspace() {
             {loading ? "Running…" : "Run Query"}
           </button>
         </div>
-        <textarea value={sql} onChange={e => setSql(e.target.value)}
+        <textarea value={sql} onChange={e => setSql(e.target.value)} aria-label="SQL query (read-only, SELECT statements only)"
           className="input font-mono text-sm resize-none" rows={5}
           placeholder="SELECT * FROM schemes.scheme LIMIT 10;" />
 
@@ -445,7 +448,12 @@ function DataQualityPanel() {
       ) : !data?.datasets?.length ? (
         <div className="card p-10 text-center text-slate-500">No dataset quality data available.</div>
       ) : (
-        data.datasets.map((d: any) => (
+        <>
+        <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="quality-disclaimer">
+          These scores are values <b>recorded in the dataset registry</b> when the data was loaded. The platform does not compute them, and they do not mean the
+          data has been verified against official documents (see the Verification Queue).
+        </p>
+        {data.datasets.map((d: any) => (
           <div key={d.dataset_id} className="card p-5">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
@@ -460,21 +468,22 @@ function DataQualityPanel() {
               {qMetrics(d).map(({ label, score }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
                   <div className={`text-xl font-black mb-1 ${
-                    (score||0) >= 0.9 ? "text-emerald-600" : (score||0) >= 0.7 ? "text-amber-500" : "text-red-500"
+                    pct(score) >= 90 ? "text-emerald-700" : pct(score) >= 70 ? "text-amber-700" : "text-red-700"
                   }`}>
-                    {Math.round((score||0)*100)}%
+                    {pct(score)}%
                   </div>
                   <p className="text-xs text-slate-500">{label}</p>
                   <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
                     <div className={`h-full rounded-full ${
-                      (score||0) >= 0.9 ? "bg-emerald-500" : (score||0) >= 0.7 ? "bg-amber-400" : "bg-red-400"
-                    }`} style={{width: `${(score||0)*100}%`}} />
+                      pct(score) >= 90 ? "bg-emerald-500" : pct(score) >= 70 ? "bg-amber-400" : "bg-red-400"
+                    }`} style={{width: `${pct(score)}%`}} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        ))
+        ))}
+        </>
       )}
     </div>
   );

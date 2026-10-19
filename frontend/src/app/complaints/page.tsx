@@ -218,11 +218,11 @@ function ComplaintForm() {
 
         <div>
           <label htmlFor="title" className="label">{t("complaint.subject")} <span className="text-red-500">*</span></label>
-          <input id="title" className="input" value={form.title} onChange={(e) => update("title", e.target.value)} maxLength={200} />
+          <input id="title" aria-required="true" className="input" value={form.title} onChange={(e) => update("title", e.target.value)} maxLength={200} />
         </div>
         <div>
           <label htmlFor="description" className="label">{t("complaint.description")} <span className="text-red-500">*</span></label>
-          <textarea id="description" className="input resize-none" rows={5} value={form.description} onChange={(e) => update("description", e.target.value)} maxLength={5000} />
+          <textarea id="description" aria-required="true" className="input resize-none" rows={5} value={form.description} onChange={(e) => update("description", e.target.value)} maxLength={5000} />
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">

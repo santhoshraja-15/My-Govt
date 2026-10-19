@@ -55,7 +55,9 @@ def expectation(method, path):
         return "staff"
     if re.fullmatch(r"/complaints/\{[^/]+\}/status", p):
         return "staff"
-    if p.startswith(("/citizens", "/chat")) or p in ("/auth/me", "/complaints/mine") or (method == "POST" and p == "/complaints") or re.fullmatch(r"/complaints/\{[^/]+\}(/evidence)?", p):
+    if p.startswith("/chat"):
+        return "optional"          # the assistant is public; sign-in only attaches conversations to the user (isolation is covered by tests)
+    if p.startswith("/citizens") or p in ("/auth/me", "/complaints/mine") or (method == "POST" and p == "/complaints") or re.fullmatch(r"/complaints/\{[^/]+\}(/evidence)?", p):
         return "auth"
     return "public"
 
@@ -70,7 +72,7 @@ def judge(need: str, role: str, method: str, s: int) -> str | None:
         return None if s == 403 else (f"{role}:allowed-but-admin-only({s})" if s < 400 else f"{role}:expected-403({s})")
     if need == "staff" and role not in STAFF:
         return None if s == 403 else f"{role}:expected-403({s})"
-    if need == "public" and s in (401, 403) and method == "GET":
+    if need in ("public", "optional") and s in (401, 403) and method == "GET":
         return f"{role}:public-endpoint-refused({s})"
     return None
 
