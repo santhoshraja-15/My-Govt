@@ -77,3 +77,18 @@ def test_production_frontend_only_copies_what_next_standalone_produces():
     assert ".next/standalone" in text and ".next/static" in text
     assert "output: 'standalone'" in (ROOT / "frontend" / "next.config.js").read_text(encoding="utf-8")
     assert "public" not in text or (ROOT / "frontend" / "public").exists()   # no COPY of a directory that does not exist
+
+
+def test_ci_image_matrix_covers_every_application_dockerfile():
+    """The `images` job must build each app Dockerfile from a context that really contains its COPY sources."""
+    import yaml
+
+    wf = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    entries = wf["jobs"]["images"]["strategy"]["matrix"]["include"]
+    built = {e["file"] for e in entries}
+    on_disk = {p.relative_to(ROOT).as_posix() for p in (ROOT / "docker").glob("*/Dockerfile*") if p.parent.name != "postgres"}
+    assert built == on_disk, (built ^ on_disk)
+    for e in entries:
+        assert (ROOT / e["file"]).is_file() and (ROOT / e["context"]).is_dir()
+    assert wf["jobs"]["images"]["strategy"]["fail-fast"] is False       # every image reports its own result
+    assert wf["permissions"] == {"contents": "read"}                     # nothing is pushed or published
