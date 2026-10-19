@@ -12,6 +12,7 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.citizens import router as citizens_router
 from app.api.v1.departments import router as departments_router
 from app.api.v1.public import router as public_router
+from app.api.v1.architecture import router as architecture_router
 
 router = APIRouter()
 
@@ -26,3 +27,4 @@ router.include_router(complaints_router, prefix="/complaints", tags=["Complaints
 router.include_router(chat_router, prefix="/chat", tags=["AI Assistant"])
 router.include_router(gis_router, prefix="/gis", tags=["GIS"])
 router.include_router(admin_router, prefix="/admin", tags=["Administration"])
+router.include_router(architecture_router, prefix="/architecture", tags=["Database Architecture"])
