@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.complaints import (
     ComplaintCreate, ComplaintOut, ComplaintDetail,
-    ComplaintListResponse, ComplaintStatusUpdate, ComplaintTrack,
+    ComplaintAssign, ComplaintListResponse, ComplaintStatusUpdate, ComplaintTrack,
 )
 from app.services.complaint_service import (
     ComplaintForbidden, ComplaintNotFound, ComplaintService, EvidenceStorageUnavailable, InvalidTransition,
@@ -66,6 +66,57 @@ async def my_complaints(
     )
 
 
+STAFF = ["officer", "department_admin", "state_admin", "system_admin"]
+
+
+@router.get("/assigned")
+async def staff_complaints(
+    status: Optional[str] = Query(None),
+    mine: bool = Query(False),
+    unassigned: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role(STAFF)),
+):
+    """Complaints within the staff member's department (all departments for state/system admins)."""
+    try:
+        return await ComplaintService(db).list_for_staff(current_user, status, mine, unassigned, limit, offset)
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+
+@router.get("/officers")
+async def staff_officers(db: AsyncSession = Depends(get_db), current_user=Depends(require_role(STAFF))):
+    """Active officers the caller may assign complaints to."""
+    try:
+        return await ComplaintService(db).officers_for(current_user)
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+
+
+@router.post("/{complaint_id}/assign")
+async def assign_complaint(
+    request: Request,
+    complaint_id: UUID,
+    data: ComplaintAssign,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role(STAFF)),
+):
+    """Assign a complaint to an officer (officers: themselves only; admins: any officer of the department)."""
+    try:
+        out = await ComplaintService(db).assign(complaint_id, data.officer_id, current_user, data.remarks)
+    except ComplaintNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    await audit.record(db, action="COMPLAINT_ASSIGNED", entity_type="complaint", entity_id=str(complaint_id),
+                       user=current_user, request=request, new={"officer_id": out["officer_id"], "status": out["status"]})
+    return out
+
+
 @router.get("/{complaint_id}", response_model=ComplaintDetail)
 async def get_complaint(
     complaint_id: UUID,
@@ -97,6 +148,8 @@ async def update_status(
         out = await service.update_status(complaint_id, data, current_user)
     except ComplaintNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except ComplaintForbidden as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except InvalidTransition as e:
         await audit.record(db, action="COMPLAINT_STATUS_REJECTED", entity_type="complaint", entity_id=str(complaint_id),
                            user=current_user, request=request, new={"requested": data.new_status}, outcome="failure")

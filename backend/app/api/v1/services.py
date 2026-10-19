@@ -28,6 +28,12 @@ async def list_services(
                                     verification_status=verification_status)
 
 
+@router.get("/categories/list")
+async def list_categories(db: AsyncSession = Depends(get_db)):
+    """Distinct categories of active services (drives the filter pills, so they always match the data)."""
+    return await ServiceService(db).get_categories()
+
+
 @router.get("/{service_id}", response_model=ServiceDetail)
 async def get_service(service_id: UUID, db: AsyncSession = Depends(get_db)):
     svc = ServiceService(db)

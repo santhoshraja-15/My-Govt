@@ -1,0 +1,57 @@
+area,check,expected_from_database,reported_by_application,result
+public stats,active schemes,12,12,PASS
+public stats,active services,10,10,PASS
+public stats,active departments,17,17,PASS
+public stats,districts,38,38,PASS
+public stats,verified schemes,0,0,PASS
+catalogue,scheme list total,12,12,PASS
+catalogue,service list total,10,10,PASS
+catalogue,scheme category 'agriculture_support',1,1,PASS
+catalogue,scheme category 'education_nutrition',1,1,PASS
+catalogue,scheme category 'education_women',1,1,PASS
+catalogue,scheme category 'food_security',1,1,PASS
+catalogue,scheme category 'health_insurance',1,1,PASS
+catalogue,scheme category 'land_records',1,1,PASS
+catalogue,scheme category 'maternal_child_health',1,1,PASS
+catalogue,scheme category 'public_health',1,1,PASS
+catalogue,scheme category 'social_security',2,2,PASS
+catalogue,scheme category 'transport_equity',1,1,PASS
+catalogue,scheme category 'women_empowerment',1,1,PASS
+catalogue,service category 'certificate',5,5,PASS
+catalogue,service category 'civil_supplies',1,1,PASS
+catalogue,service category 'land_record',2,2,PASS
+catalogue,service category 'vital_statistics',2,2,PASS
+catalogue,scheme detail eligibility rule count,0,0,PASS
+catalogue,scheme detail verification status,provisional,provisional,PASS
+admin,complaints total,86,86,PASS
+admin,complaints open,44,44,PASS
+admin,SLA target missed,44,44,PASS
+admin,without an authority,0,0,PASS
+admin,synthetic complaints (always counted),86,86,PASS
+admin,documents,0,0,PASS
+admin,verification breakdown: schemes,"{'externally_referenced': 1, 'provisional': 11}","{'externally_referenced': 1, 'provisional': 11}",PASS
+admin,verification breakdown: services,{'provisional': 10},{'provisional': 10},PASS
+admin,verification breakdown: departments,{'provisional': 17},{'provisional': 17},PASS
+admin,verification breakdown: districts,{'provisional': 38},{'provisional': 38},PASS
+admin,department performance: Department of Agriculture & Farmers Welfare,"(10, 5, 4)","(10, 5, 4)",PASS
+admin,department performance: Health and Family Welfare Department,"(16, 9, 7)","(16, 9, 7)",PASS
+admin,department performance: Social Welfare and Women Empowerment,"(4, 1, 3)","(4, 1, 3)",PASS
+admin,department performance: Rural Development and Panchayat Raj,"(7, 4, 2)","(7, 4, 2)",PASS
+admin,department performance: Revenue Department,"(9, 6, 3)","(9, 6, 3)",PASS
+admin,department performance: School Education Department,"(7, 3, 4)","(7, 3, 4)",PASS
+admin,department performance: Municipal Administration and Water Supply,"(22, 8, 14)","(22, 8, 14)",PASS
+admin,department performance: Energy Department (TANGEDCO),"(11, 3, 7)","(11, 3, 7)",PASS
+officer,status counts of the officer's department,"{'closed': 1, 'in_progress': 2, 'escalated': 1, 'resolved': 5}","{'closed': 1, 'in_progress': 2, 'escalated': 1, 'resolved': 5}",PASS
+officer,overdue,3,3,PASS
+officer,unassigned,0,0,PASS
+officer,department name,Revenue Department,Revenue Department,PASS
+officer,listed complaints all in own department,0,0,PASS
+citizen,own complaint count,6,6,PASS
+citizen,own complaint statuses,"['classified', 'closed', 'escalated', 'in_progress', 'in_progress', 'resolved']","['classified', 'closed', 'escalated', 'in_progress', 'in_progress', 'resolved']",PASS
+citizen,history rows equal timeline length,4,4,PASS
+integrity,duplicate complaint references,0,0,PASS
+integrity,complaints without a history row,0,0,PASS
+integrity,history ends in the complaint's current status,0,0,PASS
+integrity,official_verified records without a source document,0,0,PASS
+integrity,complaints assigned to an officer of another department,0,0,PASS
+integrity,synthetic rows are labelled in their title,0,0,PASS

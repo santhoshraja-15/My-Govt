@@ -7,8 +7,6 @@ import { services as servicesAPI } from "@/lib/api";
 import { ErrorState } from "@/components/ui/AsyncState";
 import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
-const CATEGORIES = ["All","certificate","land_record","welfare","utilities","transport","document","agriculture","locator"];
-
 function ServiceCard({ svc }: { svc: any }) {
   return (
     <Link data-testid="service-card" href={`/services/${svc.service_id}`}
@@ -18,10 +16,10 @@ function ServiceCard({ svc }: { svc: any }) {
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-slate-900 text-sm group-hover:text-brand-700 transition-colors line-clamp-1 mb-0.5">{svc.name}</h3>
-        {svc.name_ta && <p className="text-xs text-slate-400 font-tamil line-clamp-1 mb-2">{svc.name_ta}</p>}
+        {svc.name_ta && <p className="text-xs text-slate-500 font-tamil line-clamp-1 mb-2">{svc.name_ta}</p>}
         {svc.description && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{svc.description}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {svc.department_name && <span className="badge badge-blue">{svc.department_name}</span>}
+          {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={svc.department_name}>{svc.department_name}</span>}
           {svc.charges_verified ? (
             <>
               {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
@@ -50,6 +48,7 @@ export default function ServicesPage() {
   const [category, setCategory] = useState("All");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
+  const [cats, setCats] = useState<string[]>([]);
 
   const load = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -69,6 +68,7 @@ export default function ServicesPage() {
   }, [q, category]);
 
   useEffect(() => { load(1); }, [load]);
+  useEffect(() => { servicesAPI.categories().then(setCats).catch(() => setCats([])); }, []);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -83,11 +83,11 @@ export default function ServicesPage() {
           </div>
           <p className="text-emerald-200 text-lg mb-6">Apply online for {total > 0 ? total : ""} government certificates and services</p>
 
-          <form onSubmit={(e) => { e.preventDefault(); setQ(inputVal); }} className="flex gap-2 max-w-xl">
-            <div className="flex-1 flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
+          <form onSubmit={(e) => { e.preventDefault(); setQ(inputVal); }} role="search" className="flex flex-wrap gap-2 max-w-xl">
+            <div className="flex-1 min-w-[12rem] flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
               <Search size={18} className="text-emerald-200 shrink-0" />
-              <input value={inputVal} onChange={e => setInputVal(e.target.value)}
-                placeholder="Search services…" className="flex-1 bg-transparent text-white placeholder-emerald-300 text-sm outline-none" />
+              <input value={inputVal} onChange={e => setInputVal(e.target.value)} aria-label="Search services" data-testid="service-search"
+                placeholder="Search services…" className="flex-1 min-w-0 bg-transparent text-white placeholder-emerald-300 text-sm outline-none" />
             </div>
             <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">Search</button>
           </form>
@@ -95,10 +95,11 @@ export default function ServicesPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <h2 className="sr-only">Service results</h2>
         {/* Category filter pills */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {CATEGORIES.map(c => (
-            <button key={c} onClick={() => setCategory(c)}
+          {["All", ...cats].map(c => (
+            <button key={c} onClick={() => setCategory(c)} aria-pressed={category === c} data-testid={`service-category-${c}`}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all border ${
                 category === c
                   ? "bg-brand-600 text-white border-brand-600 shadow-sm"

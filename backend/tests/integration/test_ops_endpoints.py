@@ -123,3 +123,10 @@ async def test_evidence_upload_is_authorised_validated_and_never_claims_success(
     assert "NOT saved" in ok_type.json()["detail"]
     assert (await client.post(url, headers=officer, files={"file": PNG})).status_code == 503                    # staff pass authorisation too
     assert await conn.fetchval("SELECT count(*) FROM complaints.evidence WHERE complaint_id=$1", cid) == 0     # nothing was recorded
+
+
+async def test_docs_aliases_forward_to_the_api_docs_in_development(client):
+    for alias, target in (("/docs", "/api/docs"), ("/redoc", "/api/redoc")):
+        r = await client.get(alias, follow_redirects=False)
+        assert r.status_code in (302, 307) and r.headers["location"] == target
+        assert (await client.get(target)).status_code == 200

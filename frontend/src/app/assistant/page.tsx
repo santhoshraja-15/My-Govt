@@ -107,7 +107,7 @@ function MessageBubble({ msg }: { msg: Message }) {
             )}
 
             {msg.degraded && (
-              <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-500">
                 <Info size={12} />
                 <span>AI model unavailable — responding from database</span>
               </div>
@@ -282,7 +282,7 @@ export default function AssistantPage() {
                   <Bot size={16} className="text-white" />
                 </div>
                 <div className="chat-bubble-assistant">
-                  <div className="flex items-center gap-2 text-slate-400 text-sm">
+                  <div className="flex items-center gap-2 text-slate-500 text-sm">
                     <Loader2 size={14} className="animate-spin" />
                     Searching government data…
                   </div>
@@ -320,7 +320,7 @@ export default function AssistantPage() {
               {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>
           </div>
-          <p className="text-xs text-slate-400 mt-2 text-center">
+          <p className="text-xs text-slate-500 mt-2 text-center">
             Answers are grounded in official Tamil Nadu government sources. Not a substitute for official advice.
           </p>
         </div>

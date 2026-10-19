@@ -1,8 +1,8 @@
 # MyGovt CI. Every job is required and no step is allowed to fail silently: a failing check fails the run.
 #
-# NOTE: this workflow was written and statically validated (YAML parse + step review) but has NOT been executed
-# on GitHub Actions yet; the same commands were run locally on Windows against PostgreSQL 16 + PostGIS 3.6 +
-# pgvector, Neo4j 5.26 and Node 22. The first real run may need small fixes (paths, versions, runner tooling).
+# NOTE: the backend, frontend, security, sql-and-data-checks and e2e jobs have passed on GitHub Actions (see
+# docs/audit/deployment_reproducibility_audit.md). The `images` job builds the four application images; it does not
+# start Compose or a database, so a built image is not a verified runtime.
 name: CI
 
 on:
@@ -84,7 +84,14 @@ jobs:
           TEST_POSTGIS: "1"
           TEST_NEO4J_URI: bolt://localhost:7687
           TEST_NEO4J_PASSWORD: ${{ env.NEO4J_PASSWORD }}
-        run: pytest tests -q -rs --cov=app --cov-report=term-missing --junitxml=pytest-report.xml
+        run: |
+          set -o pipefail
+          pytest tests -q -rs -rfE --cov=app --cov-report=term-missing --junitxml=pytest-report.xml 2>&1 | tee pytest.log
+
+      - name: Report pytest failures as annotations
+        if: failure()
+        working-directory: backend
+        run: python ../.github/scripts/annotate_failure.py "backend tests failed" pytest.log
 
       - name: Fail if any test was skipped unexpectedly
         working-directory: backend
@@ -166,7 +173,8 @@ jobs:
       - run: npm run build
         working-directory: frontend
         env: { NEXT_PUBLIC_API_URL: "http://localhost:8010", NEXT_TELEMETRY_DISABLED: "1" }
-      - run: npx playwright test
+      - name: Playwright
+        id: pw
         working-directory: frontend
         env:
           E2E_PG_HOST: localhost
@@ -174,6 +182,13 @@ jobs:
           E2E_PG_USER: postgres
           E2E_PG_PASSWORD: ${{ env.PG_PASSWORD }}
           NEXT_PUBLIC_API_URL: http://localhost:8010
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee playwright.log
+      - name: Report Playwright failures as annotations
+        if: failure()
+        working-directory: frontend
+        run: python3 ../.github/scripts/annotate_failure.py "playwright failed" playwright.log
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -225,3 +240,173 @@ jobs:
               assert meta["sha256"] == digest, f"{f.name}: .meta.json checksum is stale"
           print("seed provenance checks passed")
           PY
+
+  images:
+    # Builds the four application images from the real Dockerfiles and build contexts (nothing is pushed anywhere),
+    # then runs static-property checks on each built image. A built image is NOT a verified runtime: no database,
+    # no Compose network and no real configuration is involved here.
+    name: Image build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: backend-dev, context: backend, file: docker/backend/Dockerfile }
+          - { name: frontend-dev, context: frontend, file: docker/frontend/Dockerfile }
+          - { name: backend-prod, context: backend, file: docker/backend/Dockerfile.prod }
+          - { name: frontend-prod, context: frontend, file: docker/frontend/Dockerfile.prod }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space (the dev backend image installs full CUDA torch)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }}
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: false
+          load: true
+          tags: mygovt-${{ matrix.name }}:ci
+          build-args: ${{ startsWith(matrix.name, 'frontend') && 'NEXT_PUBLIC_API_URL=http://localhost:8000' || '' }}
+
+      - name: Backend production image properties
+        if: matrix.name == 'backend-prod'
+        run: |
+          set -e
+          IMG=mygovt-backend-prod:ci
+          [ "$(docker run --rm --entrypoint id $IMG -u)" != 0 ] || { echo "::error::runs as root"; exit 1; }
+          docker run --rm --entrypoint python $IMG -c "import importlib.util as u,sys; sys.exit(1 if u.find_spec('pytest') or u.find_spec('ruff') else 0)" \
+            || { echo "::error::test/dev tools present in production image"; exit 1; }
+          docker run --rm --entrypoint python $IMG -c "import fastapi, sqlalchemy.ext.asyncio, greenlet, asyncpg, torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+          docker run --rm --entrypoint test $IMG -f /app/app/main.py
+          cmd="$(docker inspect --format '{{json .Config.Cmd}}' $IMG)"; echo "CMD: $cmd"
+          case "$cmd" in *--reload*) echo "::error::auto-reload in production CMD"; exit 1;; esac
+          [ "$(docker inspect --format '{{if .Config.Healthcheck}}yes{{end}}' $IMG)" = yes ] || { echo "::error::no HEALTHCHECK"; exit 1; }
+          docker run --rm --entrypoint sh $IMG -c 'test -z "$(find /app -name ".env*" ! -name ".env.example")"' \
+            || { echo "::error::env file inside image"; exit 1; }
+
+      - name: Frontend production image properties and start-up
+        if: matrix.name == 'frontend-prod'
+        run: |
+          set -e
+          IMG=mygovt-frontend-prod:ci
+          [ "$(docker run --rm --entrypoint id $IMG -u)" != 0 ] || { echo "::error::runs as root"; exit 1; }
+          docker run --rm --entrypoint test $IMG -f /app/server.js
+          docker run --rm --entrypoint test $IMG -d /app/.next/static
+          [ "$(docker inspect --format '{{if .Config.Healthcheck}}yes{{end}}' $IMG)" = yes ] || { echo "::error::no HEALTHCHECK"; exit 1; }
+          docker run -d --name fe -p 3000:3000 $IMG
+          code=000
+          for i in $(seq 1 30); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ || true)"
+            [ "$code" != 000 ] && break
+            sleep 2
+          done
+          echo "GET / -> HTTP $code"
+          if [ "$code" = 000 ] || [ "${code#5}" != "$code" ]; then docker logs fe; echo "::error::frontend container did not serve /"; exit 1; fi
+
+      - name: Development image properties
+        if: endsWith(matrix.name, '-dev')
+        run: |
+          set -e
+          if [ "${{ matrix.name }}" = backend-dev ]; then
+            docker run --rm --entrypoint python mygovt-backend-dev:ci -c "import fastapi, sqlalchemy.ext.asyncio, greenlet, pytest; print('dev backend imports ok')"
+          else
+            docker run --rm --entrypoint test mygovt-frontend-dev:ci -d /app/node_modules/next
+          fi
+
+      - name: Report failure as annotation
+        if: failure()
+        run: echo "::error title=image ${{ matrix.name }} failed::see the failing step above (build or property check)"
+
+  compose:
+    # Runs the real development Compose stack and the Makefile database workflow on a hosted runner with a throw-away
+    # .env. This is the first execution of docker-compose.yml and of the `make db-init / db-verify / seed-verify` paths.
+    name: Compose stack (up, db-init, db-verify, health)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
+
+      - name: Throw-away .env from .env.example
+        run: python3 .github/scripts/make_ci_env.py
+
+      - name: docker compose config
+        run: docker compose config -q
+
+      - name: docker compose up --build
+        run: |
+          set -o pipefail
+          docker compose up -d --build 2>&1 | tee compose-up.log
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 90); do
+            st="$(docker inspect --format '{{.State.Health.Status}}' mygovt_backend 2>/dev/null || echo none)"
+            echo "backend health: $st"
+            [ "$st" = healthy ] && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: make db-init (schema, migrations, seed)
+        run: make db-init 2>&1 | tee dbinit.log
+
+      - name: make db-verify
+        run: make db-verify 2>&1 | tee dbverify.log
+
+      - name: make seed-verify
+        run: make seed-verify 2>&1 | tee seedverify.log
+
+      - name: Probe health, public stats and frontend
+        run: |
+          set -e
+          curl -fsS http://localhost:8000/health | tee health.json; echo
+          curl -fsS http://localhost:8000/api/v1/public/stats | tee stats.json; echo
+          python3 .github/scripts/assert_health.py health.json
+          echo "::notice title=public stats::$(head -c 600 stats.json)"
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ || true)"; echo "frontend GET / -> $code"
+          [ "$code" != 000 ] && [ "${code#5}" = "$code" ]
+          docker compose ps
+
+      - name: Demo overlay (make demo) and demo smoke checks
+        run: |
+          set -o pipefail
+          make demo 2>&1 | tee demo.log
+          for i in $(seq 1 60); do
+            st="$(docker inspect --format '{{.State.Health.Status}}' mygovt_backend 2>/dev/null || echo none)"
+            [ "$st" = healthy ] && break
+            sleep 3
+          done
+          python3 .github/scripts/check_demo.py http://localhost:8000 2>&1 | tee demo-check.log
+
+      - name: Report failure as annotation
+        if: failure()
+        run: |
+          {
+            echo "== detailed health"
+            docker compose exec -T backend python -c "import asyncio,json; from app.core.health import get_health_status; d=asyncio.run(get_health_status(True)); print(json.dumps({k:v for k,v in d['services'].items()}, default=str))" 2>&1 | tail -n 4
+            echo "== redis from backend"
+            docker compose exec -T backend python -c "import asyncio,redis,redis.asyncio as r,os,socket; u=os.environ.get('REDIS_URL'); print('redis-py', redis.__version__, 'url', u); print('dns', socket.getaddrinfo('redis', 6379)[:2]); print(asyncio.run(r.from_url(u, socket_connect_timeout=5).ping()))" 2>&1 | tail -n 6
+            docker compose ps redis backend 2>&1 | tail -n 4
+          } > compose-diag.log 2>&1 || true
+          python3 .github/scripts/annotate_failure.py "compose diagnostics" compose-diag.log 20 raw
+          {
+            for s in backend postgres worker frontend redis; do echo "== $s"; docker compose logs --tail=25 $s 2>&1; done
+            for f in compose-up.log dbinit.log dbverify.log seedverify.log demo.log demo-check.log; do [ -f $f ] && { echo "== $f"; tail -n 15 $f; }; done
+          } > compose-failure.log 2>&1 || true
+          python3 .github/scripts/annotate_failure.py "compose job failed" compose-failure.log 40
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans

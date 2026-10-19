@@ -47,11 +47,11 @@ export default function DocumentsPage() {
             <h1 className="text-3xl font-black">Policy Documents</h1>
           </div>
           <p className="text-indigo-200 mb-6">Government Orders, Acts, Policies and Official Circulars</p>
-          <form onSubmit={e => { e.preventDefault(); setQ(inputVal); }} className="flex gap-2 max-w-xl">
-            <div className="flex-1 flex items-center gap-2 bg-white/15 border border-white/20 rounded-xl px-4 py-2.5">
+          <form onSubmit={e => { e.preventDefault(); setQ(inputVal); }} role="search" className="flex flex-wrap gap-2 max-w-xl">
+            <div className="flex-1 min-w-[12rem] flex items-center gap-2 bg-white/15 border border-white/20 rounded-xl px-4 py-2.5">
               <Search size={18} className="text-indigo-200 shrink-0" />
-              <input value={inputVal} onChange={e => setInputVal(e.target.value)}
-                placeholder="Search documents…" className="flex-1 bg-transparent text-white placeholder-indigo-300 text-sm outline-none" />
+              <input value={inputVal} onChange={e => setInputVal(e.target.value)} aria-label="Search documents" data-testid="document-search"
+                placeholder="Search documents…" className="flex-1 min-w-0 bg-transparent text-white placeholder-indigo-300 text-sm outline-none" />
             </div>
             <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600">Search</button>
           </form>
@@ -92,7 +92,7 @@ export default function DocumentsPage() {
                     {doc.department_name && <span className="badge badge-slate">{doc.department_name}</span>}
                     {doc.language && <span className="badge badge-purple uppercase">{doc.language}</span>}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
                     {doc.publication_date && (
                       <span className="flex items-center gap-1">
                         <Calendar size={11} />

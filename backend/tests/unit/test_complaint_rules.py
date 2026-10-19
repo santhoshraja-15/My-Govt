@@ -83,3 +83,14 @@ def test_view_access():
     assert r.can_view_complaint("citizen", "c1", "c1")
     assert not r.can_view_complaint("citizen", "c2", "c1")
     assert not r.can_view_complaint("citizen", None, "c1")
+
+
+def test_staff_department_scope_rule():
+    from app.services import complaint_rules as r
+
+    assert r.staff_can_act_on("state_admin", None, 7) and r.staff_can_act_on("system_admin", None, None)
+    assert r.staff_can_act_on("officer", 3, 3) and r.staff_can_act_on("department_admin", 3, 3)
+    assert not r.staff_can_act_on("officer", 3, 4)
+    assert not r.staff_can_act_on("officer", None, None)          # unlinked account never matches a department-less complaint
+    assert not r.staff_can_act_on("officer", 3, None)             # uncategorised complaints are for admins
+    assert not r.staff_can_act_on("citizen", 3, 3)

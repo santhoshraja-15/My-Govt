@@ -13,6 +13,9 @@ import { useAuth } from "@/lib/auth";
 import { LoadingState } from "@/components/ui/AsyncState";
 import { ComplaintsPanel, DepartmentPerformancePanel, VerificationQueuePanel } from "@/components/admin/OperationsPanels";
 
+/** Quality scores are stored on a 0-100 scale in the dataset registry. */
+const pct = (v: unknown) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+
 // ── Sidebar items ──────────────────────────────────────────────
 const NAV_ITEMS = [
   { key: "overview",   icon: BarChart3, label: "Overview" },
@@ -37,7 +40,7 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: any) {
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-500 font-medium mb-0.5">{title}</p>
         <p className="text-2xl font-black text-slate-900">{value ?? "—"}</p>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -73,7 +76,7 @@ function OverviewPanel() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Active Schemes" value={stats.schemes} icon={BarChart3} color="bg-emerald-600" subtitle="Live count" />
         <StatCard title="Active Services" value={stats.services} icon={Zap} color="bg-amber-500" subtitle="Live count" />
-        <StatCard title="Complaints (real)" value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
+        <StatCard title={stats.demo_data_included ? "Complaints (incl. demo data)" : "Complaints (real)"} value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
         <StatCard title="SLA target missed" value={stats.complaints_sla_breached} icon={AlertTriangle} color="bg-red-600" subtitle={`${stats.complaints_unassigned ?? "—"} without an authority`} />
       </div>
 
@@ -84,11 +87,13 @@ function OverviewPanel() {
           {Object.entries(data?.verification || {}).map(([k, v]: any) => (
             <div key={k}>
               <p className="font-semibold capitalize">{k}</p>
-              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-400">unavailable</p>}
+              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-500">unavailable</p>}
             </div>
           ))}
         </div>
-        {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3">{stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.</p>}
+        {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3" data-testid="synthetic-note">{stats.demo_data_included
+          ? `Demonstration mode: ${stats.synthetic_complaints} clearly labelled synthetic complaints are INCLUDED in the complaint figures above.`
+          : `${stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.`}</p>}
       </div>
 
       {/* Service health */}
@@ -103,7 +108,7 @@ function OverviewPanel() {
                 <HealthDot status={st.status} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 capitalize">{svc}</p>
-                  <p className="text-xs text-slate-400">{st.latency_ms ? `${st.latency_ms}ms` : st.status}</p>
+                  <p className="text-xs text-slate-500">{st.latency_ms ? `${st.latency_ms}ms` : st.status}</p>
                 </div>
               </div>
             ))}
@@ -130,9 +135,9 @@ function OverviewPanel() {
                     <td>
                       <div className="flex items-center gap-1.5">
                         <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full" style={{width: `${(d.quality_completeness||0)*100}%`}} />
+                          <div className="h-full bg-emerald-500 rounded-full" style={{width: `${pct(d.quality_completeness)}%`}} />
                         </div>
-                        <span className="text-xs text-slate-500">{Math.round((d.quality_completeness||0)*100)}%</span>
+                        <span className="text-xs text-slate-500">{pct(d.quality_completeness)}%</span>
                       </div>
                     </td>
                   </tr>
@@ -205,7 +210,7 @@ function SchemaExplorer() {
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all ${
                   selectedTable === t.table_name ? "bg-brand-50 text-brand-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
                 <span className="truncate">{t.table_name}</span>
-                <span className="text-xs text-slate-400 shrink-0 ml-1">{t.row_count_estimate?.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 shrink-0 ml-1">{t.row_count_estimate?.toLocaleString()}</span>
               </button>
             ))}
           </div>
@@ -230,7 +235,7 @@ function SchemaExplorer() {
                         <td className="font-mono text-xs font-semibold text-brand-700">{c.column_name}</td>
                         <td className="font-mono text-xs text-slate-500">{c.data_type}</td>
                         <td>{c.is_nullable === "YES" ? <span className="badge badge-slate">nullable</span> : <span className="badge badge-blue">required</span>}</td>
-                        <td className="font-mono text-xs text-slate-400 max-w-xs truncate">{c.column_default}</td>
+                        <td className="font-mono text-xs text-slate-500 max-w-xs truncate">{c.column_default}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -312,12 +317,12 @@ function SQLWorkspace() {
             {loading ? "Running…" : "Run Query"}
           </button>
         </div>
-        <textarea value={sql} onChange={e => setSql(e.target.value)}
+        <textarea value={sql} onChange={e => setSql(e.target.value)} aria-label="SQL query (read-only, SELECT statements only)"
           className="input font-mono text-sm resize-none" rows={5}
           placeholder="SELECT * FROM schemes.scheme LIMIT 10;" />
 
         <div className="mt-3">
-          <p className="text-xs text-slate-400 mb-2">Quick examples:</p>
+          <p className="text-xs text-slate-500 mb-2">Quick examples:</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex, i) => (
               <button key={i} onClick={() => setSql(ex)}
@@ -360,7 +365,7 @@ function SQLWorkspace() {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-400 py-4 text-center">Query executed — no rows returned.</p>
+            <p className="text-sm text-slate-500 py-4 text-center">Query executed — no rows returned.</p>
           )}
         </div>
       )}
@@ -389,7 +394,7 @@ function AuditLogsPanel() {
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-10 text-slate-400">No audit logs yet.</div>
+          <div className="text-center py-10 text-slate-500">No audit logs yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table text-xs">
@@ -441,14 +446,19 @@ function DataQualityPanel() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-brand-600" /></div>
       ) : !data?.datasets?.length ? (
-        <div className="card p-10 text-center text-slate-400">No dataset quality data available.</div>
+        <div className="card p-10 text-center text-slate-500">No dataset quality data available.</div>
       ) : (
-        data.datasets.map((d: any) => (
+        <>
+        <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="quality-disclaimer">
+          These scores are values <b>recorded in the dataset registry</b> when the data was loaded. The platform does not compute them, and they do not mean the
+          data has been verified against official documents (see the Verification Queue).
+        </p>
+        {data.datasets.map((d: any) => (
           <div key={d.dataset_id} className="card p-5">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
                 <h3 className="font-bold text-slate-900">{d.dataset_name}</h3>
-                <p className="text-xs text-slate-400">{d.record_count?.toLocaleString()} records</p>
+                <p className="text-xs text-slate-500">{d.record_count?.toLocaleString()} records</p>
               </div>
               <span className={`badge ${d.validation_status === "validated" ? "badge-green" : "badge-yellow"}`}>
                 {d.validation_status}
@@ -458,21 +468,22 @@ function DataQualityPanel() {
               {qMetrics(d).map(({ label, score }) => (
                 <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
                   <div className={`text-xl font-black mb-1 ${
-                    (score||0) >= 0.9 ? "text-emerald-600" : (score||0) >= 0.7 ? "text-amber-500" : "text-red-500"
+                    pct(score) >= 90 ? "text-emerald-700" : pct(score) >= 70 ? "text-amber-700" : "text-red-700"
                   }`}>
-                    {Math.round((score||0)*100)}%
+                    {pct(score)}%
                   </div>
                   <p className="text-xs text-slate-500">{label}</p>
                   <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
                     <div className={`h-full rounded-full ${
-                      (score||0) >= 0.9 ? "bg-emerald-500" : (score||0) >= 0.7 ? "bg-amber-400" : "bg-red-400"
-                    }`} style={{width: `${(score||0)*100}%`}} />
+                      pct(score) >= 90 ? "bg-emerald-500" : pct(score) >= 70 ? "bg-amber-400" : "bg-red-400"
+                    }`} style={{width: `${pct(score)}%`}} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        ))
+        ))}
+        </>
       )}
     </div>
   );
@@ -491,7 +502,7 @@ function KnowledgeGraphPanel() {
       {!stats ? (
         <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
       ) : stats.status === "disabled" ? (
-        <div className="text-center py-10 text-slate-400">Knowledge Graph feature is not enabled.</div>
+        <div className="text-center py-10 text-slate-500">Knowledge Graph feature is not enabled.</div>
       ) : stats.status !== "healthy" ? (
         <div className="text-center py-10 text-amber-500">Knowledge Graph unavailable: {stats.error}</div>
       ) : (
@@ -554,7 +565,7 @@ function AdminConsole() {
               </div>
               <div>
                 <p className="font-bold text-slate-900 text-sm">Admin Console</p>
-                <p className="text-xs text-slate-400">Intelligence Hub</p>
+                <p className="text-xs text-slate-500">Intelligence Hub</p>
               </div>
             </>
           )}
@@ -575,7 +586,12 @@ function AdminConsole() {
           ))}
         </nav>
 
-        <div className="p-2 border-t border-slate-100">
+        <div className="p-2 border-t border-slate-100 space-y-1">
+          <Link href="/database-architecture" data-testid="admin-database-architecture"
+            className={`admin-sidebar-item w-full bg-brand-50 text-brand-700 font-semibold ${collapsed ? "justify-center px-2" : ""}`}>
+            <Database size={18} className="shrink-0" />
+            {!collapsed && <span>Database Architecture</span>}
+          </Link>
           <Link href="/" className={`admin-sidebar-item w-full ${collapsed ? "justify-center px-2" : ""}`}>
             <ChevronRight size={18} className="rotate-180 shrink-0" />
             {!collapsed && <span>Exit Admin</span>}

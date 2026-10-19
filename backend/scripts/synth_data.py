@@ -91,8 +91,13 @@ def _uuid(rng: random.Random) -> uuid.UUID:
     return uuid.UUID(int=rng.getrandbits(128), version=4)
 
 
-def plan(seed: int, n_citizens: int, n_complaints: int, category_ids: list[int], district_ids: list[int]):
-    """Pure, deterministic generation of what would be written (no I/O)."""
+def plan(seed: int, n_citizens: int, n_complaints: int, category_ids: list[int], district_ids: list[int],
+         reference_time: datetime = REFERENCE_TIME, recent_open: bool = False):
+    """Pure, deterministic generation of what would be written (no I/O).
+
+    ``reference_time`` anchors every timestamp (default: a fixed time, so output is reproducible byte for byte). Demonstration
+    databases pass "now" and ``recent_open=True`` so that unresolved complaints are days old rather than months old.
+    """
     if n_citizens < 0 or n_complaints < 0:
         raise ValueError("counts must be >= 0")
     if n_complaints and not n_citizens:
@@ -120,8 +125,13 @@ def plan(seed: int, n_citizens: int, n_complaints: int, category_ids: list[int],
     complaints = []
     for i in range(1, n_complaints + 1):
         scenario = rng.choices(names, weights)[0]
-        age_h = rng.randint(6, 90 * 24) if scenario != "overdue_open" else rng.randint(10 * 24, 90 * 24)
-        created = REFERENCE_TIME - timedelta(hours=age_h)
+        if recent_open and scenario in ("open_new", "in_progress", "escalated"):
+            age_h = rng.randint(6, 5 * 24)
+        elif recent_open and scenario == "overdue_open":
+            age_h = rng.randint(6 * 24, 30 * 24)
+        else:
+            age_h = rng.randint(6, 90 * 24) if scenario != "overdue_open" else rng.randint(10 * 24, 90 * 24)
+        created = reference_time - timedelta(hours=age_h)
         path = SCENARIOS[scenario]
         t, times = created, [created]
         for _ in path[1:]:

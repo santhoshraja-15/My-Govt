@@ -1,0 +1,64 @@
+method,path,operation,access_rule,status_anonymous,status_citizen,status_officer,status_officer2,status_deptadmin,status_admin,status_sysadmin,result,anomalies,covered_by_tests
+GET,/api/v1/admin/audit-logs,Get Audit Logs,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/complaints,Admin Complaints,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/data-quality,Data Quality,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/databases/connections,Db Connections,admin,401,403,403,403,403,200,200,PASS,,test_ops_endpoints.py
+GET,/api/v1/admin/datasets,List Datasets,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/department-performance,Department Performance,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/health,Admin Health,admin,401,403,403,403,403,200,200,PASS,,test_ops_endpoints.py
+GET,/api/v1/admin/knowledge-graph/stats,Kg Stats,admin,401,403,403,403,403,200,200,PASS,,test_ops_endpoints.py
+GET,/api/v1/admin/overview,Admin Overview,admin,401,403,403,403,403,200,200,PASS,,"auth_admin.spec.ts, test_api_admin_chat_governance.py"
+POST,/api/v1/admin/query,Run Query,admin,401,403,403,403,403,403,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/admin/relationships,Get Relationships,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/schemas,List Schemas,admin,401,403,403,403,403,200,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/admin/schemas/{schema_name}/tables,List Tables,admin,401,403,403,403,403,200,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/admin/schemas/{schema_name}/tables/{table_name},Get Table Detail,admin,401,403,403,403,403,200,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/admin/schemas/{schema_name}/tables/{table_name}/sample,Get Table Sample,admin,401,403,403,403,403,200,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/admin/sources,List Sources,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/admin/verification-queue,Verification Queue,admin,401,403,403,403,403,200,200,PASS,,test_api_admin_chat_governance.py
+GET,/api/v1/architecture/advanced,Advanced,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/components,Components,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/examples/{example_id}/explain,Explain Example,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/examples/{example_id}/run,Run Example,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/implementation,Implementation,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/normalization,Normalization,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/overview,Overview,admin,401,403,403,403,403,200,200,PASS,,"architecture.spec.ts, test_api_architecture.py"
+GET,/api/v1/architecture/relationships,Relationships,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/schema,Relational Schema,admin,401,403,403,403,403,200,200,PASS,,test_api_architecture.py
+GET,/api/v1/architecture/tables,Tables,admin,401,403,403,403,403,200,200,PASS,,"architecture.spec.ts, test_api_architecture.py"
+GET,/api/v1/architecture/tables/{schema}/{table},Table Detail,admin,401,403,403,403,403,200,200,PASS,,"architecture.spec.ts, test_api_architecture.py"
+GET,/api/v1/auth/me,Get Me,auth,401,200,200,200,200,200,200,PASS,,test_api_auth_catalog.py
+GET,/api/v1/chat/conversations,List Conversations,optional,200,200,200,200,200,200,200,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/chat/conversations/{conversation_id},Get Conversation,optional,404,404,404,404,404,404,404,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/chat/decisions/{decision_id}/lineage,Get Decision Lineage,optional,404,404,404,404,404,404,404,PASS,,"test_api_admin_chat_governance.py, test_rag_assistant.py"
+POST,/api/v1/chat/message,Chat Message,optional,422,422,422,422,422,422,422,PASS,,"complaints_assistant.spec.ts, test_api_admin_chat_governance.py, test_rag_assistant.py, test_security.py"
+GET,/api/v1/citizens/profile,Get Profile,auth,401,200,404,404,404,404,404,PASS,,"test_api_auth_catalog.py, test_security.py"
+PUT,/api/v1/citizens/profile,Update Profile,auth,401,200,404,404,404,404,404,PASS,,"test_api_auth_catalog.py, test_security.py"
+POST,/api/v1/complaints,Submit Complaint,auth,401,422,422,422,422,422,422,PASS,,"accessibility.spec.ts, architecture.spec.ts, audit_fixes.spec.ts, auth_admin.spec.ts, complaints_assistant.spec.ts, public.spec.ts, staff_workflows.spec.ts, test_api_admin_chat_governance.py, test_api_architecture.py, test_api_complaints.py, test_complaint_routing.py, test_knowledge_graph.py, test_ops_endpoints.py, test_postgis_spatial.py, test_security.py"
+GET,/api/v1/complaints/assigned,Staff Complaints,staff,401,403,200,200,200,200,200,PASS,,"staff_workflows.spec.ts, test_api_complaints.py"
+GET,/api/v1/complaints/categories/list,List Categories,public,200,200,200,200,200,200,200,PASS,,"auth_admin.spec.ts, staff_workflows.spec.ts"
+GET,/api/v1/complaints/mine,My Complaints,auth,401,200,200,200,200,200,200,PASS,,"complaints_assistant.spec.ts, test_security.py"
+GET,/api/v1/complaints/officers,Staff Officers,staff,401,403,200,200,200,200,200,PASS,,test_api_complaints.py
+GET,/api/v1/complaints/track/{reference},Track Complaint,public,404,404,404,404,404,404,404,PASS,,"auth_admin.spec.ts, test_security.py"
+GET,/api/v1/complaints/{complaint_id},Get Complaint,auth,401,404,404,404,404,404,404,PASS,,"accessibility.spec.ts, architecture.spec.ts, audit_fixes.spec.ts, auth_admin.spec.ts, complaints_assistant.spec.ts, public.spec.ts, staff_workflows.spec.ts, test_api_admin_chat_governance.py, test_api_architecture.py, test_api_complaints.py, test_complaint_routing.py, test_knowledge_graph.py, test_ops_endpoints.py, test_postgis_spatial.py, test_security.py"
+POST,/api/v1/complaints/{complaint_id}/assign,Assign Complaint,staff,401,403,404,404,404,404,404,PASS,,"staff_workflows.spec.ts, test_api_complaints.py"
+POST,/api/v1/complaints/{complaint_id}/evidence,Upload Evidence,auth,401,422,422,422,422,422,422,PASS,,test_ops_endpoints.py
+PATCH,/api/v1/complaints/{complaint_id}/status,Update Status,staff,401,403,422,422,422,422,403,PASS,,"staff_workflows.spec.ts, test_api_complaints.py, test_security.py"
+GET,/api/v1/departments,List Departments,public,200,200,200,200,200,200,200,PASS,,"test_api_auth_catalog.py, test_security.py"
+GET,/api/v1/departments/{department_id},Get Department,public,200,200,200,200,200,200,200,PASS,,"test_api_auth_catalog.py, test_security.py"
+GET,/api/v1/documents,List Documents,public,200,200,200,200,200,200,200,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/documents/search/full-text,Full Text Search,public,422,422,422,422,422,422,422,PASS,,"test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/documents/{document_id},Get Document,public,404,404,404,404,404,404,404,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, test_api_admin_chat_governance.py, test_security.py"
+GET,/api/v1/gis/districts,List Districts,public,200,200,200,200,200,200,200,PASS,,"test_api_auth_catalog.py, test_security.py"
+GET,/api/v1/gis/districts/{district_id}/taluks,Get Taluks,public,422,422,422,422,422,422,422,PASS,,"test_api_auth_catalog.py, test_security.py"
+GET,/api/v1/gis/facilities,Get Nearby Facilities,public,422,422,422,422,422,422,422,PASS,,test_postgis_spatial.py
+GET,/api/v1/gis/resolve-jurisdiction,Resolve Jurisdiction,public,422,422,422,422,422,422,422,PASS,,test_postgis_spatial.py
+GET,/api/v1/public/stats,Public Stats,public,200,200,200,200,200,200,200,PASS,,"public.spec.ts, test_seed_cli.py"
+GET,/api/v1/schemes,List Schemes,public,200,200,200,200,200,200,200,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, catalog.spec.ts, public.spec.ts, test_api_architecture.py, test_api_auth_catalog.py, test_security.py"
+GET,/api/v1/schemes/categories/list,List Categories,public,200,200,200,200,200,200,200,PASS,,"audit_fixes.spec.ts, test_api_auth_catalog.py"
+GET,/api/v1/schemes/{scheme_id},Get Scheme,public,200,200,200,200,200,200,200,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, catalog.spec.ts, public.spec.ts, test_api_architecture.py, test_api_auth_catalog.py, test_security.py"
+POST,/api/v1/schemes/{scheme_id}/eligibility,Check Eligibility,public,200,200,200,200,200,200,200,PASS,,"audit_fixes.spec.ts, test_api_auth_catalog.py"
+GET,/api/v1/services,List Services,public,200,200,200,200,200,200,200,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, catalog.spec.ts, public.spec.ts, test_api_auth_catalog.py"
+GET,/api/v1/services/categories/list,List Categories,public,200,200,200,200,200,200,200,PASS,,audit_fixes.spec.ts
+GET,/api/v1/services/{service_id},Get Service,public,200,200,200,200,200,200,200,PASS,,"accessibility.spec.ts, audit_fixes.spec.ts, catalog.spec.ts, public.spec.ts, test_api_auth_catalog.py"
+GET,/health,Health Check,public,200,200,200,200,200,200,200,PASS,,"test_ci_scripts.py, test_ops_endpoints.py"

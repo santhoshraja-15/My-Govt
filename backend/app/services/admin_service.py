@@ -7,6 +7,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.health import get_health_status
 
 logger = structlog.get_logger(__name__)
@@ -47,16 +48,17 @@ class AdminService:
                 overview[key] = r.scalar() or 0
             except Exception:
                 overview[key] = None
+        ns = "TRUE" if settings.DEMO_INCLUDE_SYNTHETIC else "NOT is_synthetic"
         biz = {
             "schemes": "SELECT count(*) FROM schemes.scheme WHERE status='active'",
             "services": "SELECT count(*) FROM services.service WHERE status='active'",
             "departments": "SELECT count(*) FROM administration.department WHERE status='active'",
             "districts": "SELECT count(*) FROM administration.district",
             "documents": "SELECT count(*) FROM documents.document",
-            "complaints_total": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic",
-            "complaints_open": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND status NOT IN ('resolved','closed','rejected')",
-            "complaints_sla_breached": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND due_date < now() AND status NOT IN ('resolved','closed','rejected')",
-            "complaints_unassigned": "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND authority_id IS NULL AND status NOT IN ('resolved','closed','rejected')",
+            "complaints_total": f"SELECT count(*) FROM complaints.complaint WHERE {ns}",
+            "complaints_open": f"SELECT count(*) FROM complaints.complaint WHERE {ns} AND status NOT IN ('resolved','closed','rejected')",
+            "complaints_sla_breached": f"SELECT count(*) FROM complaints.complaint WHERE {ns} AND due_date < now() AND status NOT IN ('resolved','closed','rejected')",
+            "complaints_unassigned": f"SELECT count(*) FROM complaints.complaint WHERE {ns} AND authority_id IS NULL AND status NOT IN ('resolved','closed','rejected')",
             "synthetic_complaints": "SELECT count(*) FROM complaints.complaint WHERE is_synthetic",
         }
         stats: dict = {}
@@ -73,6 +75,7 @@ class AdminService:
                 verification[label] = {r[0]: r[1] for r in rows}
             except Exception:
                 verification[label] = None
+        stats["demo_data_included"] = settings.DEMO_INCLUDE_SYNTHETIC
         overview["database_stats"] = stats
         overview["verification"] = verification
         return overview
@@ -382,7 +385,7 @@ class AdminService:
         """Staff view of real (non-synthetic) complaints with the legal next statuses for each."""
         from app.services import complaint_rules as rules
 
-        cond = ["NOT c.is_synthetic"]
+        cond = ["TRUE" if settings.DEMO_INCLUDE_SYNTHETIC else "NOT c.is_synthetic"]
         params: dict[str, Any] = {}
         if status:
             cond.append("c.status = :status")
@@ -415,7 +418,8 @@ class AdminService:
 
     async def get_department_performance(self) -> list:
         """Per-department workload from real complaints (synthetic excluded)."""
-        r = await self.db.execute(text("""
+        ns = "TRUE" if settings.DEMO_INCLUDE_SYNTHETIC else "NOT c.is_synthetic"
+        r = await self.db.execute(text(f"""
             SELECT d.department_id, d.department_name,
                    count(c.complaint_id)::int AS total,
                    count(*) FILTER (WHERE c.status IN ('resolved','closed'))::int AS resolved,
@@ -423,7 +427,7 @@ class AdminService:
                    count(*) FILTER (WHERE c.authority_id IS NULL AND c.status NOT IN ('resolved','closed','rejected'))::int AS without_authority,
                    round(extract(epoch FROM avg(c.resolved_at - c.created_at) FILTER (WHERE c.resolved_at IS NOT NULL)) / 3600.0, 1)::float AS avg_resolution_hours
             FROM administration.department d
-            JOIN complaints.complaint c ON c.department_id = d.department_id AND NOT c.is_synthetic
+            JOIN complaints.complaint c ON c.department_id = d.department_id AND {ns}
             GROUP BY d.department_id, d.department_name
             ORDER BY sla_breached DESC, total DESC"""))
         return [dict(row._mapping) for row in r.fetchall()]

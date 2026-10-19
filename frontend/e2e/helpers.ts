@@ -4,6 +4,7 @@ export const API = "http://localhost:8010/api/v1";
 export const ADMIN_EMAIL = "e2e-admin@example.com";
 export const OFFICER_EMAIL = "e2e-officer@example.com";
 export const SYSADMIN_EMAIL = "e2e-sysadmin@example.com";
+export const DEPTADMIN_EMAIL = "e2e-deptadmin@example.com";
 // Fixture credentials for the disposable E2E database only (see backend/scripts/e2e_env.py).
 export const STAFF_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "E2e-test-pass-1";
 export const CITIZEN_PASSWORD = "Citizen-test-pass-1";

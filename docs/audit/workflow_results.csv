@@ -1,0 +1,31 @@
+workflow,step,description,evidence,result
+A citizen,1,Open the landing page,public.spec.ts: shows live counts from the API and no invented figures,PASS
+A citizen,2,Navigate to registration and sign in,public.spec.ts: primary navigation reaches every section | public.spec.ts: sign in link resolves to a real page,PASS
+A citizen,3,Authenticate as a citizen,auth_admin.spec.ts: register signs the citizen in; sign out returns to anonymous | auth_admin.spec.ts: login redirects back to the page that required it,PASS
+A citizen,4,Open the citizen dashboard,staff_workflows.spec.ts: registering lands a citizen on their dashboard,PASS
+A citizen,5,Search schemes,catalog.spec.ts: search filters results and shows an empty state for no match,PASS
+A citizen,6,Open a scheme detail page,catalog.spec.ts: detail page shows source status,PASS
+A citizen,7,"Eligibility with valid, ineligible, boundary, incomplete and invalid inputs","audit_fixes.spec.ts: a woman under the income limit is shown as meeting the recorded criteria, with per-criterion results | audit_fixes.spec.ts: ineligible, boundary and incomplete cases | audit_fixes.spec.ts: invalid answers are explained next to the field and nothing is sent",PASS
+A citizen,8,Browse services and open one,catalog.spec.ts: lists all services with verification labels and search works | audit_fixes.spec.ts: every service card opens a real detail page with honest fee information,PASS
+A citizen,9,Submit a complaint,"complaints_assistant.spec.ts: file a categorised complaint, see routing + SLA, then track it",PASS
+A citizen,10,Unique reference and status shown,"complaints_assistant.spec.ts: file a categorised complaint, see routing + SLA, then track it",PASS
+A citizen,11,Refresh and verify persistence,"staff_workflows.spec.ts: officer assigns, progresses and resolves; the citizen sees status and remarks | CLI: audit_persistence create + restart + verify",PASS
+A citizen,12,Complaint history and status updates visible,"staff_workflows.spec.ts: officer assigns, progresses and resolves; the citizen sees status and remarks",PASS
+A citizen,13,Assistant: answerable question with citations,complaints_assistant.spec.ts: answers cite their sources and flag unverified records,PASS
+A citizen,14,Assistant: unsupported question handled honestly,complaints_assistant.spec.ts: abstains instead of inventing an answer when nothing matches,PASS
+A citizen,15,Log out,auth_admin.spec.ts: register signs the citizen in; sign out returns to anonymous,PASS
+B officer,1,Sign in and land on the officer console,staff_workflows.spec.ts: staff land on their own consoles after sign-in,PASS
+B officer,2,Find the complaint and read its details,"staff_workflows.spec.ts: officer assigns, progresses and resolves; the citizen sees status and remarks",PASS
+B officer,3,Assign and update status (legal transitions only),"staff_workflows.spec.ts: officer assigns, progresses and resolves; the citizen sees status and remarks",PASS
+B officer,4,Database record and timeline changed,CLI: audit_persistence create + restart + verify,PASS
+B officer,5,Cross-department attempt refused by the backend,staff_workflows.spec.ts: an officer of another department can neither see nor change the complaint,PASS
+C department administrator,1,"Department-scoped dashboard, statistics, assignment, refusal outside the department and from admin areas","staff_workflows.spec.ts: sees and manages only their own department, assigns its officers, and is refused elsewhere",PASS
+D state / system administrator,1,Sign in; role-specific navigation and Database Architecture button,architecture.spec.ts: administrators see the Database Architecture button; it opens the page and is marked active,PASS
+D state / system administrator,2,Dashboard counts equal database records,"auth_admin.spec.ts: admin sees live metrics that match the API, and the verification breakdown | CLI: audit_consistency (56 checks)",PASS
+D state / system administrator,3,"Management operations: complaints, transitions, assignment across departments","staff_workflows.spec.ts: state admin works in the officer console across departments and can assign any officer | auth_admin.spec.ts: complaint backlog: filter, legal status transition, and routing text",PASS
+D state / system administrator,4,State admin is not offered the SQL workspace; system admin runs read-only SQL,auth_admin.spec.ts: state administrators are not offered the SQL workspace (system admin only) | auth_admin.spec.ts: SQL workspace (system admin) runs SELECT and refuses mutating statements,PASS
+D state / system administrator,5,"Unauthorized operations rejected (citizen, officer)","auth_admin.spec.ts: a citizen is denied the admin console, and the API agrees | auth_admin.spec.ts: an officer is not an administrator",PASS
+E persistence and recovery,1,"Create through the UI/API, read through UI and API","complaints_assistant.spec.ts: file a categorised complaint, see routing + SLA, then track it | CLI: audit_persistence create + restart + verify",PASS
+E persistence and recovery,2,Update through an authorized workflow; confirm in the database,CLI: audit_persistence create + restart + verify,PASS
+E persistence and recovery,3,Refresh the browser,"staff_workflows.spec.ts: officer assigns, progresses and resolves; the citizen sees status and remarks",PASS
+E persistence and recovery,4,Restart the API process and confirm everything persisted,CLI: audit_persistence create + restart + verify,PASS

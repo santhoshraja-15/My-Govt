@@ -1,0 +1,29 @@
+# Production image for the API (and worker). Build context: ./backend
+#   docker build -f docker/backend/Dockerfile.prod -t mygovt-backend backend
+# NOT yet built or run anywhere (no Docker on the author's machine); the hosted CI does not build it either.
+FROM python:3.12-slim AS builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY pyproject.toml ./
+# Dependencies only (no editable install, no test/dev extras). torch from the CPU index: the default wheel pulls CUDA.
+RUN python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/python -c "import tomllib; print(chr(10).join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > requirements.runtime.txt
+RUN /opt/venv/bin/pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements.runtime.txt
+
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PATH="/opt/venv/bin:$PATH" APP_ENV=production
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home mygovt
+WORKDIR /app
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=mygovt:mygovt . .
+USER mygovt
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://localhost:8000/health || exit 1
+# Auto-reload is intentionally absent. Scale with replicas / --workers behind a TLS-terminating proxy; rate limits are per-process (see docs).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

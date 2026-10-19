@@ -2,15 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, Filter, ChevronRight, Award, CheckCircle2, XCircle, AlertCircle, ArrowLeft, X, Loader2, SlidersHorizontal } from "lucide-react";
+import { Search, Filter, ChevronRight, Award, ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { schemes as schemesAPI } from "@/lib/api";
 import { ErrorState } from "@/components/ui/AsyncState";
 import { VerificationBadge } from "@/components/ui/VerificationBadge";
-
-const CATEGORIES = [
-  "All","education","health_insurance","social_security","agriculture","women_welfare",
-  "housing","transport","labour_welfare","fisheries","rural_development","youth_employment",
-];
 
 const LEVELS = ["All","state","central","district"];
 
@@ -24,7 +19,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
             {scheme.name}
           </h3>
           {scheme.name_ta && (
-            <p className="text-xs text-slate-400 font-tamil mt-0.5 line-clamp-1">{scheme.name_ta}</p>
+            <p className="text-xs text-slate-500 font-tamil mt-0.5 line-clamp-1">{scheme.name_ta}</p>
           )}
         </div>
         <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-1 transition-all shrink-0 mt-0.5" />
@@ -36,7 +31,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
 
       <div className="flex flex-wrap gap-2 pt-1">
         {scheme.department_name && (
-          <span className="badge badge-blue">{scheme.department_name}</span>
+          <span className="badge badge-blue max-w-full truncate" title={scheme.department_name}>{scheme.department_name}</span>
         )}
         {scheme.category && (
           <span className="badge badge-slate">{scheme.category.replace(/_/g," ")}</span>
@@ -50,120 +45,6 @@ function SchemeCard({ scheme }: { scheme: any }) {
   );
 }
 
-function EligibilityModal({ scheme, onClose }: { scheme: any; onClose: () => void }) {
-  const [profile, setProfile] = useState<Record<string, any>>({});
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fields = [
-    { key: "age", label: "Age (years)", type: "number" },
-    { key: "gender", label: "Gender", type: "select", opts: ["", "male", "female", "other"] },
-    { key: "annual_income", label: "Annual Income (₹)", type: "number" },
-    { key: "social_category", label: "Social Category", type: "select", opts: ["", "SC", "ST", "OBC", "MBC", "OC"] },
-    { key: "bpl_status", label: "BPL Family?", type: "select", opts: ["", "true", "false"] },
-    { key: "disability_status", label: "Person with Disability?", type: "select", opts: ["", "true", "false"] },
-    { key: "is_student", label: "Currently a Student?", type: "select", opts: ["", "true", "false"] },
-    { key: "occupation", label: "Occupation", type: "text" },
-    { key: "education_level", label: "Education Level", type: "select", opts: ["", "below_10th", "10th", "12th", "graduate", "postgraduate"] },
-  ];
-
-  const check = async () => {
-    setLoading(true);
-    try {
-      const payload: Record<string, any> = {};
-      for (const [k, v] of Object.entries(profile)) {
-        if (v === "" || v === undefined) continue;
-        if (v === "true") payload[k] = true;
-        else if (v === "false") payload[k] = false;
-        else if (!isNaN(Number(v)) && v !== "") payload[k] = Number(v);
-        else payload[k] = v;
-      }
-      const res = await schemesAPI.checkEligibility(scheme.scheme_id, payload);
-      setResult(res);
-    } catch { setResult({ overall: "ERROR" }); }
-    setLoading(false);
-  };
-
-  const overallColor = result?.overall === "ELIGIBLE" ? "emerald" : result?.overall === "NOT_ELIGIBLE" ? "red" : "amber";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="font-bold text-slate-900">Eligibility Check</h2>
-          <button onClick={onClose} className="btn-ghost p-2"><X size={18} /></button>
-        </div>
-
-        <div className="p-6">
-          <p className="text-sm text-slate-600 mb-5 font-medium">
-            {scheme.name}
-          </p>
-
-          {!result ? (
-            <>
-              <div className="grid grid-cols-1 gap-4 mb-6">
-                {fields.map(({ key, label, type, opts }) => (
-                  <div key={key}>
-                    <label className="label">{label}</label>
-                    {type === "select" ? (
-                      <select className="input" value={profile[key] || ""} onChange={e => setProfile(p => ({...p, [key]: e.target.value}))}>
-                        {opts?.map(o => <option key={o} value={o}>{o || "— not specified —"}</option>)}
-                      </select>
-                    ) : (
-                      <input type={type} className="input" placeholder="Enter value"
-                        value={profile[key] || ""}
-                        onChange={e => setProfile(p => ({...p, [key]: e.target.value}))} />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button onClick={check} disabled={loading} className="btn-primary w-full justify-center">
-                {loading ? <><Loader2 size={16} className="animate-spin" /> Checking…</> : "Check Eligibility"}
-              </button>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className={`rounded-2xl p-5 text-center bg-${overallColor}-50 border-2 border-${overallColor}-200`}>
-                {result.overall === "ELIGIBLE" ? <CheckCircle2 size={36} className="text-emerald-500 mx-auto mb-2" /> :
-                 result.overall === "NOT_ELIGIBLE" ? <XCircle size={36} className="text-red-500 mx-auto mb-2" /> :
-                 <AlertCircle size={36} className="text-amber-500 mx-auto mb-2" />}
-                <h3 className={`font-bold text-lg text-${overallColor}-700`}>
-                  {result.overall === "ELIGIBLE" ? "You appear eligible" :
-                   result.overall === "NOT_ELIGIBLE" ? "Not eligible based on inputs" :
-                   "Insufficient data to determine"}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">{result.disclaimer}</p>
-              </div>
-
-              {result.failing_rules?.length > 0 && (
-                <div className="bg-red-50 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-red-700 mb-2">Failing criteria:</p>
-                  {result.failing_rules.map((r: string, i: number) => (
-                    <p key={i} className="text-xs text-red-600 flex items-start gap-1.5 mb-1">
-                      <XCircle size={12} className="mt-0.5 shrink-0" /> {r}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              {result.missing_attributes?.length > 0 && (
-                <div className="bg-amber-50 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-amber-700 mb-1">Additional info needed:</p>
-                  <p className="text-xs text-amber-600">{result.missing_attributes.join(", ")}</p>
-                </div>
-              )}
-
-              <button onClick={() => setResult(null)} className="btn-secondary w-full justify-center">
-                Re-check with different values
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SchemesPage() {
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -174,7 +55,7 @@ export default function SchemesPage() {
   const [category, setCategory] = useState("All");
   const [level, setLevel] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
-  const [eligScheme, setEligScheme] = useState<any>(null);
+  const [cats, setCats] = useState<string[]>([]);
   const [inputVal, setInputVal] = useState("");
   const [error, setError] = useState("");
 
@@ -197,6 +78,7 @@ export default function SchemesPage() {
   }, [q, category, level]);
 
   useEffect(() => { load(1); }, [load]);
+  useEffect(() => { schemesAPI.categories().then(setCats).catch(() => setCats([])); }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,11 +100,11 @@ export default function SchemesPage() {
           <p className="text-blue-200 text-lg">Discover {total > 0 ? total : ""} Tamil Nadu government benefit programmes</p>
 
           {/* Search */}
-          <form onSubmit={handleSearch} className="mt-6 flex gap-2 max-w-xl">
-            <div className="flex-1 flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
+          <form onSubmit={handleSearch} role="search" className="mt-6 flex flex-wrap gap-2 max-w-xl">
+            <div className="flex-1 min-w-[12rem] flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
               <Search size={18} className="text-blue-200 shrink-0" />
-              <input value={inputVal} onChange={e => setInputVal(e.target.value)}
-                placeholder="Search schemes…" className="flex-1 bg-transparent text-white placeholder-blue-300 text-sm outline-none" />
+              <input value={inputVal} onChange={e => setInputVal(e.target.value)} aria-label="Search schemes" data-testid="scheme-search"
+                placeholder="Search schemes…" className="flex-1 min-w-0 bg-transparent text-white placeholder-blue-300 text-sm outline-none" />
             </div>
             <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">Search</button>
             <button type="button" onClick={() => setShowFilters(s => !s)} aria-label="Toggle filters" aria-expanded={showFilters}
@@ -235,15 +117,15 @@ export default function SchemesPage() {
           {showFilters && (
             <div className="mt-3 flex flex-wrap gap-3 animate-slide-up">
               <div>
-                <label className="text-xs text-blue-300 mb-1 block">Category</label>
-                <select className="input bg-white/15 border-white/20 text-white text-xs py-1.5"
+                <label htmlFor="scheme-category" className="text-xs text-blue-100 mb-1 block">Category</label>
+                <select id="scheme-category" className="input bg-white/15 border-white/20 text-white text-xs py-1.5"
                   value={category} onChange={e => setCategory(e.target.value)}>
-                  {CATEGORIES.map(c => <option key={c} value={c} className="text-slate-900">{c === "All" ? "All Categories" : c.replace(/_/g," ")}</option>)}
+                  {["All", ...cats].map(c => <option key={c} value={c} className="text-slate-900">{c === "All" ? "All Categories" : c.replace(/_/g," ")}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-blue-300 mb-1 block">Level</label>
-                <select className="input bg-white/15 border-white/20 text-white text-xs py-1.5"
+                <label htmlFor="scheme-level" className="text-xs text-blue-100 mb-1 block">Level</label>
+                <select id="scheme-level" className="input bg-white/15 border-white/20 text-white text-xs py-1.5"
                   value={level} onChange={e => setLevel(e.target.value)}>
                   {LEVELS.map(l => <option key={l} value={l} className="text-slate-900">{l === "All" ? "All Levels" : l}</option>)}
                 </select>
@@ -255,6 +137,7 @@ export default function SchemesPage() {
 
       {/* Results */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <h2 className="sr-only">Scheme results</h2>
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-slate-500">
             {loading ? "Loading…" : error ? "" : `${total} scheme${total !== 1 ? "s" : ""} found`}
@@ -278,7 +161,7 @@ export default function SchemesPage() {
           <div className="text-center py-20" data-testid="empty-state">
             <Award size={48} className="text-slate-300 mx-auto mb-4" />
             <h3 className="font-semibold text-slate-600 mb-1">No schemes found</h3>
-            <p className="text-sm text-slate-400">Try different keywords or remove filters</p>
+            <p className="text-sm text-slate-500">Try different keywords or remove filters</p>
           </div>
         ) : (
           <>
@@ -304,7 +187,6 @@ export default function SchemesPage() {
         )}
       </div>
 
-      {eligScheme && <EligibilityModal scheme={eligScheme} onClose={() => setEligScheme(null)} />}
     </div>
   );
 }

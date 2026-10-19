@@ -140,18 +140,18 @@ const QUICK_ACTIONS = [
 const FEATURES = [
   { icon: Shield, title: "Source-Grounded Answers", desc: "Answers come only from the records we hold, each labelled Verified, Provisional or External — no invented facts." },
   { icon: Zap, title: "Real-time AI Eligibility", desc: "Eligibility checks run only on rules recorded for a scheme; where rules are missing we say so instead of guessing." },
-  { icon: Globe, title: "Bilingual — English & Tamil", desc: "Ask questions and read answers in English or Tamil. Full UI available in both languages." },
+  { icon: Globe, title: "Bilingual — English & Tamil", desc: "Ask questions in English or Tamil. Navigation and scheme names are bilingual; many page texts are still English and the Tamil is unreviewed." },
   { icon: TrendingUp, title: "End-to-End Complaint Tracking", desc: "File, track, and escalate civic complaints with SLA timelines and real-time status updates." },
 ];
 
 // ── Popular schemes ───────────────────────────────────────────
 const POPULAR_SCHEMES = [
-  { name: "Kalaignar Magalir Urimai", dept: "Social Welfare", tag: "₹1,000/month", color: "badge-purple" },
-  { name: "CM Health Insurance", dept: "Health", tag: "₹5L cover", color: "badge-blue" },
-  { name: "Old Age Pension", dept: "Social Welfare", tag: "₹1,000/month", color: "badge-green" },
-  { name: "PM-Kisan", dept: "Agriculture", tag: "₹6,000/year", color: "badge-yellow" },
-  { name: "Free Laptop Scheme", dept: "Education", tag: "Students", color: "badge-blue" },
-  { name: "Free Bus Pass for Women", dept: "Transport", tag: "All Women", color: "badge-green" },
+  { name: "Kalaignar Magalir Urimai Thogai", dept: "Social Welfare", tag: "Provisional", color: "badge-yellow" },
+  { name: "CMCHIS (Health Insurance)", dept: "Health", tag: "Provisional", color: "badge-yellow" },
+  { name: "Pudhumai Penn", dept: "Higher Education", tag: "Provisional", color: "badge-yellow" },
+  { name: "PM-Kisan", dept: "Agriculture (central scheme)", tag: "External source", color: "badge-blue" },
+  { name: "Vidiyal Payanam", dept: "Transport", tag: "Provisional", color: "badge-yellow" },
+  { name: "Old Age Pension", dept: "Social Welfare", tag: "Provisional", color: "badge-yellow" },
 ];
 
 // ── Main page ─────────────────────────────────────────────────
@@ -182,7 +182,7 @@ export default function HomePage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 mb-6 animate-fade-in">
             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse-slow" />
-            <span className="text-blue-100 text-sm font-medium">Official AI-Powered Platform — Tamil Nadu Government</span>
+            <span className="text-blue-100 text-sm font-medium">AI-powered citizen information platform — university demonstration</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-white leading-tight mb-6 animate-slide-up">
@@ -203,8 +203,8 @@ export default function HomePage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search schemes, services, or ask a question…"
-                  className="flex-1 bg-transparent text-white placeholder-blue-300 text-sm outline-none"
+                  placeholder="Search schemes, services, or ask a question…" aria-label="Search schemes, services, or ask a question" data-testid="landing-search"
+                  className="flex-1 min-w-0 bg-transparent text-white placeholder-blue-300 text-sm outline-none"
                 />
               </div>
               <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">
@@ -272,7 +272,7 @@ export default function HomePage() {
               <h2 className="text-3xl font-bold text-white mb-2">Popular Schemes</h2>
               <p className="text-blue-300">Most accessed government benefit programmes</p>
             </div>
-            <Link href="/schemes" className="btn-secondary border-blue-700 text-blue-300 hover:bg-blue-900">
+            <Link href="/schemes" className="btn-secondary bg-transparent border-blue-300 text-blue-100 hover:bg-white/10">
               View All <ChevronRight size={16} />
             </Link>
           </div>
@@ -299,7 +299,7 @@ export default function HomePage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Why MyGovt?</h2>
           <p className="text-slate-500 text-lg max-w-xl mx-auto">
-            Built on verified government data, grounded AI, and a commitment to no misinformation
+            Built on source-labelled data and grounded AI. Records stay marked Provisional until checked against an official document.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -342,7 +342,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────── */}
-      <footer className="bg-slate-900 text-slate-400 py-12">
+      <footer className="bg-slate-900 text-slate-300 py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
             <div>
@@ -358,16 +358,16 @@ export default function HomePage() {
               </p>
             </div>
             {[
-              { title: "Citizen Services", links: ["Find Schemes", "e-Sevai Services", "File Complaint", "Track Complaint"] },
-              { title: "Information", links: ["Policy Documents", "Government Orders", "Departments", "Districts"] },
-              { title: "Platform", links: ["AI Assistant", "About MyGovt", "Privacy Policy", "Accessibility"] },
+              { title: "Citizen Services", links: [["Find schemes", "/schemes"], ["Government services", "/services"], ["File a complaint", "/complaints"], ["Track a complaint", "/complaints"]] },
+              { title: "Information", links: [["Policy documents", "/documents"], ["AI assistant", "/assistant"]] },
+              { title: "Account", links: [["Sign in", "/login"], ["Register", "/register"]] },
             ].map(({ title, links }) => (
               <div key={title}>
                 <h4 className="text-white font-semibold mb-3 text-sm">{title}</h4>
                 <ul className="space-y-2">
-                  {links.map((link) => (
-                    <li key={link}>
-                      <Link href="#" className="text-sm hover:text-white transition-colors">{link}</Link>
+                  {links.map(([label, href]) => (
+                    <li key={label}>
+                      <Link href={href} className="text-sm hover:text-white transition-colors">{label}</Link>
                     </li>
                   ))}
                 </ul>
@@ -375,7 +375,7 @@ export default function HomePage() {
             ))}
           </div>
           <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs">© 2024 Government of Tamil Nadu. All rights reserved.</p>
+            <p className="text-xs">MyGovt is a university demonstration project. It is not an official Government of Tamil Nadu website.</p>
             <p className="text-xs">Records are labelled by verification status. Provisional items have not yet been verified against an official document; confirm with the department before acting.</p>
           </div>
         </div>

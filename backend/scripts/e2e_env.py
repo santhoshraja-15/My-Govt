@@ -55,9 +55,28 @@ async def main() -> int:
         await conn.execute(
             "INSERT INTO documents.document_chunk (document_id,chunk_number,content,page_number) VALUES ($1,0,$2,2)", did,
             "The Zorblax scholarship test notice describes a fictional monthly grant used only by automated tests.")
-        for email, role in (("e2e-admin@example.com", "state_admin"), ("e2e-sysadmin@example.com", "system_admin"), ("e2e-officer@example.com", "officer")):
+        from scripts.demo_env import load_demo_rules   # labelled DEMO rules so the eligibility checker has something to evaluate
+        await load_demo_rules(conn)
+        for email, role in (("e2e-admin@example.com", "state_admin"), ("e2e-sysadmin@example.com", "system_admin")):
             await conn.execute("INSERT INTO identity.app_user (email,password_hash,role) VALUES ($1,$2,$3)",
                                email, hash_password(password), role)
+        # Officers belong to a department: officer #1 to the department of the FIRST complaint category by name (the one the
+        # E2E specs file against), officer #2 to a different department (used to prove department scoping).
+        depts = [r["default_department_id"] for r in await conn.fetch(
+            "SELECT DISTINCT ON (default_department_id) default_department_id, min(category_name) OVER (PARTITION BY default_department_id) AS n "
+            "FROM complaints.complaint_category WHERE is_active AND default_department_id IS NOT NULL ORDER BY default_department_id, n")]
+        first_dept = await conn.fetchval(
+            "SELECT default_department_id FROM complaints.complaint_category WHERE is_active ORDER BY category_name LIMIT 1")
+        other_dept = next(d for d in depts if d != first_dept)
+        for email, dept, label, role in (("e2e-officer@example.com", first_dept, "E2E Officer", "officer"), ("e2e-officer2@example.com", other_dept, "E2E Officer Two", "officer"),
+                                         ("e2e-deptadmin@example.com", first_dept, "E2E Department Admin", "department_admin")):
+            authority = await conn.fetchval(
+                "SELECT authority_id FROM administration.authority WHERE department_id=$1 ORDER BY authority_id LIMIT 1", dept)
+            oid = await conn.fetchval(
+                "INSERT INTO administration.officer (department_id,authority_id,name,designation,status) "
+                "VALUES ($1,$2,$3,'Test Officer (E2E fixture)','active') RETURNING officer_id", dept, authority, label)
+            await conn.execute("INSERT INTO identity.app_user (email,password_hash,role,officer_id) VALUES ($1,$2,$3,$4)",
+                               email, hash_password(password), role, oid)
     finally:
         await conn.close()
     print(f"ready: {DB}")

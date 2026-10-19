@@ -157,6 +157,11 @@ class ServiceService:
         return {"items": items, "total": total, "page": page, "page_size": page_size,
                 "pages": math.ceil(total / page_size) if total else 0}
 
+    async def get_categories(self) -> list:
+        r = await self.db.execute(text(
+            "SELECT DISTINCT category FROM services.service WHERE category IS NOT NULL AND status = 'active' ORDER BY category"))
+        return [row[0] for row in r.fetchall()]
+
     async def get_service(self, service_id: UUID) -> Optional[dict]:
         r = await self.db.execute(
             text("""

@@ -17,6 +17,7 @@ from app.schemas.complaints import (
     ComplaintCreate, ComplaintDetail, ComplaintHistoryItem, ComplaintListResponse,
     ComplaintOut, ComplaintStatusUpdate, ComplaintTrack,
 )
+from app.core.config import settings
 from app.services import complaint_rules as rules
 
 logger = structlog.get_logger(__name__)
@@ -277,7 +278,7 @@ class ComplaintService:
     async def get_complaint(self, complaint_id: UUID, current_user) -> Optional[ComplaintDetail]:
         r = await self.db.execute(
             text("""
-                SELECT c.complaint_id, c.citizen_id, c.complaint_ref AS reference_number, c.title,
+                SELECT c.complaint_id, c.citizen_id, c.department_id AS dept_id, c.complaint_ref AS reference_number, c.title,
                        c.description, c.status, cc.category_name, d.department_name,
                        c.latitude, c.longitude, c.address, c.priority,
                        a.authority_name, o.name AS officer_name,
@@ -301,8 +302,13 @@ class ComplaintService:
             getattr(current_user, "role", ""), getattr(current_user, "citizen_id", None), row.citizen_id
         ):
             raise ComplaintForbidden("You may only view your own complaints")
+        role = getattr(current_user, "role", "")
+        if role in ("officer", "department_admin") and not rules.staff_can_act_on(
+                role, getattr(current_user, "department_id", None), row.dept_id):
+            raise ComplaintForbidden("This complaint belongs to another department")
         data = dict(row._mapping)
         data.pop("citizen_id")
+        data.pop("dept_id")
         detail = ComplaintDetail(**data)
         detail.timeline = await self._history(complaint_id)
         return detail
@@ -310,13 +316,15 @@ class ComplaintService:
     # ── update ────────────────────────────────────────────────────────────────
     async def update_status(self, complaint_id: UUID, data: ComplaintStatusUpdate, user) -> dict:
         r = await self.db.execute(
-            text("SELECT status FROM complaints.complaint WHERE complaint_id = :cid FOR UPDATE"),
+            text("SELECT status, department_id FROM complaints.complaint WHERE complaint_id = :cid FOR UPDATE"),
             {"cid": complaint_id},
         )
         row = r.fetchone()
         if not row:
             raise ComplaintNotFound("Complaint not found")
         current = row[0]
+        if not rules.staff_can_act_on(getattr(user, "role", ""), getattr(user, "department_id", None), row[1]):
+            raise ComplaintForbidden("You may only update complaints of your own department")
         if data.new_status not in rules.STATUSES:
             raise ValueError(f"Unknown status '{data.new_status}'")
         if not rules.can_transition(current, data.new_status):
@@ -342,6 +350,127 @@ class ComplaintService:
         )
         await self.db.commit()
         return {"status": "updated", "new_status": data.new_status}
+
+    # ── staff (officer / department admin / state admin) ──────────────────────
+    @staticmethod
+    def _staff_scope(user) -> Optional[int]:
+        """None = every department (state/system admin); otherwise the staff member's own department id."""
+        role = getattr(user, "role", "")
+        if role in ("state_admin", "system_admin"):
+            return None
+        dept = getattr(user, "department_id", None)
+        if role in ("officer", "department_admin") and dept is not None:
+            return dept
+        raise ComplaintForbidden("Your account is not linked to a department")
+
+    async def list_for_staff(self, user, status: Optional[str], mine: bool, unassigned: bool,
+                             limit: int, offset: int) -> dict:
+        scope = self._staff_scope(user)
+        cond = ["TRUE" if settings.DEMO_INCLUDE_SYNTHETIC else "NOT c.is_synthetic"]
+        params: dict = {}
+        if scope is not None:
+            cond.append("c.department_id = :dept")
+            params["dept"] = scope
+        base = " AND ".join(cond)
+        counts = (await self.db.execute(text(f"SELECT c.status, count(*)::int FROM complaints.complaint c WHERE {base} GROUP BY c.status"), params)).fetchall()
+        flt = list(cond)
+        if status:
+            flt.append("c.status = :status")
+            params["status"] = status
+        if mine:
+            flt.append("c.assigned_officer_id = :me")
+            params["me"] = getattr(user, "officer_id", None)
+        if unassigned:
+            flt.append("c.assigned_officer_id IS NULL AND c.status NOT IN ('resolved','closed','rejected')")
+        where = " AND ".join(flt)
+        total = (await self.db.execute(text(f"SELECT count(*) FROM complaints.complaint c WHERE {where}"), params)).scalar() or 0
+        rows = (await self.db.execute(text(f"""
+            SELECT c.complaint_id::text AS complaint_id, c.complaint_ref AS reference_number, c.title, c.status, c.priority,
+                   cat.category_name, d.department_name, o.name AS officer_name, c.assigned_officer_id::text AS officer_id,
+                   c.created_at, c.due_date, c.is_synthetic,
+                   (c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected')) AS sla_breached
+            FROM complaints.complaint c
+            LEFT JOIN complaints.complaint_category cat ON cat.category_id = c.category_id
+            LEFT JOIN administration.department d ON d.department_id = c.department_id
+            LEFT JOIN administration.officer o ON o.officer_id = c.assigned_officer_id
+            WHERE {where}
+            ORDER BY (c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected')) DESC NULLS LAST,
+                     CASE c.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, c.created_at DESC
+            LIMIT :lim OFFSET :off"""), {**params, "lim": limit, "off": offset})).fetchall()
+        items = []
+        for r in rows:
+            m = dict(r._mapping)
+            m["allowed_next"] = list(rules.TRANSITIONS.get(m["status"], ()))
+            items.append(m)
+        scope_params = {"dept": scope} if scope is not None else {}
+        extra = (await self.db.execute(text(f"""
+            SELECT count(*) FILTER (WHERE c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected'))::int,
+                   count(*) FILTER (WHERE c.assigned_officer_id IS NULL AND c.status NOT IN ('resolved','closed','rejected'))::int
+            FROM complaints.complaint c WHERE {base}"""), scope_params)).fetchone()
+        dept_name = None
+        if scope is not None:
+            dept_name = (await self.db.execute(
+                text("SELECT department_name FROM administration.department WHERE department_id = :d"), {"d": scope})).scalar()
+        return {"total": total, "items": items, "limit": limit, "offset": offset,
+                "status_counts": {k: v for k, v in counts}, "department_scope": scope, "department_name": dept_name,
+                "overdue": extra[0] if extra else 0, "unassigned": extra[1] if extra else 0,
+                "demo_data_included": settings.DEMO_INCLUDE_SYNTHETIC}
+
+    async def officers_for(self, user) -> list:
+        scope = self._staff_scope(user)
+        cond, params = ("WHERE o.status = 'active'" + (" AND o.department_id = :d" if scope is not None else "")), ({"d": scope} if scope is not None else {})
+        r = await self.db.execute(text(f"""
+            SELECT o.officer_id::text AS officer_id, o.name, o.designation, d.department_name,
+                   (SELECT count(*) FROM complaints.complaint c WHERE c.assigned_officer_id = o.officer_id
+                      AND c.status NOT IN ('resolved','closed','rejected'))::int AS open_complaints
+            FROM administration.officer o JOIN administration.department d ON d.department_id = o.department_id
+            {cond} ORDER BY d.department_name, o.name"""), params)
+        return [dict(x._mapping) for x in r.fetchall()]
+
+    async def assign(self, complaint_id: UUID, officer_id: Optional[str], user, remarks: Optional[str] = None) -> dict:
+        """Assign a complaint to an officer of the complaint's department.
+
+        Officers may only assign to themselves; department/state admins may assign to any officer of that department.
+        When the state machine allows it the complaint also moves to 'assigned' (history written by the trigger).
+        """
+        r = await self.db.execute(
+            text("SELECT status, department_id FROM complaints.complaint WHERE complaint_id = :cid FOR UPDATE"),
+            {"cid": complaint_id})
+        row = r.fetchone()
+        if not row:
+            raise ComplaintNotFound("Complaint not found")
+        status, dept = row
+        role = getattr(user, "role", "")
+        if not rules.staff_can_act_on(role, getattr(user, "department_id", None), dept):
+            raise ComplaintForbidden("You may only assign complaints of your own department")
+        target = officer_id
+        if role == "officer":
+            target = str(getattr(user, "officer_id", "") or "")
+            if officer_id and str(officer_id) != target:
+                raise ComplaintForbidden("Officers may only assign complaints to themselves")
+            if not target:
+                raise ComplaintForbidden("Your account is not linked to an officer record")
+        if not target:
+            raise ValueError("officer_id is required")
+        o = (await self.db.execute(
+            text("SELECT department_id, name FROM administration.officer WHERE officer_id = CAST(:o AS uuid) AND status = 'active'"),
+            {"o": target})).fetchone()
+        if not o or o[0] != dept:
+            raise ValueError("Officer not found in this complaint's department")
+        await self.db.execute(
+            text("UPDATE complaints.complaint SET assigned_officer_id = CAST(:o AS uuid) WHERE complaint_id = :cid"),
+            {"o": target, "cid": complaint_id})
+        new_status = status
+        if rules.can_transition(status, "assigned"):
+            new_status = "assigned"
+            await self.db.execute(text("UPDATE complaints.complaint SET status = 'assigned' WHERE complaint_id = :cid"),
+                                  {"cid": complaint_id})
+            await self.db.execute(text("""
+                UPDATE complaints.complaint_history SET remarks = :rem, changed_by = :uid
+                WHERE history_id = (SELECT max(history_id) FROM complaints.complaint_history WHERE complaint_id = :cid)"""),
+                {"rem": remarks or f"Assigned to {o[1]}", "uid": getattr(user, "user_id", None), "cid": complaint_id})
+        await self.db.commit()
+        return {"status": new_status, "assigned_officer": o[1], "officer_id": target}
 
     async def upload_evidence(self, complaint_id: UUID, file, user) -> dict:
         """Authorise and validate the upload. Object storage is not wired yet, so a valid upload is refused with

@@ -108,6 +108,7 @@ export const services = {
     return request<any>(`/api/v1/services?${q}`);
   },
   get: (id: string) => request<any>(`/api/v1/services/${id}`),
+  categories: () => request<string[]>("/api/v1/services/categories/list"),
 };
 
 // ── Documents ─────────────────────────────────────────────────
@@ -137,6 +138,14 @@ export const complaints = {
   },
   get: (id: string) => request<any>(`/api/v1/complaints/${id}`),
   categories: () => request<any[]>("/api/v1/complaints/categories/list"),
+  /** Staff (officer / department admin / state admin): complaints within the caller's department. */
+  staffList: (params: Record<string, any> = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== false).map(([k, v]) => [k, String(v)]));
+    return request<any>(`/api/v1/complaints/assigned?${q}`);
+  },
+  officers: () => request<any[]>("/api/v1/complaints/officers"),
+  assign: (id: string, officer_id?: string, remarks?: string) =>
+    request<any>(`/api/v1/complaints/${id}/assign`, { method: "POST", body: JSON.stringify({ officer_id, remarks }) }),
 };
 
 // ── Chat ──────────────────────────────────────────────────────

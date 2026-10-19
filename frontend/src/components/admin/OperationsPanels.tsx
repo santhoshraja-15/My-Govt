@@ -57,7 +57,7 @@ export function ComplaintsPanel() {
                   <td className={c.sla_breached ? "text-red-700 font-semibold" : ""}>{fmt(c.due_date)}{c.sla_breached ? " (missed)" : ""}</td>
                   {canUpdate && (
                     <td>
-                      {c.allowed_next.length === 0 ? <span className="text-slate-400">final</span> : (
+                      {c.allowed_next.length === 0 ? <span className="text-slate-500">final</span> : (
                         <select aria-label={`Move ${c.reference_number}`} disabled={busy === c.complaint_id} defaultValue=""
                           onChange={(e) => e.target.value && move(c.complaint_id, e.target.value)} className="input py-1 text-xs">
                           <option value="">—</option>
