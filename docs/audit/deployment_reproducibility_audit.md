@@ -9,8 +9,8 @@
 | Date | 2026-10-19 |
 | Environment | Windows 11, Python 3.11.9 (project targets 3.12), Node 25.6.0 (CI uses 22), GNU Make 4.4.1 (WSL2 Ubuntu). **No Docker** (not on Windows, not in WSL; WSL `sudo` needs a password). |
 | Branch | `audit/tn-data-verification` (never merged to `main`) |
-| HEAD at time of writing | `3e42db4` |
-| Hosted CI result | **PASS — all 5 jobs green** for `3e42db4` (run 39220815138, GitHub Actions, reproduced on GitHub, not locally). Earlier runs failed; causes in D. Counts per job were not retrieved; the workflow itself fails on any skipped test. |
+| HEAD at time of writing | `f046712` (report commit follows) |
+| Hosted CI result | **PASS — all 9 jobs green** for `f046712` (run 39224287935: Backend, Playwright, Frontend, Security, SQL provenance, and 4 image-build jobs), previously all 5 original jobs green for `3e42db4` (run 39220815138). Reproduced on GitHub, not locally. Earlier runs failed; causes in D. Counts per job were not retrieved; the workflow itself fails on any skipped test. |
 
 Why blocked, independent of CI: no government record is `official_verified` (0 of 77), the Docker/Compose stack has never been
 built or started by anyone, and production security controls remain open (see E).
@@ -23,7 +23,8 @@ built or started by anyone, and production security controls remain open (see E)
 |---|---|---|---|---|
 | Repo baseline | `git status`, `git log` | PASS (reproduced now) | clean tree, branch above, HEAD `780eb61` | — |
 | Compose validation | `docker compose config` | NOT RUN — PREREQUISITE UNAVAILABLE | no Docker | YAML parse-checked only (historical) |
-| Backend image build | `docker build docker/backend` | NOT RUN locally. **Defect found and fixed**: invalid `build-backend` (historical repro via `pip install -e .`, now guarded by `test_packaging.py`, 4 pass now) | hosted CI does not build this image | Build once with Docker |
+| Application image builds | `images` CI job (docker/build-push-action, `push: false`) for `docker/backend/Dockerfile`, `docker/frontend/Dockerfile`, `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` | **PASS on hosted CI (run 39224287935), all four.** Earlier **defect found and fixed**: invalid `build-backend` (guarded by `test_packaging.py`). Local build NOT RUN (no Docker). | run 39224287935 | Built ≠ verified runtime |
+| Image property checks | same job, post-build steps | **PASS on hosted CI**: prod backend non-root, no pytest/ruff, imports fastapi/async SQLAlchemy/greenlet/asyncpg/torch, `app/main.py` present, no `--reload`, HEALTHCHECK defined, no env file; prod frontend non-root, `server.js` + `.next/static` present, HEALTHCHECK, container answers `GET /` without 5xx; dev images import/`next` present | run 39224287935 | The frontend probe has no backend/DB; backend prod image was never started |
 | Postgres image build | `docker build docker/postgres` | **PASS on hosted CI (run 39220815138, image built in the Backend and E2E jobs)**. Failed in earlier runs `3ae63b9`, `be07fb5`, `5b5a9c0`, `13b49c8`. Cause (from the build's own annotation): `postgis/postgis:16-3.4` and `16-3.5` are Debian bullseye; `apt.postgresql.org bullseye-pgdg` returns 404 so `postgresql-16-pgvector` cannot install. Fixed by `780eb61` (base `postgres:16-bookworm` + pgdg `postgresql-16-postgis-3`, `-scripts`, `-pgvector`). | annotations of runs 39213304212/39213525821/39213844357 | Fix confirmed on hosted CI. Local image build still NOT RUN (no Docker) |
 | Stack startup / health | `make up`, `make health` | NOT RUN — PREREQUISITE UNAVAILABLE | no Docker | — |
 | DB init / migrations | `make db-init`, `migrate-sql`, `db_verify` | Historical PASS locally; **hosted PASS** (Backend job runs `db_verify` and schema/SQL conformance on the project image) | `final_build_validation.md`, run 39220815138 | Compose-based `make db-init` still NOT RUN |
@@ -68,14 +69,15 @@ A successful local build, if one is later possible, would not prove the hosted r
 | `6a29e90` | `greenlet==3.5.6` added to `requirements-ci.txt` — its absence broke the backend tests (coverage `concurrency=greenlet`) and the E2E API server (SQLAlchemy asyncio). Reproduced in a clean venv built from the file; production already gets it via `sqlalchemy[asyncio]` |
 | `e088b9e` | `setuptools` added to `requirements-ci.txt` — `test_packaging.py` imports the build backend and py3.12 venvs lack setuptools (hosted: 434 passed, 1 failed before this) |
 | `3e42db4` | `setuptools` pinned to 83.0.0 — 80.9.0 failed `pip-audit` (PYSEC-2026-3447), reproduced locally |
-| `a824e5c`, `7a2f468` | Production images `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` + static tests; LF endings for `Dockerfile.*`. **Not built anywhere** |
+| `a824e5c`, `7a2f468` | Production images `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` + static tests; LF endings for `Dockerfile.*`. Built on hosted CI by `f046712` |
+| `f046712` | CI `images` job (4-image matrix, property checks, frontend start-up probe), matrix-coverage test, `pyyaml==6.0.3` in `requirements-ci.txt`, stale workflow header corrected |
 
 Consequence to watch: PostGIS version on the new image is whatever pgdg ships for bookworm (not 3.4); earlier PostGIS tests ran on 3.6.2.
 
 ## E. Remaining blockers
 
 * **Critical:** no officially verified government data; do not present as verified.
-* **High:** Docker Compose stack, the backend/frontend images (dev and production) and every `docker compose`-based Make target never executed (no Docker).
+* **High:** Docker Compose stack and every `docker compose`-based Make target never executed (no Docker). The images build, but the backend production image has never been started, with or without a database; services have never run together in Compose.
 * **High:** production security controls (E list above); no TLS, backups, monitoring.
 * **Medium:** no real boundary data; evidence upload intentionally returns 503; no officer UI; Python 3.11 locally vs 3.12 target.
 * **Low:** Node 20 deprecation notice for `actions/checkout@v4`/`upload-artifact@v4`.
@@ -83,7 +85,7 @@ Consequence to watch: PostGIS version on the new image is whatever pgdg ships fo
 ## F. Ordered next steps
 
 1. Retrieve per-job counts (tests passed, Playwright count) for the green run, and compare with the historical 428 + 53.
-2. Add a hosted job that builds the backend, frontend and production images.
+2. Add a hosted Compose job: bring up postgres + backend (prod image) + frontend, hit `/health`, run `db_verify` through the Makefile paths.
 3. Install Docker (Docker Desktop or WSL), then run `docker compose config`, `make up`, `make health`, `make db-verify`, `make test`; record exit codes.
 4. Obtain human-validated official evidence for schemes, departments, services, districts; record `source_document_ref`; promote through reviewed seed changes.
 5. Load authoritative boundaries; re-run PostGIS tests on the project image.
