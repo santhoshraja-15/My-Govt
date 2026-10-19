@@ -205,3 +205,28 @@ async def test_profile_validation(client, make_citizen):
     c = await make_citizen()
     r = await client.put(f"{API}/citizens/profile", headers=c["headers"], json={"gender": "robot"})
     assert r.status_code == 422
+
+
+async def test_service_and_scheme_category_lists_match_the_data_and_each_returns_results(client):
+    """The filter pills are built from these lists, so every listed category must return at least one record."""
+    for kind, path in (("schemes", "/api/v1/schemes"), ("services", "/api/v1/services")):
+        cats = (await client.get(f"{path}/categories/list")).json()
+        assert cats and cats == sorted(cats)
+        for c in cats:
+            body = (await client.get(path, params={"category": c})).json()
+            assert body["total"] >= 1, (kind, c)
+
+
+@pytest.mark.parametrize("bad", [
+    {"age": -5}, {"age": 121}, {"annual_income": -1}, {"annual_income": 1e12}, {"family_size": 0}, {"family_size": 51},
+    {"district_id": 0}, {"gender": "x" * 31}, {"occupation": "y" * 81}, {"age": "abc"}, {"bpl_status": "maybe"},
+])
+async def test_eligibility_rejects_out_of_range_or_malformed_facts(client, bad):
+    sid = (await client.get("/api/v1/schemes", params={"page_size": 1})).json()["items"][0]["scheme_id"]
+    assert (await client.post(f"/api/v1/schemes/{sid}/eligibility", json=bad)).status_code == 422
+
+
+async def test_eligibility_accepts_boundary_values_and_unknowns(client):
+    sid = (await client.get("/api/v1/schemes", params={"page_size": 1})).json()["items"][0]["scheme_id"]
+    for ok in ({}, {"age": 0}, {"age": 120}, {"annual_income": 0}, {"family_size": 1}, {"family_size": 50}):
+        assert (await client.post(f"/api/v1/schemes/{sid}/eligibility", json=ok)).status_code == 200, ok

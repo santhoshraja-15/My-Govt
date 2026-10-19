@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from typing import Any, List, Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EligibilityRuleOut(BaseModel):
@@ -85,20 +85,21 @@ class SchemeDetail(SchemeListItem):
 
 # ── Eligibility Check ─────────────────────────────────────────
 class EligibilityRequest(BaseModel):
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    annual_income: Optional[float] = None
-    social_category: Optional[str] = None
+    """Self-declared facts used for an indicative check; every field is optional (missing means unknown, never guessed)."""
+    age: Optional[int] = Field(default=None, ge=0, le=120)
+    gender: Optional[str] = Field(default=None, max_length=30)
+    annual_income: Optional[float] = Field(default=None, ge=0, le=1_000_000_000)
+    social_category: Optional[str] = Field(default=None, max_length=30)
     disability_status: Optional[bool] = None
     bpl_status: Optional[bool] = None
-    residence_type: Optional[str] = None
-    district_id: Optional[int] = None
+    residence_type: Optional[str] = Field(default=None, max_length=30)
+    district_id: Optional[int] = Field(default=None, ge=1)
     is_student: Optional[bool] = None
-    occupation: Optional[str] = None
-    education_level: Optional[str] = None
-    marital_status: Optional[str] = None
-    family_size: Optional[int] = None
-    held_documents: Optional[List[str]] = None
+    occupation: Optional[str] = Field(default=None, max_length=80)
+    education_level: Optional[str] = Field(default=None, max_length=40)
+    marital_status: Optional[str] = Field(default=None, max_length=30)
+    family_size: Optional[int] = Field(default=None, ge=1, le=50)
+    held_documents: Optional[List[str]] = Field(default=None, max_length=40)
 
 
 class RuleResult(BaseModel):
