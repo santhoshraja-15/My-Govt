@@ -22,7 +22,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
 docker compose exec -T backend sh -c 'python -m scripts.demo_env --admin-dsn postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/postgres'
 ```
 
-Open **http://localhost:3000** (API docs: http://localhost:8000/docs). Stop with `docker compose down` (add `-v` to delete the data).
+Open **http://localhost:3000** (API docs: http://localhost:8000/api/docs). Stop with `docker compose down` (add `-v` to delete the data).
 
 Re-running `make demo` is safe: the script is idempotent; add `--reset` (in the `demo_env` command) to rebuild the demo database.
 

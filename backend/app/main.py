@@ -7,7 +7,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.core.config import settings
 from app.core.database import check_db_health
@@ -41,6 +41,17 @@ app = FastAPI(
     openapi_url=None if settings.APP_ENV.lower() == "production" else "/api/openapi.json",
     lifespan=lifespan,
 )
+
+if settings.APP_ENV.lower() != "production":
+    # The documented/expected URLs (/docs, /redoc) forward to where FastAPI serves them; absent in production like the docs.
+    @app.get("/docs", include_in_schema=False)
+    async def docs_alias() -> RedirectResponse:
+        return RedirectResponse("/api/docs")
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_alias() -> RedirectResponse:
+        return RedirectResponse("/api/redoc")
+
 
 # ── Middleware ────────────────────────────────────────────────
 app.add_middleware(GZipMiddleware, minimum_size=1000)
