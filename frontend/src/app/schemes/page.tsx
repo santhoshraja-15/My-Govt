@@ -137,6 +137,7 @@ export default function SchemesPage() {
 
       {/* Results */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <h2 className="sr-only">Scheme results</h2>
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-slate-500">
             {loading ? "Loading…" : error ? "" : `${total} scheme${total !== 1 ? "s" : ""} found`}

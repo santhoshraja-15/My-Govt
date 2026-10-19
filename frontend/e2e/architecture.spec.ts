@@ -234,8 +234,13 @@ test.describe("responsive and accessible", () => {
       await page.getByTestId(`tab-${tab}`).click();
       await expect(page.getByTestId(`panel-${tab}`)).toBeVisible();
       await page.waitForTimeout(400);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-      expect(overflow, tab).toBeLessThanOrEqual(1);
+      const info = await page.evaluate(() => {
+        const w = document.documentElement.clientWidth;
+        const offenders = [...document.querySelectorAll("body *")].map((e) => ({ e, r: e.getBoundingClientRect() })).filter(({ r }) => r.width > 0 && r.right > w + 0.5)
+          .slice(0, 6).map(({ e, r }) => `${e.tagName}.${String(e.className).slice(0, 50)} right=${r.right.toFixed(0)}`);
+        return { overflow: document.documentElement.scrollWidth - w, viewport: w, offenders };
+      });
+      expect(info.overflow, `${tab}: ${JSON.stringify(info)}`).toBeLessThanOrEqual(1);
     }
     await page.getByTestId("tab-er").click();
     const box = await page.getByTestId("er-diagram").locator(".react-flow").boundingBox();

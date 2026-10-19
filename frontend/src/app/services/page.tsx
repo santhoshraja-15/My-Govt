@@ -95,6 +95,7 @@ export default function ServicesPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+        <h2 className="sr-only">Service results</h2>
         {/* Category filter pills */}
         <div className="flex flex-wrap gap-2 mb-6">
           {["All", ...cats].map(c => (
