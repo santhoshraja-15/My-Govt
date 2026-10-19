@@ -577,7 +577,12 @@ function AdminConsole() {
           ))}
         </nav>
 
-        <div className="p-2 border-t border-slate-100">
+        <div className="p-2 border-t border-slate-100 space-y-1">
+          <Link href="/database-architecture" data-testid="admin-database-architecture"
+            className={`admin-sidebar-item w-full bg-brand-50 text-brand-700 font-semibold ${collapsed ? "justify-center px-2" : ""}`}>
+            <Database size={18} className="shrink-0" />
+            {!collapsed && <span>Database Architecture</span>}
+          </Link>
           <Link href="/" className={`admin-sidebar-item w-full ${collapsed ? "justify-center px-2" : ""}`}>
             <ChevronRight size={18} className="rotate-180 shrink-0" />
             {!collapsed && <span>Exit Admin</span>}

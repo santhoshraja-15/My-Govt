@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthNav } from "@/components/layout/AuthNav";
 import { LangToggle } from "@/components/layout/LangToggle";
+import { Database } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 
@@ -25,7 +26,7 @@ export function SiteHeader() {
     ...(user?.role === "citizen" ? [{ href: "/dashboard", label: t("nav.dashboard") }] : []),
     ...ITEMS.map((i) => ({ href: i.href, label: t(i.key) })),
     ...(isStaff ? [{ href: "/officer", label: t("nav.officer") }] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin" }, { href: "/database-architecture", label: t("nav.architecture"), icon: true }] : []),
   ];
   return (
     <header className="bg-brand-800 text-white" data-testid="site-header">
@@ -34,8 +35,9 @@ export function SiteHeader() {
         <nav aria-label="Main" className="flex flex-wrap gap-4 text-sm text-blue-100">
           {items.map((i) => (
             <Link key={i.href} href={i.href} aria-current={path.startsWith(i.href) ? "page" : undefined}
-              className={path.startsWith(i.href) ? "text-white font-semibold underline underline-offset-4" : "hover:text-white"}>
-              {i.label}
+              data-testid={i.href === "/database-architecture" ? "nav-database-architecture" : undefined}
+              className={`${path.startsWith(i.href) ? "text-white font-semibold underline underline-offset-4" : "hover:text-white"} ${i.icon ? "inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 hover:bg-white/20" : ""}`}>
+              {i.icon && <Database size={14} aria-hidden />}{i.label}
             </Link>
           ))}
         </nav>
