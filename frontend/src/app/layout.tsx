@@ -4,6 +4,7 @@ import { Inter, Noto_Sans_Tamil } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import { LangProvider } from "@/lib/i18n";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
   title: {
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_IN",
   },
-  metadataBase: new URL("https://mygovt.tn.gov.in"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
 };
 
 // Self-hosted at build time (no request to Google when a citizen loads a page).
@@ -37,8 +38,10 @@ export default function RootLayout({
       <body className="min-h-screen bg-slate-50">
         <LangProvider>
           <AuthProvider>
-            <SiteHeader />
-            {children}
+            <ToastProvider>
+              <SiteHeader />
+              {children}
+            </ToastProvider>
           </AuthProvider>
         </LangProvider>
       </body>

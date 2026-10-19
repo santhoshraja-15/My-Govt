@@ -19,9 +19,19 @@ interface AuthState {
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  /** officer, department admin, state admin or system admin */
+  isStaff: boolean;
 }
 
 const ADMIN_ROLES = ["state_admin", "system_admin"];
+const STAFF_ROLES = ["officer", "department_admin", "state_admin", "system_admin"];
+
+/** Where each role lands after signing in. */
+export function homeFor(role?: string | null): string {
+  if (role === "officer" || role === "department_admin") return "/officer";
+  if (role === "state_admin" || role === "system_admin") return "/admin";
+  return "/dashboard";
+}
 const Ctx = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -52,7 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, login, register, logout, isAdmin: !!user && ADMIN_ROLES.includes(user.role) }),
+    () => ({
+      user, loading, login, register, logout,
+      isAdmin: !!user && ADMIN_ROLES.includes(user.role),
+      isStaff: !!user && STAFF_ROLES.includes(user.role),
+    }),
     [user, loading, login, register, logout],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

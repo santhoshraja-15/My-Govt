@@ -92,7 +92,7 @@ export default function DocumentsPage() {
                     {doc.department_name && <span className="badge badge-slate">{doc.department_name}</span>}
                     {doc.language && <span className="badge badge-purple uppercase">{doc.language}</span>}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-4 text-xs text-slate-500">
                     {doc.publication_date && (
                       <span className="flex items-center gap-1">
                         <Calendar size={11} />

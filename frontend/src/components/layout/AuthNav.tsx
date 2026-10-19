@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/lib/auth";
+import { usePathname } from "next/navigation";
+import { homeFor, useAuth } from "@/lib/auth";
 import { useLang } from "@/lib/i18n";
 
 /** Sign in / Register links, or the signed-in user's name with a sign-out button. */
 export function AuthNav({ className = "" }: { className?: string }) {
-  const { user, loading, logout, isAdmin } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { t } = useLang();
+  const path = usePathname();
   if (loading) return <span className={className} aria-busy="true" />;
   if (!user) {
     return (
@@ -19,8 +21,8 @@ export function AuthNav({ className = "" }: { className?: string }) {
   }
   return (
     <span className={`flex items-center gap-3 text-blue-100 ${className}`}>
+      {path === "/" && <Link href={homeFor(user.role)} data-testid="home-link" className="text-sm underline">{user.role === "citizen" ? "My dashboard" : user.role === "officer" || user.role === "department_admin" ? "Console" : "Admin"}</Link>}
       <span data-testid="user-name" className="text-sm font-medium">{user.full_name || user.email}</span>
-      {isAdmin && <Link href="/admin" className="text-sm underline">Admin</Link>}
       <button onClick={() => logout()} className="btn-ghost text-blue-100 hover:bg-white/10 hover:text-white">{t("auth.logout")}</button>
     </span>
   );

@@ -37,7 +37,7 @@ function StatCard({ title, value, subtitle, icon: Icon, color }: any) {
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-500 font-medium mb-0.5">{title}</p>
         <p className="text-2xl font-black text-slate-900">{value ?? "—"}</p>
-        {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -84,7 +84,7 @@ function OverviewPanel() {
           {Object.entries(data?.verification || {}).map(([k, v]: any) => (
             <div key={k}>
               <p className="font-semibold capitalize">{k}</p>
-              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-400">unavailable</p>}
+              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-500">unavailable</p>}
             </div>
           ))}
         </div>
@@ -103,7 +103,7 @@ function OverviewPanel() {
                 <HealthDot status={st.status} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-800 capitalize">{svc}</p>
-                  <p className="text-xs text-slate-400">{st.latency_ms ? `${st.latency_ms}ms` : st.status}</p>
+                  <p className="text-xs text-slate-500">{st.latency_ms ? `${st.latency_ms}ms` : st.status}</p>
                 </div>
               </div>
             ))}
@@ -205,7 +205,7 @@ function SchemaExplorer() {
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all ${
                   selectedTable === t.table_name ? "bg-brand-50 text-brand-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
                 <span className="truncate">{t.table_name}</span>
-                <span className="text-xs text-slate-400 shrink-0 ml-1">{t.row_count_estimate?.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 shrink-0 ml-1">{t.row_count_estimate?.toLocaleString()}</span>
               </button>
             ))}
           </div>
@@ -230,7 +230,7 @@ function SchemaExplorer() {
                         <td className="font-mono text-xs font-semibold text-brand-700">{c.column_name}</td>
                         <td className="font-mono text-xs text-slate-500">{c.data_type}</td>
                         <td>{c.is_nullable === "YES" ? <span className="badge badge-slate">nullable</span> : <span className="badge badge-blue">required</span>}</td>
-                        <td className="font-mono text-xs text-slate-400 max-w-xs truncate">{c.column_default}</td>
+                        <td className="font-mono text-xs text-slate-500 max-w-xs truncate">{c.column_default}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -317,7 +317,7 @@ function SQLWorkspace() {
           placeholder="SELECT * FROM schemes.scheme LIMIT 10;" />
 
         <div className="mt-3">
-          <p className="text-xs text-slate-400 mb-2">Quick examples:</p>
+          <p className="text-xs text-slate-500 mb-2">Quick examples:</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex, i) => (
               <button key={i} onClick={() => setSql(ex)}
@@ -360,7 +360,7 @@ function SQLWorkspace() {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-400 py-4 text-center">Query executed — no rows returned.</p>
+            <p className="text-sm text-slate-500 py-4 text-center">Query executed — no rows returned.</p>
           )}
         </div>
       )}
@@ -389,7 +389,7 @@ function AuditLogsPanel() {
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-10 text-slate-400">No audit logs yet.</div>
+          <div className="text-center py-10 text-slate-500">No audit logs yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table text-xs">
@@ -441,14 +441,14 @@ function DataQualityPanel() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-brand-600" /></div>
       ) : !data?.datasets?.length ? (
-        <div className="card p-10 text-center text-slate-400">No dataset quality data available.</div>
+        <div className="card p-10 text-center text-slate-500">No dataset quality data available.</div>
       ) : (
         data.datasets.map((d: any) => (
           <div key={d.dataset_id} className="card p-5">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
                 <h3 className="font-bold text-slate-900">{d.dataset_name}</h3>
-                <p className="text-xs text-slate-400">{d.record_count?.toLocaleString()} records</p>
+                <p className="text-xs text-slate-500">{d.record_count?.toLocaleString()} records</p>
               </div>
               <span className={`badge ${d.validation_status === "validated" ? "badge-green" : "badge-yellow"}`}>
                 {d.validation_status}
@@ -491,7 +491,7 @@ function KnowledgeGraphPanel() {
       {!stats ? (
         <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
       ) : stats.status === "disabled" ? (
-        <div className="text-center py-10 text-slate-400">Knowledge Graph feature is not enabled.</div>
+        <div className="text-center py-10 text-slate-500">Knowledge Graph feature is not enabled.</div>
       ) : stats.status !== "healthy" ? (
         <div className="text-center py-10 text-amber-500">Knowledge Graph unavailable: {stats.error}</div>
       ) : (
@@ -554,7 +554,7 @@ function AdminConsole() {
               </div>
               <div>
                 <p className="font-bold text-slate-900 text-sm">Admin Console</p>
-                <p className="text-xs text-slate-400">Intelligence Hub</p>
+                <p className="text-xs text-slate-500">Intelligence Hub</p>
               </div>
             </>
           )}

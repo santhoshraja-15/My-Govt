@@ -68,7 +68,7 @@ function ComplaintSummary({ c }: { c: any }) {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusBadge status={t.new_status} />
-                    <span className="text-xs text-slate-400">{fmt(t.changed_at)}</span>
+                    <span className="text-xs text-slate-500">{fmt(t.changed_at)}</span>
                   </div>
                   {t.remarks && <p className="text-xs text-slate-500 mt-1">{t.remarks}</p>}
                 </div>

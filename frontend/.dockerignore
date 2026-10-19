@@ -10,3 +10,4 @@ tsconfig.tsbuildinfo
 .env.*
 !.env.example
 *.log
+.next-e2e

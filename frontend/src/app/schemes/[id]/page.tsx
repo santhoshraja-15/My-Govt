@@ -118,15 +118,23 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
         {tab === "eligibility" && (
           <div className="space-y-4 animate-fade-in">
             {!scheme.eligibility_rules?.length ? (
-              <div className="card p-8 text-center text-slate-400">
+              <div className="card p-8 text-center text-slate-500">
                 <Shield size={36} className="mx-auto mb-2 opacity-40" />
                 <p>No eligibility rules defined for this scheme yet.</p>
               </div>
             ) : (
               <>
-                <div className="card p-4 bg-blue-50 border-blue-100 text-sm text-blue-700">
-                  These are the official eligibility criteria. Rules in the same group (AND logic) must all pass.
-                </div>
+                {scheme.eligibility_rules.some((r: any) => String(r.source_reference || "").startsWith("DEMO RULE")) ? (
+                  <div className="card p-4 bg-amber-50 border-amber-200 text-sm text-amber-800" data-testid="demo-rules-banner">
+                    <b>Demonstration rules.</b> These criteria are illustrative examples for this demo, not the scheme&apos;s official eligibility conditions.
+                    Rules in the same group (AND logic) must all pass.
+                  </div>
+                ) : (
+                  <div className="card p-4 bg-blue-50 border-blue-100 text-sm text-blue-700">
+                    Eligibility criteria as recorded in this platform (confirm with the department before applying).
+                    Rules in the same group (AND logic) must all pass.
+                  </div>
+                )}
                 {Object.entries(
                   scheme.eligibility_rules.reduce((acc: any, rule: any) => {
                     const g = rule.rule_group || 1;
@@ -136,7 +144,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                   }, {})
                 ).map(([group, rules]: any) => (
                   <div key={group} className="card p-5">
-                    <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">
+                    <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">
                       Criteria Group {group}
                     </p>
                     <div className="space-y-3">
@@ -146,10 +154,10 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                           <div className="flex-1">
                             <p className="text-sm font-medium text-slate-800">{rule.human_readable}</p>
                             {rule.human_readable_ta && (
-                              <p className="text-xs text-slate-400 font-tamil mt-0.5">{rule.human_readable_ta}</p>
+                              <p className="text-xs text-slate-500 font-tamil mt-0.5">{rule.human_readable_ta}</p>
                             )}
                             {rule.source_reference && (
-                              <p className="text-xs text-slate-400 mt-1">Source: {rule.source_reference}</p>
+                              <p className="text-xs text-slate-500 mt-1">Source: {rule.source_reference}</p>
                             )}
                           </div>
                           <span className={`badge ${rule.mandatory ? "badge-red" : "badge-slate"} shrink-0`}>
@@ -168,7 +176,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
         {tab === "benefits" && (
           <div className="space-y-4 animate-fade-in">
             {!scheme.benefits?.length ? (
-              <div className="card p-8 text-center text-slate-400">
+              <div className="card p-8 text-center text-slate-500">
                 <Award size={36} className="mx-auto mb-2 opacity-40" />
                 <p>Benefit details not yet available.</p>
               </div>
@@ -179,7 +187,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                     <Award size={18} className="text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">{b.benefit_type?.replace(/_/g," ")}</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">{b.benefit_type?.replace(/_/g," ")}</p>
                     <p className="font-semibold text-slate-800">{b.description}</p>
                     {b.amount && <p className="text-emerald-600 font-bold mt-1">₹{b.amount.toLocaleString("en-IN")}{b.unit ? ` / ${b.unit}` : ""}</p>}
                   </div>
@@ -192,7 +200,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
         {tab === "documents" && (
           <div className="space-y-4 animate-fade-in">
             {!scheme.required_documents?.length ? (
-              <div className="card p-8 text-center text-slate-400">
+              <div className="card p-8 text-center text-slate-500">
                 <FileText size={36} className="mx-auto mb-2 opacity-40" />
                 <p>Document requirements not yet listed.</p>
               </div>

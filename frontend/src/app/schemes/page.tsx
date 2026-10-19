@@ -24,7 +24,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
             {scheme.name}
           </h3>
           {scheme.name_ta && (
-            <p className="text-xs text-slate-400 font-tamil mt-0.5 line-clamp-1">{scheme.name_ta}</p>
+            <p className="text-xs text-slate-500 font-tamil mt-0.5 line-clamp-1">{scheme.name_ta}</p>
           )}
         </div>
         <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-1 transition-all shrink-0 mt-0.5" />
@@ -278,7 +278,7 @@ export default function SchemesPage() {
           <div className="text-center py-20" data-testid="empty-state">
             <Award size={48} className="text-slate-300 mx-auto mb-4" />
             <h3 className="font-semibold text-slate-600 mb-1">No schemes found</h3>
-            <p className="text-sm text-slate-400">Try different keywords or remove filters</p>
+            <p className="text-sm text-slate-500">Try different keywords or remove filters</p>
           </div>
         ) : (
           <>

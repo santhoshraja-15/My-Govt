@@ -15,6 +15,8 @@ const DICT: Record<string, { en: string; ta: string }> = {
   "nav.complaints": { en: "Complaints", ta: "புகார்கள்" },
   "nav.assistant": { en: "AI Assistant", ta: "உதவியாளர்" },
   "nav.documents": { en: "Documents", ta: "ஆவணங்கள்" },
+  "nav.dashboard": { en: "Dashboard", ta: "முகப்புப் பலகை" },
+  "nav.officer": { en: "Officer console", ta: "அலுவலர் பலகை" },
   "auth.signin": { en: "Sign In", ta: "உள்நுழைய" },
   "auth.register": { en: "Register", ta: "பதிவு செய்ய" },
   "auth.logout": { en: "Sign out", ta: "வெளியேறு" },

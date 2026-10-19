@@ -18,7 +18,7 @@ function ServiceCard({ svc }: { svc: any }) {
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-slate-900 text-sm group-hover:text-brand-700 transition-colors line-clamp-1 mb-0.5">{svc.name}</h3>
-        {svc.name_ta && <p className="text-xs text-slate-400 font-tamil line-clamp-1 mb-2">{svc.name_ta}</p>}
+        {svc.name_ta && <p className="text-xs text-slate-500 font-tamil line-clamp-1 mb-2">{svc.name_ta}</p>}
         {svc.description && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{svc.description}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
           {svc.department_name && <span className="badge badge-blue">{svc.department_name}</span>}

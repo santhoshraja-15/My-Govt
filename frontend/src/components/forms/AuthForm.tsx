@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { homeFor, useAuth } from "@/lib/auth";
 import { useLang } from "@/lib/i18n";
 
 function Inner({ mode }: { mode: "login" | "register" }) {
   const { login, register } = useAuth();
   const { t } = useLang();
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  const nextParam = useSearchParams().get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -25,11 +25,10 @@ function Inner({ mode }: { mode: "login" | "register" }) {
     try {
       if (mode === "login") {
         const u = await login(email.trim(), password);
-        router.push(next.startsWith("/") ? next : "/");
-        void u;
+        router.push(nextParam && nextParam.startsWith("/") ? nextParam : homeFor(u.role));
       } else {
         await register(email.trim(), password, name.trim());
-        router.push(next.startsWith("/") ? next : "/");
+        router.push(nextParam && nextParam.startsWith("/") ? nextParam : homeFor("citizen"));
       }
     } catch (err: any) {
       setError(err.status === 401 ? "Invalid email or password." : err.status === 429 ? "Too many attempts. Please wait and try again." : err.message || t("common.error"));

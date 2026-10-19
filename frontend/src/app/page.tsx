@@ -272,7 +272,7 @@ export default function HomePage() {
               <h2 className="text-3xl font-bold text-white mb-2">Popular Schemes</h2>
               <p className="text-blue-300">Most accessed government benefit programmes</p>
             </div>
-            <Link href="/schemes" className="btn-secondary border-blue-700 text-blue-300 hover:bg-blue-900">
+            <Link href="/schemes" className="btn-secondary bg-transparent border-blue-300 text-blue-100 hover:bg-white/10">
               View All <ChevronRight size={16} />
             </Link>
           </div>
@@ -342,7 +342,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────── */}
-      <footer className="bg-slate-900 text-slate-400 py-12">
+      <footer className="bg-slate-900 text-slate-300 py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
             <div>
@@ -358,16 +358,16 @@ export default function HomePage() {
               </p>
             </div>
             {[
-              { title: "Citizen Services", links: ["Find Schemes", "e-Sevai Services", "File Complaint", "Track Complaint"] },
-              { title: "Information", links: ["Policy Documents", "Government Orders", "Departments", "Districts"] },
-              { title: "Platform", links: ["AI Assistant", "About MyGovt", "Privacy Policy", "Accessibility"] },
+              { title: "Citizen Services", links: [["Find schemes", "/schemes"], ["Government services", "/services"], ["File a complaint", "/complaints"], ["Track a complaint", "/complaints"]] },
+              { title: "Information", links: [["Policy documents", "/documents"], ["AI assistant", "/assistant"]] },
+              { title: "Account", links: [["Sign in", "/login"], ["Register", "/register"]] },
             ].map(({ title, links }) => (
               <div key={title}>
                 <h4 className="text-white font-semibold mb-3 text-sm">{title}</h4>
                 <ul className="space-y-2">
-                  {links.map((link) => (
-                    <li key={link}>
-                      <Link href="#" className="text-sm hover:text-white transition-colors">{link}</Link>
+                  {links.map(([label, href]) => (
+                    <li key={label}>
+                      <Link href={href} className="text-sm hover:text-white transition-colors">{label}</Link>
                     </li>
                   ))}
                 </ul>
@@ -375,7 +375,7 @@ export default function HomePage() {
             ))}
           </div>
           <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs">© 2024 Government of Tamil Nadu. All rights reserved.</p>
+            <p className="text-xs">MyGovt is a university demonstration project. It is not an official Government of Tamil Nadu website.</p>
             <p className="text-xs">Records are labelled by verification status. Provisional items have not yet been verified against an official document; confirm with the department before acting.</p>
           </div>
         </div>
