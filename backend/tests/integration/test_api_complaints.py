@@ -270,8 +270,8 @@ async def test_staff_list_is_scoped_to_the_department_and_citizens_are_refused(c
 
 async def test_unlinked_officer_account_is_refused_not_given_everything(client, make_staff):
     _, officer = await make_staff("officer")                   # no officer record -> no department
-    assert (await client.get(f"{API}/assigned", headers=officer)).status_code == 403
-    assert (await client.get(f"{API}/officers", headers=officer)).status_code == 403
+    assert (await client.get("/api/v1/complaints/assigned", headers=officer)).status_code == 403
+    assert (await client.get("/api/v1/complaints/officers", headers=officer)).status_code == 403
 
 
 async def test_officer_self_assigns_and_the_complaint_moves_to_assigned_with_history(client, make_citizen, make_officer, conn):

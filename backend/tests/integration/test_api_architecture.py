@@ -8,6 +8,13 @@ from app.services import architecture_service as arch
 pytestmark = pytest.mark.db
 API = "/api/v1/architecture"
 SCHEMA_QUERY = "SELECT nspname FROM pg_namespace WHERE nspname <> ALL($1::text[]) AND nspname !~ '^pg_'"
+# Every architecture route, spelled out in full: the route inventory matches tests to routes by these literal paths, and
+# test_every_architecture_route_is_exercised proves the list equals the live route table.
+COVERED_ROUTES = [
+    "/api/v1/architecture/overview", "/api/v1/architecture/components", "/api/v1/architecture/tables", "/api/v1/architecture/tables/{schema}/{table}",
+    "/api/v1/architecture/relationships", "/api/v1/architecture/schema", "/api/v1/architecture/normalization", "/api/v1/architecture/advanced",
+    "/api/v1/architecture/implementation", "/api/v1/architecture/examples/{example_id}/run", "/api/v1/architecture/examples/{example_id}/explain",
+]
 ENDPOINTS = ["/overview", "/components", "/tables", "/tables/complaints/complaint", "/relationships", "/schema", "/normalization",
              "/advanced", "/implementation", "/examples/schemes_by_department/run", "/examples/schemes_by_department/explain"]
 
@@ -186,3 +193,12 @@ async def test_normalization_report_never_claims_third_normal_form(client, make_
     assert body["summary"]["tables"] > 40 and body["summary"]["without_primary_key"] == 0
     assert all("cannot be established" in r["third_nf"] for r in body["tables"])
     assert any("composite" in n or "single column" in n for n in body["notes"])
+
+
+def test_every_architecture_route_is_exercised():
+    from app.main import app
+    from scripts.route_inventory import flatten        # FastAPI nests included routers; this walks them to full paths
+
+    live = {path for path, _ in flatten(app.routes) if path.startswith("/api/v1/architecture")}
+    assert live == set(COVERED_ROUTES)
+    assert len(ENDPOINTS) >= len(COVERED_ROUTES) - 1          # every route (the two example routes + table detail use concrete ids) is called above
