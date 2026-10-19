@@ -1,4 +1,4 @@
-.PHONY: up down build migrate seed embed graph-rebuild test eval lint clean logs shell-db shell-backend
+.PHONY: ingest e2e synth-db seed-synthetic eval up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
 
 # ── Docker ───────────────────────────────────────────────────
 up:
@@ -18,57 +18,97 @@ logs-backend:
 
 # ── Database ─────────────────────────────────────────────────
 migrate:
-	docker compose exec backend alembic upgrade head
+	@echo "Alembic has no revisions yet. The SQL migrations are the source of truth: run 'make migrate-sql'."; exit 1
 
 migrate-down:
-	docker compose exec backend alembic downgrade -1
+	@echo "No automated downgrade: SQL migrations are forward-only (restore from backup instead)."; exit 1
 
 migrate-status:
-	docker compose exec backend alembic current
+	@docker compose exec -T postgres psql -U postgres -d mygovt -c "SELECT count(*) AS migration_columns_present FROM information_schema.columns WHERE table_schema='documents' AND table_name='document' AND column_name='retrieved_at'"
 
-# Run schema directly (first-time setup)
+# Step 1: baseline schema (no provenance columns — do NOT seed yet). Fails fast on any SQL error.
 schema:
-	docker compose exec -T postgres psql -U postgres -d mygovt < database/schema/001_schema.sql
+	docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < database/schema/001_schema.sql
+
+# Step 2: raw SQL migration (002 adds headquarters, lgd_code, verification_status etc.)
+migrate-sql:
+	for f in database/migrations/[0-9][0-9][0-9]_*.sql; do 		echo "applying $$f"; 		docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d mygovt < $$f || exit 1; 	done
+
+# Full first-time database initialisation in correct dependency order:
+#   1. Base schema (001_schema.sql)      → tables, functions, triggers
+#   2. Migration 002                     → provenance columns seeds depend on
+#   3. Seed data (backend/scripts/seed.py, applies database/seeds/002_verified_seed_data.sql only,
+#      then runs integrity + provenance checks; idempotent)
+# db-init is for a CLEAN database only (001_schema.sql is not re-runnable). To re-seed an existing
+# database use 'make seed' (idempotent).
+# NOTE: 'migrate' (alembic) has no revisions yet; use migrate-sql until Milestone 7.
+db-init: schema migrate-sql seed
 
 seed:
 	docker compose exec backend python -m scripts.seed
 
+# Re-run the post-seed integrity/provenance checks without changing data
+seed-verify:
+	docker compose exec backend python -m scripts.seed --verify-only
+
+# Build a throw-away mygovt_test_* database, run schema -> migration -> seed (twice) -> constraint probes, drop it.
+# Never touches the 'mygovt' database. Requires the postgres service (PostGIS image) to be up.
+db-verify:
+	docker compose exec backend sh -c 'python -m scripts.db_verify --admin-dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres'
+
+# Synthetic (fake) citizens/complaints for DEVELOPMENT ONLY. Refuses the real 'mygovt' database:
+# create a separate one first, e.g.  make synth-db SYNTH_DB=mygovt_dev
+SYNTH_DB ?= mygovt_dev
+synth-db:
+	docker compose exec -T postgres psql -U postgres -c "CREATE DATABASE $(SYNTH_DB)" || true
+	for f in database/schema/001_schema.sql database/migrations/[0-9][0-9][0-9]_*.sql; do docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d $(SYNTH_DB) < $$f || exit 1; done
+	docker compose exec backend sh -c 'python -m scripts.seed --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$(SYNTH_DB)'
+
 seed-synthetic:
-	docker compose exec backend python -m scripts.synth_data
+	docker compose exec backend sh -c 'python -m scripts.synth_data --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$(SYNTH_DB) --seed $${SEED:-42} --citizens $${CITIZENS:-50} --complaints $${COMPLAINTS:-200}'
+
 
 # ── AI / Data ────────────────────────────────────────────────
 embed:
 	docker compose exec backend python -m app.ai.embeddings.run --all
+
+# Fetch PDFs from an approved official source (see system.source_registry). Example:
+#   make ingest SOURCE=TN_GOV_PORTAL PAGE=https://www.tn.gov.in/ LIMIT=5
+SOURCE ?= TN_GOV_PORTAL
+PAGE ?= https://www.tn.gov.in/
+LIMIT ?= 5
+ingest:
+	docker compose exec backend sh -c 'python -m etl.pipeline --dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/$$POSTGRES_DB --source $(SOURCE) --page $(PAGE) --limit $(LIMIT) --data-dir /data'
 
 graph-rebuild:
 	docker compose exec backend python -m knowledge_graph.rebuild
 
 # ── Testing ──────────────────────────────────────────────────
 test:
-	docker compose exec backend pytest -q --cov=app --cov-report=term-missing
+	docker compose exec backend sh -c 'TEST_ADMIN_DSN=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres TEST_POSTGIS=1 pytest -q -rs --cov=app --cov-report=term-missing'
 
 test-unit:
 	docker compose exec backend pytest tests/unit -q
 
 test-integration:
-	docker compose exec backend pytest tests/integration -q
+	docker compose exec backend sh -c 'TEST_ADMIN_DSN=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres TEST_POSTGIS=1 pytest tests/integration -q -rs'
 
 eval:
 	docker compose exec backend python -m ai.eval.run_all
 
 e2e:
-	cd frontend && npx playwright test
+	@test -n "$(E2E_ADMIN_DSN)" || (echo "set E2E_ADMIN_DSN (superuser DSN of a DISPOSABLE PostgreSQL), E2E_PG_PORT, E2E_PG_PASSWORD"; exit 1)
+	cd backend && python -m scripts.e2e_env --admin-dsn "$(E2E_ADMIN_DSN)"
+	cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8010 npm run build && npx playwright test
 
 # ── Code Quality ─────────────────────────────────────────────
 lint:
-	docker compose exec backend ruff check . && \
-	docker compose exec backend black --check . && \
-	docker compose exec backend mypy app && \
-	cd frontend && npm run lint && npx tsc --noEmit
+	docker compose exec backend ruff check app scripts etl knowledge_graph ai tests
+	docker compose exec backend mypy app scripts etl knowledge_graph ai
+	cd frontend && npx tsc --noEmit && npx next lint
 
 format:
-	docker compose exec backend ruff check --fix . && \
-	docker compose exec backend black .
+	docker compose exec backend ruff check --fix app scripts etl knowledge_graph ai tests
 
 # ── Shell Access ─────────────────────────────────────────────
 shell-db:
@@ -98,6 +138,5 @@ scheduler:
 setup: up
 	@echo "Waiting for services to be healthy..."
 	@sleep 15
-	$(MAKE) migrate
-	$(MAKE) seed
+	$(MAKE) db-init
 	@echo "Setup complete. Visit http://localhost:3000"

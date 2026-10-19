@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, ExternalLink, Award, FileText, Shield, Loader2 } from "lucide-react";
 import { schemes as schemesAPI } from "@/lib/api";
 import { use } from "react";
+import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
 function RuleBadge({ outcome }: { outcome: string }) {
   if (outcome === "PASS") return <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />;
@@ -55,11 +56,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
             {scheme.department_name && <span className="badge badge-blue">{scheme.department_name}</span>}
             {scheme.category && <span className="badge badge-slate capitalize">{scheme.category.replace(/_/g," ")}</span>}
             <span className="badge badge-green capitalize">{scheme.scheme_level}</span>
-            {scheme.verified_at && (
-              <span className="badge badge-purple flex items-center gap-1">
-                <CheckCircle2 size={10} /> Verified
-              </span>
-            )}
+            <VerificationBadge status={scheme.verification_status} />
           </div>
           <h1 className="text-2xl md:text-3xl font-black mb-2">{scheme.name}</h1>
           {scheme.name_ta && <p className="text-blue-300 font-tamil text-lg">{scheme.name_ta}</p>}

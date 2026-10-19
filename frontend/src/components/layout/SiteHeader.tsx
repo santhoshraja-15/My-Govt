@@ -1,0 +1,38 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AuthNav } from "@/components/layout/AuthNav";
+import { LangToggle } from "@/components/layout/LangToggle";
+import { useLang } from "@/lib/i18n";
+
+const ITEMS = [
+  { href: "/schemes", key: "nav.schemes" },
+  { href: "/services", key: "nav.services" },
+  { href: "/complaints", key: "nav.complaints" },
+  { href: "/assistant", key: "nav.assistant" },
+  { href: "/documents", key: "nav.documents" },
+];
+
+/** Compact global header for all pages except the landing page (which has its own hero navigation). */
+export function SiteHeader() {
+  const path = usePathname();
+  const { t } = useLang();
+  if (path === "/") return null;
+  return (
+    <header className="bg-brand-800 text-white" data-testid="site-header">
+      <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <Link href="/" className="font-black tracking-tight">MyGovt</Link>
+        <nav aria-label="Main" className="flex flex-wrap gap-4 text-sm text-blue-100">
+          {ITEMS.map((i) => (
+            <Link key={i.href} href={i.href} aria-current={path.startsWith(i.href) ? "page" : undefined}
+              className={path.startsWith(i.href) ? "text-white font-semibold underline underline-offset-4" : "hover:text-white"}>
+              {t(i.key)}
+            </Link>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-3"><LangToggle /><AuthNav /></div>
+      </div>
+    </header>
+  );
+}

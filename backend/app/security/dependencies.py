@@ -1,6 +1,5 @@
 """FastAPI security dependencies — authentication and authorization."""
-from typing import Optional
-from uuid import UUID
+from typing import Any, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,7 +15,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def _get_user_from_token(
     credentials: Optional[HTTPAuthorizationCredentials],
     db: AsyncSession,
-) -> Optional[object]:
+) -> Optional[Any]:
     if not credentials:
         return None
     payload = decode_token(credentials.credentials)
@@ -27,8 +26,9 @@ async def _get_user_from_token(
         return None
     result = await db.execute(
         text("""
-            SELECT u.user_id, u.email, u.role, u.status, u.citizen_id
+            SELECT u.user_id, u.email, u.role, u.status, c.citizen_id, coalesce(c.name, '') AS full_name
             FROM identity.app_user u
+            LEFT JOIN identity.citizen c ON c.user_id = u.user_id
             WHERE u.user_id = :uid AND u.status = 'active'
         """),
         {"uid": user_id},
@@ -44,6 +44,7 @@ async def _get_user_from_token(
             self.role = r.role
             self.status = r.status
             self.citizen_id = r.citizen_id
+            self.full_name = r.full_name
 
     return UserContext(row)
 
@@ -65,7 +66,7 @@ async def get_current_user(
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
-) -> Optional[object]:
+) -> Optional[Any]:
     return await _get_user_from_token(credentials, db)
 
 

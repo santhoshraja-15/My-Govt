@@ -1,0 +1,12 @@
+# Keep host-built artefacts out of the image (Windows node_modules would overwrite the container ones)
+node_modules
+.next
+out
+test-results
+playwright-report
+e2e/results.json
+tsconfig.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log

@@ -11,19 +11,61 @@ export class APIError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+/** Token storage (localStorage). Access tokens are short-lived; the refresh token renews them. */
+export const tokens = {
+  get access() { return typeof window !== "undefined" ? localStorage.getItem("access_token") : null; },
+  get refresh() { return typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null; },
+  set(access: string, refresh?: string) {
+    localStorage.setItem("access_token", access);
+    if (refresh) localStorage.setItem("refresh_token", refresh);
+  },
+  clear() { localStorage.removeItem("access_token"); localStorage.removeItem("refresh_token"); },
+};
+
+/** FastAPI returns `detail` as a string or as a list of validation errors. */
+function errorMessage(body: any, fallback: string): string {
+  const d = body?.detail ?? body?.message;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return d.map((e: any) => `${(e.loc || []).slice(1).join(".")}: ${e.msg}`).join("; ");
+  return fallback;
+}
+
+let refreshing: Promise<boolean> | null = null;
+async function refreshAccessToken(): Promise<boolean> {
+  const refresh = tokens.refresh;
+  if (!refresh) return false;
+  refreshing ??= fetch(`${API_BASE}/api/v1/auth/refresh`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: refresh }),
+  }).then(async (r) => {
+    if (!r.ok) return false;
+    tokens.set((await r.json()).access_token);
+    return true;
+  }).catch(() => false).finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
+  const token = tokens.access;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string>),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  } catch {
+    throw new APIError(0, "NETWORK_ERROR", "Cannot reach the server. Please check your connection and try again.");
+  }
+
+  if (res.status === 401 && !retried && !path.startsWith("/api/v1/auth/") && (await refreshAccessToken())) {
+    return request<T>(path, options, true);
+  }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new APIError(res.status, error.code || "API_ERROR", error.message || error.detail || "Request failed");
+    const error = await res.json().catch(() => ({}));
+    throw new APIError(res.status, error.code || "API_ERROR", errorMessage(error, res.statusText || "Request failed"));
   }
 
   if (res.status === 204) return undefined as T;
@@ -38,7 +80,7 @@ export const auth = {
       body: JSON.stringify({ email, password }),
     }),
   register: (email: string, password: string, full_name: string) =>
-    request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email, password, full_name }) }),
+    request<any>("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email, password, full_name }) }),
   me: () => request<any>("/api/v1/auth/me"),
   logout: () => request("/api/v1/auth/logout", { method: "POST" }),
 };
@@ -85,6 +127,8 @@ export const documents = {
 export const complaints = {
   submit: (data: any) => request<any>("/api/v1/complaints", { method: "POST", body: JSON.stringify(data) }),
   track: (reference: string) => request<any>(`/api/v1/complaints/track/${reference}`),
+  updateStatus: (id: string, new_status: string, remarks?: string) =>
+    request<any>(`/api/v1/complaints/${id}/status`, { method: "PATCH", body: JSON.stringify({ new_status, remarks }) }),
   mine: (params: Record<string, any> = {}) => {
     const q = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])
@@ -132,10 +176,21 @@ export const admin = {
   query: (sql: string) => request<any>("/api/v1/admin/query", { method: "POST", body: JSON.stringify({ sql }) }),
   datasets: () => request<any[]>("/api/v1/admin/datasets"),
   sources: () => request<any[]>("/api/v1/admin/sources"),
+  complaints: (params: Record<string, any> = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
+    return request<any>(`/api/v1/admin/complaints?${q}`);
+  },
+  departmentPerformance: () => request<any[]>("/api/v1/admin/department-performance"),
+  verificationQueue: () => request<any>("/api/v1/admin/verification-queue"),
   auditLogs: (limit = 50, offset = 0) => request<any>(`/api/v1/admin/audit-logs?limit=${limit}&offset=${offset}`),
   kgStats: () => request<any>("/api/v1/admin/knowledge-graph/stats"),
   dataQuality: () => request<any>("/api/v1/admin/data-quality"),
   connections: () => request<any>("/api/v1/admin/databases/connections"),
+};
+
+// ── Public stats ──────────────────────────────────────────────
+export const publicStats = {
+  get: () => request<{ schemes: number; services: number; departments: number; districts: number; verified_schemes: number }>("/api/v1/public/stats"),
 };
 
 // ── System ────────────────────────────────────────────────────

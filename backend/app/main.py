@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import engine, check_db_health
+from app.core.database import check_db_health
 from app.core.logging import setup_logging
 from app.api.v1 import router as api_v1_router
 
@@ -35,9 +35,10 @@ app = FastAPI(
     title="MyGovt API",
     description="AI-Powered Citizen Intelligence & State Governance Platform",
     version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    # API docs are an information leak in production; keep them for development/test only
+    docs_url=None if settings.APP_ENV.lower() == "production" else "/api/docs",
+    redoc_url=None if settings.APP_ENV.lower() == "production" else "/api/redoc",
+    openapi_url=None if settings.APP_ENV.lower() == "production" else "/api/openapi.json",
     lifespan=lifespan,
 )
 
@@ -52,14 +53,34 @@ app.add_middleware(
 )
 
 
-# ── Request ID middleware ─────────────────────────────────────
+# ── Request ID, body-size cap and security headers ────────────
+MAX_JSON_BODY_BYTES = 1 * 1024 * 1024           # 1 MiB for ordinary API calls
+MAX_UPLOAD_BODY_BYTES = 55 * 1024 * 1024        # evidence uploads (<= 50 MB file + multipart overhead)
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(self), camera=(), microphone=()",
+}
+
+
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     import uuid
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
+
+    limit = MAX_UPLOAD_BODY_BYTES if request.url.path.endswith("/evidence") else MAX_JSON_BODY_BYTES
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > limit:
+        return JSONResponse(status_code=413, content={"code": "PAYLOAD_TOO_LARGE",
+                                                      "message": "Request body too large.", "request_id": request_id})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    if request.url.path.startswith("/api/v1/auth"):
+        response.headers["Cache-Control"] = "no-store"      # never cache tokens / identity
     return response
 
 

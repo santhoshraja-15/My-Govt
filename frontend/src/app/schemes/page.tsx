@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Filter, ChevronRight, Award, CheckCircle2, XCircle, AlertCircle, ArrowLeft, X, Loader2, SlidersHorizontal } from "lucide-react";
 import { schemes as schemesAPI } from "@/lib/api";
+import { ErrorState } from "@/components/ui/AsyncState";
+import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
 const CATEGORIES = [
   "All","education","health_insurance","social_security","agriculture","women_welfare",
@@ -14,7 +16,7 @@ const LEVELS = ["All","state","central","district"];
 
 function SchemeCard({ scheme }: { scheme: any }) {
   return (
-    <Link href={`/schemes/${scheme.scheme_id}`}
+    <Link data-testid="scheme-card" href={`/schemes/${scheme.scheme_id}`}
       className="group card p-5 flex flex-col gap-3 hover:border-brand-200">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -42,11 +44,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
         {scheme.scheme_level && (
           <span className="badge badge-green capitalize">{scheme.scheme_level}</span>
         )}
-        {scheme.verified_at && (
-          <span className="badge badge-purple flex items-center gap-1">
-            <CheckCircle2 size={10} /> Verified
-          </span>
-        )}
+        <VerificationBadge status={scheme.verification_status} />
       </div>
     </Link>
   );
@@ -178,9 +176,11 @@ export default function SchemesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [eligScheme, setEligScheme] = useState<any>(null);
   const [inputVal, setInputVal] = useState("");
+  const [error, setError] = useState("");
 
   const load = useCallback(async (pg = 1) => {
     setLoading(true);
+    setError("");
     try {
       const res = await schemesAPI.list({
         q: q || undefined,
@@ -192,7 +192,7 @@ export default function SchemesPage() {
       setTotal(res.total || 0);
       setPages(res.pages || 1);
       setPage(pg);
-    } catch { setItems([]); }
+    } catch (e: any) { setItems([]); setTotal(0); setError(e?.message || "Could not load schemes."); }
     setLoading(false);
   }, [q, category, level]);
 
@@ -215,7 +215,7 @@ export default function SchemesPage() {
             <Award size={32} className="text-saffron-400" />
             <h1 className="text-3xl font-black">Government Schemes</h1>
           </div>
-          <p className="text-blue-200 text-lg">Discover {total > 0 ? total : "30+"} Tamil Nadu government benefit programmes</p>
+          <p className="text-blue-200 text-lg">Discover {total > 0 ? total : ""} Tamil Nadu government benefit programmes</p>
 
           {/* Search */}
           <form onSubmit={handleSearch} className="mt-6 flex gap-2 max-w-xl">
@@ -225,7 +225,7 @@ export default function SchemesPage() {
                 placeholder="Search schemes…" className="flex-1 bg-transparent text-white placeholder-blue-300 text-sm outline-none" />
             </div>
             <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">Search</button>
-            <button type="button" onClick={() => setShowFilters(s => !s)}
+            <button type="button" onClick={() => setShowFilters(s => !s)} aria-label="Toggle filters" aria-expanded={showFilters}
               className="btn-ghost bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl">
               <SlidersHorizontal size={18} />
             </button>
@@ -257,7 +257,7 @@ export default function SchemesPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-slate-500">
-            {loading ? "Loading…" : `${total} scheme${total !== 1 ? "s" : ""} found`}
+            {loading ? "Loading…" : error ? "" : `${total} scheme${total !== 1 ? "s" : ""} found`}
           </p>
         </div>
 
@@ -272,8 +272,10 @@ export default function SchemesPage() {
               </div>
             ))}
           </div>
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => load(1)} />
         ) : items.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="text-center py-20" data-testid="empty-state">
             <Award size={48} className="text-slate-300 mx-auto mb-4" />
             <h3 className="font-semibold text-slate-600 mb-1">No schemes found</h3>
             <p className="text-sm text-slate-400">Try different keywords or remove filters</p>

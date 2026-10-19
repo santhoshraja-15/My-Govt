@@ -1,5 +1,6 @@
 """GIS-related Pydantic schemas."""
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel
 
 
@@ -30,15 +31,14 @@ class DistrictOut(BaseModel):
 
 
 class FacilityOut(BaseModel):
-    facility_id: int
+    facility_id: UUID
     name: str
-    facility_type: str
-    department_name: Optional[str] = None
-    address: Optional[str] = None
+    facility_type: Optional[str] = None
     district_name: Optional[str] = None
+    operator: Optional[str] = None
+    opening_hours: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    phone: Optional[str] = None
     distance_km: Optional[float] = None
 
     class Config:

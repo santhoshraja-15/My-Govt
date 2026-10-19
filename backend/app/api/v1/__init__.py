@@ -11,9 +11,11 @@ from app.api.v1.gis import router as gis_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.citizens import router as citizens_router
 from app.api.v1.departments import router as departments_router
+from app.api.v1.public import router as public_router
 
 router = APIRouter()
 
+router.include_router(public_router, prefix="/public", tags=["Public"])
 router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 router.include_router(citizens_router, prefix="/citizens", tags=["Citizens"])
 router.include_router(departments_router, prefix="/departments", tags=["Departments"])

@@ -14,6 +14,11 @@ interface Citation {
   department?: string;
   source_url?: string;
   verified_at?: string;
+  verification_status?: string;
+  page?: number | null;
+  excerpt?: string | null;
+  outdated?: boolean;
+  chunk_id?: string | null;
 }
 
 interface Message {
@@ -27,6 +32,8 @@ interface Message {
   degraded?: boolean;
   intent?: string;
   suggested_actions?: string[];
+  contains_unverified?: boolean;
+  evidence_notes?: string[];
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -62,7 +69,11 @@ function CitationCard({ citations }: { citations: Citation[] }) {
         {citations.map((c) => (
           <a key={c.index} href={c.source_url || "#"} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 px-2.5 py-1 rounded-full border border-brand-100 transition-all">
-            [{c.index}] {c.title}
+            [{c.index}] {c.title}{c.page ? ` · p.${c.page}` : ""}
+            {c.outdated && <span className="text-[10px] uppercase tracking-wide text-red-700">outdated</span>}
+            {c.verification_status && c.verification_status !== "official_verified" && (
+              <span className="text-[10px] uppercase tracking-wide text-amber-700">{c.verification_status.replace("_", " ")}</span>
+            )}
             {c.source_url && <ExternalLink size={10} />}
           </a>
         ))}
@@ -102,7 +113,17 @@ function MessageBubble({ msg }: { msg: Message }) {
               </div>
             )}
 
-            <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+            {msg.contains_unverified && (
+              <div role="note" data-testid="unverified-notice" className="mb-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2.5 py-1.5">
+                Some of the sources below are provisional or external and have not been verified against an official document. Please confirm with the department.
+              </div>
+            )}
+            <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap" data-testid="assistant-answer">{msg.content}</p>
+            {msg.evidence_notes?.length ? (
+              <ul data-testid="evidence-notes" className="mt-2 text-xs text-slate-500 list-disc pl-4 space-y-0.5">
+                {msg.evidence_notes.map((n) => <li key={n}>{n}</li>)}
+              </ul>
+            ) : null}
 
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <TrustIndicator score={msg.trust_score} />
@@ -171,6 +192,8 @@ export default function AssistantPage() {
         degraded: res.degraded,
         intent: res.intent,
         suggested_actions: res.suggested_actions,
+        contains_unverified: res.contains_unverified,
+        evidence_notes: res.evidence_notes,
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
@@ -277,6 +300,7 @@ export default function AssistantPage() {
           <div className="flex gap-3 items-end">
             <textarea
               ref={inputRef}
+              aria-label="Ask a question"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -291,7 +315,7 @@ export default function AssistantPage() {
               }}
               disabled={loading}
             />
-            <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
+            <button onClick={() => sendMessage()} disabled={loading || !input.trim()} aria-label="Send message"
               className="btn-primary h-11 w-11 p-0 justify-center rounded-xl shrink-0 disabled:opacity-40">
               {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>

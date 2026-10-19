@@ -4,12 +4,14 @@ import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { Search, FileText, ArrowLeft, ExternalLink, Download, Loader2, Filter } from "lucide-react";
 import { services as servicesAPI } from "@/lib/api";
+import { ErrorState } from "@/components/ui/AsyncState";
+import { VerificationBadge } from "@/components/ui/VerificationBadge";
 
 const CATEGORIES = ["All","certificate","land_record","welfare","utilities","transport","document","agriculture","locator"];
 
 function ServiceCard({ svc }: { svc: any }) {
   return (
-    <Link href={`/services/${svc.service_id}`}
+    <Link data-testid="service-card" href={`/services/${svc.service_id}`}
       className="group card p-5 flex gap-4 items-start hover:border-brand-200">
       <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
         <FileText size={18} className="text-white" />
@@ -20,9 +22,18 @@ function ServiceCard({ svc }: { svc: any }) {
         {svc.description && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{svc.description}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
           {svc.department_name && <span className="badge badge-blue">{svc.department_name}</span>}
-          {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
-          {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
-          {svc.processing_days > 0 && <span className="badge badge-slate">{svc.processing_days} days</span>}
+          {svc.charges_verified ? (
+            <>
+              {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
+              {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
+              {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
+            </>
+          ) : (
+            <span className="badge badge-yellow" data-testid="charges-unconfirmed" title="Fees and processing time for this service have not been verified against an official source">
+              Fees &amp; timing unconfirmed
+            </span>
+          )}
+          <VerificationBadge status={svc.verification_status} />
         </div>
       </div>
     </Link>
@@ -33,6 +44,7 @@ export default function ServicesPage() {
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [inputVal, setInputVal] = useState("");
   const [category, setCategory] = useState("All");
@@ -41,6 +53,7 @@ export default function ServicesPage() {
 
   const load = useCallback(async (pg = 1) => {
     setLoading(true);
+    setError("");
     try {
       const res = await servicesAPI.list({
         q: q || undefined,
@@ -51,7 +64,7 @@ export default function ServicesPage() {
       setTotal(res.total || 0);
       setPages(res.pages || 1);
       setPage(pg);
-    } catch { setItems([]); }
+    } catch (e: any) { setItems([]); setTotal(0); setError(e?.message || "Could not load services."); }
     setLoading(false);
   }, [q, category]);
 
@@ -68,7 +81,7 @@ export default function ServicesPage() {
             <FileText size={30} className="text-emerald-300" />
             <h1 className="text-3xl font-black">e-Sevai Services</h1>
           </div>
-          <p className="text-emerald-200 text-lg mb-6">Apply online for {total > 0 ? total : "20+"} government certificates and services</p>
+          <p className="text-emerald-200 text-lg mb-6">Apply online for {total > 0 ? total : ""} government certificates and services</p>
 
           <form onSubmit={(e) => { e.preventDefault(); setQ(inputVal); }} className="flex gap-2 max-w-xl">
             <div className="flex-1 flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
@@ -96,13 +109,15 @@ export default function ServicesPage() {
         </div>
 
         <div className="flex items-center justify-between mb-5">
-          <p className="text-sm text-slate-500">{loading ? "Loading…" : `${total} service${total !== 1 ? "s" : ""}`}</p>
+          <p className="text-sm text-slate-500">{loading ? "Loading…" : error ? "" : `${total} service${total !== 1 ? "s" : ""}`}</p>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-brand-600" /></div>
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => load(1)} />
         ) : items.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="text-center py-20" data-testid="empty-state">
             <FileText size={48} className="text-slate-300 mx-auto mb-3" />
             <p className="text-slate-500">No services found</p>
           </div>

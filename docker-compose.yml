@@ -1,7 +1,8 @@
 version: "3.9"
 
 # ================================================================
-# MyGovt — Local Development Docker Compose
+# MyGovt — Local Development Docker Compose (NOT a production deployment: dev servers, hot reload,
+# source mounts). Secrets have no defaults: copy .env.example to .env and set every value.
 # Run: docker compose up -d --build
 # ================================================================
 
@@ -17,15 +18,15 @@ services:
     environment:
       POSTGRES_DB: mygovt
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
-      MYGOVT_APP_PASSWORD: ${MYGOVT_APP_PASSWORD:-changeme_app}
-      MYGOVT_AI_READONLY_PASSWORD: ${MYGOVT_AI_READONLY_PASSWORD:-changeme_ai}
-      MYGOVT_ETL_PASSWORD: ${MYGOVT_ETL_PASSWORD:-changeme_etl}
-      MYGOVT_ADMIN_PASSWORD: ${MYGOVT_ADMIN_PASSWORD:-changeme_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
+      MYGOVT_APP_PASSWORD: ${MYGOVT_APP_PASSWORD:?set MYGOVT_APP_PASSWORD in .env (see .env.example)}
+      MYGOVT_AI_READONLY_PASSWORD: ${MYGOVT_AI_READONLY_PASSWORD:?set MYGOVT_AI_READONLY_PASSWORD in .env (see .env.example)}
+      MYGOVT_ETL_PASSWORD: ${MYGOVT_ETL_PASSWORD:?set MYGOVT_ETL_PASSWORD in .env (see .env.example)}
+      MYGOVT_ADMIN_PASSWORD: ${MYGOVT_ADMIN_PASSWORD:?set MYGOVT_ADMIN_PASSWORD in .env (see .env.example)}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d mygovt"]
       interval: 10s
@@ -39,7 +40,7 @@ services:
     container_name: mygovt_neo4j
     restart: unless-stopped
     environment:
-      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/changeme_neo4j}
+      NEO4J_AUTH: ${NEO4J_AUTH:?set NEO4J_AUTH in .env (see .env.example)}
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_memory_heap_initial__size: 512m
@@ -48,8 +49,8 @@ services:
       - neo4j_data:/data
       - neo4j_logs:/logs
     ports:
-      - "7474:7474"   # HTTP browser
-      - "7687:7687"   # Bolt
+      - "127.0.0.1:7474:7474"   # HTTP browser
+      - "127.0.0.1:7687:7687"   # Bolt
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7474"]
       interval: 15s
@@ -65,7 +66,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -79,13 +80,13 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-changeme_minio}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env (see .env.example)}
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Console
+      - "127.0.0.1:9000:9000"   # API
+      - "127.0.0.1:9001:9001"   # Console
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 15s

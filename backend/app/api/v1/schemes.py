@@ -24,6 +24,8 @@ async def list_schemes(
     category: Optional[str] = Query(None),
     level: Optional[str] = Query(None, description="central|state|district"),
     status: str = Query("active"),
+    verification_status: Optional[str] = Query(
+        None, description="official_verified|externally_referenced|provisional|unverified|deprecated"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -32,7 +34,8 @@ async def list_schemes(
     service = SchemeService(db)
     return await service.list_schemes(
         q=q, department_id=department_id, category=category,
-        level=level, status=status, page=page, page_size=page_size
+        level=level, status=status, page=page, page_size=page_size,
+        verification_status=verification_status,
     )
 
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.gis import JurisdictionResult, DistrictOut
+from app.schemas.gis import DistrictOut, FacilityOut, JurisdictionResult
 from app.services.gis_service import GISService
 
 router = APIRouter()
@@ -37,7 +37,7 @@ async def get_taluks(district_id: int, db: AsyncSession = Depends(get_db)):
     return await svc.get_taluks(district_id)
 
 
-@router.get("/facilities")
+@router.get("/facilities", response_model=list[FacilityOut])
 async def get_nearby_facilities(
     lat: float = Query(...),
     lon: float = Query(...),

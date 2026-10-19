@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "mygovt-backend"
@@ -27,7 +27,7 @@ dependencies = [
     "email-validator>=2.1.1",
 
     # Auth
-    "python-jose[cryptography]>=3.3.0",
+    "PyJWT>=2.10.0",
     "passlib[argon2]>=1.7.4",
 
     # Cache / Queue
@@ -93,8 +93,18 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
-ignore = ["B008", "N805"]
+
+[tool.ruff.lint]
+# Enforced in CI: correctness (E, F, W), bugbear (B), simplify (SIM) and naming (N).
+# Not enforced: E501 (line length - handled by the formatter), I (import order) and UP (syntax modernisation);
+# these are a style backlog, not defects.
+select = ["E", "F", "W", "B", "SIM", "N"]
+# N818: domain exceptions (ComplaintNotFound, InvalidTransition...) are named for the condition, not "...Error".
+ignore = ["B008", "N805", "E501", "N818"]
+
+[tool.ruff.lint.per-file-ignores]
+# Settings properties are upper-case on purpose: they mirror the environment-variable names.
+"app/core/config.py" = ["N802"]
 
 [tool.black]
 line-length = 100
@@ -108,9 +118,17 @@ exclude = ["migrations/", "tests/"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*", "scripts*", "etl*", "knowledge_graph*"]
+
+[tool.coverage.run]
+# SQLAlchemy's async layer runs on greenlets; without this, code executed inside them is reported as uncovered.
+concurrency = ["greenlet", "thread"]
+source = ["app", "etl", "knowledge_graph", "scripts", "ai"]
+omit = ["*/tests/*", "scripts/db_verify.py"]

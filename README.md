@@ -7,20 +7,20 @@
 
 ## Overview
 
-MyGovt is a production-grade, AI-powered platform that makes Tamil Nadu government services, schemes, and information accessible to every citizen. Built with verified government data and a zero-hallucination AI commitment.
+MyGovt is an AI-assisted platform that makes Tamil Nadu government schemes, services, documents and grievance handling easier to find and track, in English and Tamil. It is a **validated prototype, not a production service**: the seeded catalogue is *provisional* (no record is officially verified yet), real officer/authority data is not loaded, and parts of the stack have only been run locally. See [docs/audit/master_implementation_status.md](docs/audit/master_implementation_status.md) for exactly what works and what does not.
 
 ### Core Capabilities
 
 | Capability | Description |
 |---|---|
-| 🏛️ **Scheme Discovery** | 30+ TN government schemes with eligibility rule engine |
-| 🤖 **AI Assistant** | Grounded RAG with trust scoring, abstention, and citation |
+| 🏛️ **Scheme Discovery** | 12 curated TN/central schemes, each labelled with its verification status; deterministic eligibility engine (rules not yet loaded) |
+| 🤖 **AI Assistant** | Hybrid (keyword + vector) retrieval, passage-level citations, abstention, validated answers |
 | 📋 **Complaint Management** | File, track, escalate civic complaints with SLA timelines |
 | 📜 **Document Library** | Search GOs, acts, policies, and circulars |
-| 🗺️ **GIS & Jurisdiction** | PostGIS-backed coordinate → admin boundary resolution |
-| 🏥 **e-Sevai Services** | 20+ citizen services directory with fees and processing times |
-| 🔐 **RBAC Auth** | JWT + Argon2 with 6-tier role hierarchy |
-| 🖥️ **Admin Console** | Schema explorer, SQL workspace, data quality, audit logs |
+| 🗺️ **GIS & Jurisdiction** | PostGIS point-in-polygon resolution (tested on synthetic boundaries; real boundary data not loaded) |
+| 🏥 **e-Sevai Services** | 10 curated services (fees / processing times shown as *unconfirmed* until verified) |
+| 🔐 **RBAC Auth** | JWT (PyJWT) + Argon2, role checks, lockout, rate limits, audit trail |
+| 🖥️ **Admin Console** | Live metrics, complaint backlog, department performance, verification queue, schema explorer, audited SQL workspace, audit logs |
 
 ---
 
@@ -31,8 +31,8 @@ MyGovt is a production-grade, AI-powered platform that makes Tamil Nadu governme
 - **PostgreSQL 16** with **PostGIS 3** (spatial) and **pgvector 0.7+** (embeddings)
 - **SQLAlchemy 2.0** (async, asyncpg driver)
 - **Neo4j 5** — Knowledge graph
-- **Redis 7** — Caching and session management
-- **MinIO** — Object storage for evidence files
+- **Redis 7** — optional (health check only; not required by the core flows)
+- **MinIO** — evidence storage is **not wired yet** (uploads are refused with 503, never silently dropped)
 
 ### Frontend
 - **Next.js 15** (App Router, TypeScript)
@@ -101,10 +101,13 @@ My-Govt/
 
 ## Getting Started
 
+> The Docker stack and `make` targets below have **not been executed** by the maintainers of this branch (no Docker on the
+> development machine). Everything else in this repository was verified against a locally installed PostgreSQL 16 +
+> PostGIS + pgvector, Neo4j 5 and Node — see [docs/audit/final_build_validation.md](docs/audit/final_build_validation.md).
+> For a step-by-step local setup without Docker see [docs/development.md](docs/development.md).
+
 ### Prerequisites
-- Docker Desktop 24+
-- Node.js 20+
-- Python 3.12+
+- Docker Desktop 24+ (for the compose stack), Node.js 22, Python 3.12
 
 ### 1. Clone and configure
 
@@ -112,90 +115,102 @@ My-Govt/
 git clone https://github.com/santhoshraja-15/My-Govt.git
 cd My-Govt
 cp .env.example .env
-# Edit .env with your values
+# Set EVERY secret in .env — docker compose refuses to start with any secret unset (there are no defaults)
 ```
 
-### 2. Start all services
+### 2. Start the stack and initialise the database
 
 ```bash
-docker compose up -d
+docker compose up -d --build
+make db-init          # schema -> migrations 002..NNN -> verified seed (+ integrity checks). Clean database only.
+make db-verify        # optional: replays the whole sequence in a throw-away database
 ```
 
-### 3. Run database migrations and seed
-
-```bash
-# Once PostgreSQL is healthy:
-docker compose exec postgres psql -U mygovt -d mygovt -f /docker-entrypoint-initdb.d/schema.sql
-docker compose exec postgres psql -U mygovt -d mygovt -f /docker-entrypoint-initdb.d/seeds.sql
-```
-
-### 4. Access the platform
+### 3. Access the platform
 
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| Admin Console | http://localhost:3000/admin |
-| MinIO Console | http://localhost:9001 |
-| Neo4j Browser | http://localhost:7474 |
+| API docs (development only) | http://localhost:8000/api/docs |
+| Admin console | http://localhost:3000/admin (state/system administrators only) |
+
+Data stores (PostgreSQL, Neo4j, Redis, MinIO) are bound to `127.0.0.1` only.
 
 ---
 
 ## Key Design Decisions
 
-### Zero-Hallucination Commitment
-- AI answers are grounded **only** in database content from verified government sources
-- Trust score computed per response; below-threshold answers are abstained
-- Every citation links back to the official government source URL
+### Source-grounded answers, and what that does and does not mean
+- The assistant answers only from records it retrieved (schemes, services, ingested document passages) and cites them
+  with document, page and retrieval time. With no supporting source it **abstains**.
+- Retrieved text is treated as untrusted data; model output is validated (citations must exist, amounts must appear in a
+  source, it may never declare a person eligible) and replaced by a direct quotation of the sources if it fails.
+- This reduces, but cannot eliminate, error: if a source is wrong or out of date the answer will be too. Every record shows
+  its verification status so citizens can tell.
+
+### Verification status is explicit
+- `official_verified` requires a recorded document reference and is enforced by a database constraint; every change is
+  logged with old status, new status, reason and time (`system.verification_status_log`).
+- **At present no record is `official_verified`.** No official order text was located for any seeded record, so schemes,
+  services, departments and districts are `provisional` and the UI labels them so. Fees and processing times for services
+  are shown as *unconfirmed*.
 
 ### Eligibility Rule Engine
-- Rules stored in `schemes.eligibility_rule` with JSON-serializable operators
-- Deterministic, fully auditable — no ML involved in eligibility decisions
-- Groups support AND/OR logic; all group results combined
+- Rules live in `schemes.eligibility_rule`; evaluation is deterministic (no ML) and missing facts give `UNKNOWN`, never a guess.
+- **No scheme currently has eligibility rules recorded**, so the checker returns `INSUFFICIENT_DATA` until rules are added from official sources.
 
-### SLA Management
-- Complaint resolution deadlines auto-computed from `complaints.sla_rule`
-- Background scheduler runs every 5 minutes to escalate overdue complaints
-- Full timeline history preserved in `complaint_history`
+### Complaints and SLA
+- Complaints route by category → department → authority. Only department-level *routing placeholders* are seeded (no real
+  offices or officers); the API reports `assignment_state` honestly. Deadlines come from `complaints.sla_rule`
+  (platform targets, not statutory guarantees); a scheduler escalates overdue complaints along the legal state machine.
 
 ### Data Provenance
-- Every scheme, service, and document links to `system.source_registry`
-- `reliability_score` (0–1) on every source drives trust computation
-- Dataset registry tracks ingestion date, record count, and quality metrics
+- Seed records link to `system.source_registry`; datasets carry real SHA-256 checksums. A checksum proves file integrity,
+  not that the content is correct.
 
 ---
 
 ## API Overview
 
 ```
-POST /api/v1/auth/register          Register citizen
-POST /api/v1/auth/login             Login (JWT)
-GET  /api/v1/schemes                List/search schemes
-POST /api/v1/schemes/{id}/eligibility  Check eligibility
-POST /api/v1/complaints             File complaint
-GET  /api/v1/complaints/track/{ref} Track by reference
-POST /api/v1/chat/message           AI assistant query
-GET  /api/v1/gis/resolve-jurisdiction?lat=&lon= Spatial lookup
-GET  /api/v1/admin/overview         Dashboard metrics
-POST /api/v1/admin/query            Read-only SQL workspace
-GET  /health                        System health
+POST /api/v1/auth/register              Register citizen          (rate limited)
+POST /api/v1/auth/login                 Login (JWT)               (rate limited, 5-failure lockout)
+GET  /api/v1/schemes                    List/search (verification_status filter)
+POST /api/v1/schemes/{id}/eligibility   Deterministic eligibility from recorded rules
+POST /api/v1/complaints                 File complaint            (signed in)
+GET  /api/v1/complaints/track/{ref}     Track by reference        (public; anonymous complaints hidden)
+POST /api/v1/chat/message               Source-grounded assistant
+GET  /api/v1/gis/resolve-jurisdiction   Spatial lookup (needs boundary data + PostGIS)
+GET  /api/v1/admin/overview             Dashboard metrics         (admin)
+GET  /api/v1/admin/complaints           Backlog with legal next statuses (admin)
+POST /api/v1/admin/query                Read-only SQL workspace   (system_admin; audited)
+GET  /health                            State only, no internal detail
 ```
 
-Full interactive docs: **http://localhost:8000/docs**
+Complete, generated list with access rules and test coverage: [docs/audit/route_test_inventory.md](docs/audit/route_test_inventory.md).
 
 ---
 
 ## Data Sources
 
-All data is sourced from official Tamil Nadu government portals:
+Seeded catalogue data comes from a curated dataset assembled from Tamil Nadu government portals (tn.gov.in, esevai,
+socialwelfare, agri, tnhealth, tnschools). **It has not been verified record-by-record against official orders** — see
+[docs/audit/data_provenance_assessment.md](docs/audit/data_provenance_assessment.md) and the decision register
+[docs/audit/verification_decisions_2026-10-18.csv](docs/audit/verification_decisions_2026-10-18.csv). Official PDFs can be
+ingested from approved sources with `make ingest` (provenance, hash and retrieval time recorded; status `unverified`).
 
-- **tn.gov.in** — State government portal
-- **socialwelfare.tn.gov.in** — Social welfare schemes
-- **agri.tn.gov.in** — Agricultural schemes
-- **esevai.gov.in** — e-Sevai services catalogue
-- **tnhealth.tn.gov.in** — Health schemes
-- **tnschools.gov.in** — Education schemes
+---
+
+## Testing
+
+```bash
+cd backend && TEST_ADMIN_DSN=postgresql://postgres@localhost:5432/postgres TEST_POSTGIS=1 \
+  TEST_NEO4J_URI=bolt://localhost:7687 TEST_NEO4J_PASSWORD=... pytest tests -q -rs     # 428 tests
+cd frontend && npx playwright test                                                      # 53 browser tests
+```
+`TEST_ADMIN_DSN` must point at a **disposable** server (tests create/drop `mygovt_test_*` databases). Without PostGIS /
+Neo4j configured the dependent tests are skipped and reported as such. Current results: [docs/audit/test_inventory.md](docs/audit/test_inventory.md).
 
 ---
 

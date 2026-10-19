@@ -58,7 +58,12 @@ async def check_minio() -> dict:
         return {"status": "unhealthy", "error": str(e)}
 
 
-async def get_health_status() -> dict:
+def _redact(result: dict) -> dict:
+    """Public health shows state only: exception text can reveal internal hostnames and driver details."""
+    return {k: v for k, v in result.items() if k != "error"}
+
+
+async def get_health_status(detailed: bool = False) -> dict:
     """Aggregate health check for all services."""
     checks = await asyncio.gather(
         check_postgres(),
@@ -68,17 +73,16 @@ async def get_health_status() -> dict:
         return_exceptions=True,
     )
 
-    results = {
-        "postgresql": checks[0] if not isinstance(checks[0], Exception) else {"status": "unhealthy", "error": str(checks[0])},
-        "neo4j": checks[1] if not isinstance(checks[1], Exception) else {"status": "unhealthy", "error": str(checks[1])},
-        "redis": checks[2] if not isinstance(checks[2], Exception) else {"status": "unhealthy", "error": str(checks[2])},
-        "minio": checks[3] if not isinstance(checks[3], Exception) else {"status": "unhealthy", "error": str(checks[3])},
-    }
+    def _norm(r: object) -> dict:
+        if isinstance(r, BaseException):
+            return {"status": "unhealthy", "error": str(r)}
+        return r if isinstance(r, dict) else {"status": "unhealthy", "error": "unexpected result"}
 
-    all_healthy = all(
-        v.get("status") in ("healthy", "disabled")
-        for v in results.values()
-    )
+    results = {name: _norm(r) for name, r in zip(("postgresql", "neo4j", "redis", "minio"), checks, strict=True)}
+    if not detailed:
+        results = {name: _redact(r) for name, r in results.items()}
+
+    all_healthy = all(v.get("status") in ("healthy", "disabled") for v in results.values())
 
     return {
         "status": "healthy" if all_healthy else "degraded",

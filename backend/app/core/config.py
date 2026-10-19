@@ -2,7 +2,7 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import field_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,7 +59,10 @@ class Settings(BaseSettings):
 
     # Embedding
     EMBEDDING_PROVIDER: str = "local"
-    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    # English 1024-d model; multilingual retrieval is not required. Changing model or dimension means
+    # changing the vector(1024) columns deliberately (see docs); vectors are never truncated or padded.
+    EMBEDDING_MODEL: str = "BAAI/bge-large-en-v1.5"
+    EMBEDDING_API_KEY: str = ""        # only for EMBEDDING_PROVIDER=openai; set via environment
     EMBEDDING_DIMENSION: int = 1024
     EMBEDDING_BATCH_SIZE: int = 32
 
@@ -72,12 +75,40 @@ class Settings(BaseSettings):
     HYBRID_WEIGHT_RELIABILITY: float = 0.15
     HYBRID_WEIGHT_FRESHNESS: float = 0.10
     MAX_RETRIEVAL_CHUNKS: int = 50
+    # A vector hit with no keyword match must reach this cosine similarity to count as evidence; otherwise
+    # nearest-neighbour search would return something for ANY question and the assistant could never abstain.
+    # Provisional calibration with BAAI/bge-large-en-v1.5 on 5 sample queries: relevant 0.59-0.78, irrelevant 0.31-0.39.
+    # Re-measure with a proper evaluation set (and again whenever the model changes) before relying on it.
+    RETRIEVAL_MIN_SIMILARITY: float = 0.5
     MAX_CONTEXT_TOKENS: int = 6000
+
+    # Abuse protection (per client IP, per process)
+    RATE_LIMIT_LOGIN_PER_MIN: int = 10
+    RATE_LIMIT_REGISTER_PER_HOUR: int = 5
+    RATE_LIMIT_CHAT_PER_MIN: int = 30
 
     # Features
     FEATURE_VOICE: bool = False
     FEATURE_GRAPH: bool = True
     FEATURE_VECTOR_SEARCH: bool = True
+
+    @model_validator(mode="after")
+    def _reject_insecure_production_defaults(self):
+        """Refuse to start in production with placeholder secrets."""
+        if self.APP_ENV.lower() == "production":
+            bad = [
+                name for name, val in (
+                    ("JWT_SECRET_KEY", self.JWT_SECRET_KEY),
+                    ("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD),
+                    ("NEO4J_PASSWORD", self.NEO4J_PASSWORD),
+                    ("MINIO_SECRET_KEY", self.MINIO_SECRET_KEY),
+                ) if val.lower().startswith(("change", "minioadmin")) or len(val) < 8
+            ]
+            if len(self.JWT_SECRET_KEY) < 32 and "JWT_SECRET_KEY" not in bad:
+                bad.append("JWT_SECRET_KEY")
+            if bad:
+                raise ValueError("Insecure placeholder secrets in production: " + ", ".join(bad))
+        return self
 
     @property
     def DATABASE_URL(self) -> str:

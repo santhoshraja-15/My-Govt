@@ -17,13 +17,15 @@ async def list_services(
     q: Optional[str] = Query(None),
     department_id: Optional[int] = Query(None),
     category: Optional[str] = Query(None),
+    verification_status: Optional[str] = Query(None, description="e.g. official_verified|provisional"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     svc = ServiceService(db)
     return await svc.list_services(q=q, department_id=department_id,
-                                    category=category, page=page, page_size=page_size)
+                                    category=category, page=page, page_size=page_size,
+                                    verification_status=verification_status)
 
 
 @router.get("/{service_id}", response_model=ServiceDetail)

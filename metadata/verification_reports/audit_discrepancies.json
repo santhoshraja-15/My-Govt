@@ -1,0 +1,96 @@
+{
+  "audit_timestamp": "2026-10-18T05:19:16.705364+00:00",
+  "total_discrepancies": 10,
+  "by_severity": {
+    "CRITICAL": 1,
+    "HIGH": 5,
+    "MEDIUM": 3,
+    "LOW": 1
+  },
+  "discrepancies": [
+    {
+      "severity": "HIGH",
+      "category": "SCHEMA_COLUMN_MISMATCH",
+      "table": "administration.state",
+      "field": "state_name_ta",
+      "description": "Seed inserts into column 'state_name_ta', but schema defines only (state_id, state_code, state_name). Column does not exist in 001_schema.sql.",
+      "remediation": "Add 'state_name_ta text' to administration.state in schema migration, or omit from insert."
+    },
+    {
+      "severity": "HIGH",
+      "category": "SCHEMA_COLUMN_MISMATCH",
+      "table": "administration.district",
+      "field": "district_name_ta, headquarters",
+      "description": "Seed inserts 'district_name_ta' and 'headquarters', but schema defines columns as 'name_ta' and lacks 'headquarters'.",
+      "remediation": "Align column names to 'name_ta' and add 'headquarters text' to schema migration."
+    },
+    {
+      "severity": "HIGH",
+      "category": "SCHEMA_COLUMN_MISMATCH",
+      "table": "administration.department",
+      "field": "department_name_ta, short_name, portal_url",
+      "description": "Seed inserts 'department_name_ta', 'short_name', and 'portal_url', whereas schema defines 'name_ta', 'website_url', and lacks 'short_name'.",
+      "remediation": "Align columns to schema or add missing columns in schema migration."
+    },
+    {
+      "severity": "HIGH",
+      "category": "SCHEMA_COLUMN_MISMATCH",
+      "table": "schemes.scheme",
+      "field": "name, description, official_source_url",
+      "description": "Seed inserts columns (name, description, official_source_url), but schema expects (scheme_name, short_description/full_description, official_url).",
+      "remediation": "Update seed statement column mapping to match schema."
+    },
+    {
+      "severity": "HIGH",
+      "category": "SCHEMA_COLUMN_MISMATCH",
+      "table": "services.service",
+      "field": "name, processing_days, official_source_url",
+      "description": "Seed inserts columns (name, processing_days, official_source_url), but schema expects (service_name, processing_time, official_url).",
+      "remediation": "Update seed statement column mapping to match schema."
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "SCHEMA_TYPE_MISMATCH",
+      "table": "complaints.complaint_category",
+      "field": "category_id, category_code",
+      "description": "Seed inserts UUIDs into category_id (which is serial INT in schema) and omits category_code (which is UNIQUE NOT NULL in schema).",
+      "remediation": "Use integer category_id or omit to let serial sequence generate, provide category_code, and align column names."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "SCHEME_JURISDICTION_MISCLASSIFICATION",
+      "table": "schemes.scheme",
+      "record_id": "TN-PM-KISAN",
+      "field": "scheme_level",
+      "value": "state",
+      "description": "PM-Kisan (Pradhan Mantri Kisan Samman Nidhi) is a 100% centrally-sponsored Central Sector Scheme, but is seeded as scheme_level='state'.",
+      "remediation": "Update scheme_level='central' and add notes explaining Tamil Nadu state administration via Commissionerate of Agriculture."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "SCHEME_JURISDICTION_MISCLASSIFICATION",
+      "table": "schemes.scheme",
+      "record_id": "TN-NIRP-PENSION",
+      "field": "scheme_name / category",
+      "description": "IGNOAPS is a National Social Assistance Programme (NSAP) component co-funded by Central & State governments.",
+      "remediation": "Add co-funding provenance (Central NSAP + State Social Welfare top-up)."
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "SYNTHETIC_DATASET_METRICS",
+      "table": "system.dataset_registry",
+      "field": "quality_completeness, validation_status",
+      "value": "1.0, validated",
+      "description": "Dataset registry contains claims of 1.0/0.95 quality scores with 'loaded' status for GeoJSON boundaries, but no raw GeoJSON files were ever downloaded or stored in data/raw/.",
+      "remediation": "Set quality scores to actual validated metrics, set processing_status to 'raw' or 'pending' until actual boundary GeoJSON is ingested."
+    },
+    {
+      "severity": "LOW",
+      "category": "APPLICATION_DEFINED_TARGETS",
+      "table": "complaints.sla_rule",
+      "field": "resolution_hours, escalation_hours",
+      "description": "SLA rules (24h/12h for high, 72h/48h for medium) are prototype application targets and not statutory citizen charter SLA mandates.",
+      "remediation": "Document clearly in audit and catalog that these are platform operational defaults, pending integration with CM Helpline 1100 departmental SLAs."
+    }
+  ]
+}

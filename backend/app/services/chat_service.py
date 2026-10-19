@@ -1,15 +1,19 @@
 """AI Chat service — hybrid retrieval, trust engine, LLM orchestration."""
+import json
+import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 from uuid import UUID
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.schemas.chat import ChatRequest, ChatResponse, Citation, ConversationOut
+from app.ai.orchestration import answering
+from app.ai.orchestration.llm import LLMClient, get_llm
+from app.ai.retrieval.hybrid import search
+from app.core.config import settings  # noqa: F401
+from app.schemas.chat import ChatRequest, ChatResponse, Citation
 
 logger = structlog.get_logger(__name__)
 
@@ -24,12 +28,23 @@ _INTENT_PATTERNS = {
 }
 
 
+_ALL_KINDS = ("document_chunk", "scheme", "service")
+_KINDS_BY_INTENT: dict[str, tuple[str, ...]] = {
+    "complaint_status": (),
+    "service_lookup": ("service", "document_chunk"),
+    "policy_query": ("document_chunk", "scheme"),
+}
+
+
 def _classify_intent(message: str) -> str:
     msg_lower = message.lower()
+    # "am I eligible ..." is more specific than the generic scheme words that also match it, so it wins ties
+    if any(kw.lower() in msg_lower for kw in _INTENT_PATTERNS["eligibility_check"]):
+        return "eligibility_check"
     scores: dict[str, int] = {}
     for intent, keywords in _INTENT_PATTERNS.items():
         scores[intent] = sum(1 for kw in keywords if kw.lower() in msg_lower)
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda k: scores[k])
     return best if scores[best] > 0 else "general_query"
 
 
@@ -39,56 +54,90 @@ def _detect_language(message: str) -> str:
     return "ta" if tamil_chars > 2 else "en"
 
 
+
+_STOPWORDS = frozenset(
+    ["a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does", "for", "from", "get", "give", "has", "have", "how", "i", "in", "is", "it", "me", "my", "of", "on", "or", "please", "tell", "the", "to", "what", "when", "where", "which", "who", "why", "will", "with", "you", "your", "about", "any", "there", "their", "this", "that", "these", "those", "should", "would", "could", "tamil", "nadu", "government", "govt", "state"]
+)
+
+# Weight applied to a source's reliability when computing answer trust.
+VERIFICATION_WEIGHT = {
+    "official_verified": 1.0,
+    "externally_referenced": 0.6,
+    "provisional": 0.5,
+    "unverified": 0.3,
+}
+
+
+def build_tsquery(message: str, max_terms: int = 8) -> Optional[str]:
+    """OR-query of the meaningful words in a question ('a | b | c'), or None.
+
+    Only letters/digits (incl. Tamil) survive, so the result is safe for to_tsquery().
+    """
+    seen: list[str] = []
+    for tok in re.findall(r"[\w\u0B80-\u0BFF]+", message.lower()):
+        if len(tok) >= 3 and tok not in _STOPWORDS and tok not in seen:
+            seen.append(tok)
+    return " | ".join(seen[:max_terms]) or None
+
+
+def compute_trust(retrieved: list[dict]) -> float:
+    """Mean of reliability x verification weight; 0.0 when nothing was retrieved."""
+    if not retrieved:
+        return 0.0
+    scores = [
+        float(r.get("reliability_score") or 0.5)
+        * VERIFICATION_WEIGHT.get(r.get("verification_status") or "provisional", 0.3)
+        for r in retrieved
+    ]
+    return round(sum(scores) / len(scores), 3)
+
+
 class ChatService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, llm: Optional[LLMClient] = None, embedder=None):
         self.db = db
+        self.llm = llm if llm is not None else get_llm()
+        self.embedder = embedder
+        self.last_retrieval_notes: list[str] = []
 
     async def process_message(self, request: ChatRequest, current_user) -> ChatResponse:
         message_id = uuid.uuid4()
         conversation_id = request.conversation_id or uuid.uuid4()
+        citizen_id = getattr(current_user, "citizen_id", None) if current_user else None
 
-        # Persist conversation if authenticated
-        if current_user:
-            await self._ensure_conversation(conversation_id, current_user.user_id)
+        if citizen_id:
+            await self._ensure_conversation(conversation_id, citizen_id)
 
-        # Classify intent & detect language
         intent = _classify_intent(request.message)
-        language = request.language or _detect_language(request.message)
+        language = request.language if request.language in ("en", "ta") else _detect_language(request.message)
 
-        # Hybrid retrieval
         retrieved = await self._hybrid_retrieve(request.message, intent, limit=8)
-
-        # Build context
-        context_text, citations = self._build_context(retrieved)
-
-        # Trust score
+        context_text, citations, sources = self._build_context(retrieved)
         trust_score = self._compute_trust(retrieved)
+        contains_unverified = any(c.verification_status != "official_verified" for c in citations)
+        notes = list(self.last_retrieval_notes)
+        if sources and len(sources) < 2:
+            notes.append("Only one supporting source was found; the answer may be incomplete.")
+        if any(s.outdated for s in sources):
+            notes.append("At least one source is marked outdated (past its expiry date); check for a newer order.")
+        if intent == "eligibility_check":
+            notes.append("This assistant does not decide eligibility. Use the eligibility checker on the scheme page.")
 
-        # Try LLM, fall back to deterministic template
-        answer, abstained, abstain_reason, degraded = await self._generate_answer(
-            request.message, intent, context_text, language, trust_score
+        answer, abstained, abstain_reason, degraded, answer_notes = await self._generate_answer(
+            request.message, intent, sources, language, contains_unverified
         )
-
-        # Suggested actions
+        notes += answer_notes
         actions = self._suggest_actions(intent)
 
-        # Persist messages
         decision_id = uuid.uuid4()
-        if current_user:
-            await self._save_messages(
-                conversation_id, message_id, request.message, answer,
-                citations, trust_score, intent, decision_id
-            )
-
-        # Persist decision lineage
-        await self._save_decision(decision_id, {
-            "query": request.message,
-            "intent": intent,
-            "language": language,
-            "retrieved_count": len(retrieved),
-            "trust_score": trust_score,
-            "degraded": degraded,
-        })
+        await self._save_decision(
+            decision_id, citizen_id, conversation_id if citizen_id else None,
+            {"query": request.message, "intent": intent, "language": language,
+             "retrieved_count": len(retrieved), "degraded": degraded,
+             "contains_unverified": contains_unverified, "evidence_notes": notes},
+            trust_score, abstained, retrieved,
+        )
+        if citizen_id:
+            await self._save_messages(conversation_id, message_id, request.message, answer, language)
 
         return ChatResponse(
             message_id=message_id,
@@ -104,157 +153,107 @@ class ChatService:
             action_type="inform",
             suggested_actions=actions,
             degraded=degraded,
+            contains_unverified=contains_unverified,
+            evidence_notes=notes,
         )
 
     async def _hybrid_retrieve(self, query: str, intent: str, limit: int = 8) -> list[dict]:
-        """Hybrid: full-text + keyword search (vector search when embeddings ready)."""
+        """Ranked evidence from schemes, services and ingested document passages on one score scale.
+
+        Deprecated records are never retrieved. Provisional / externally-referenced / unverified items are
+        returned WITH their verification_status so they can be labelled. A scheme's recorded eligibility
+        rules (or the explicit absence of any) are attached so the model never has to guess them.
+        """
+        self.last_retrieval_notes = []
+        tsq = build_tsquery(query)
+        kinds = _KINDS_BY_INTENT.get(intent, _ALL_KINDS)
+        if not kinds:
+            return []
+        ranked, info = await search(self.db, tsq, query, kinds=kinds, limit=limit, embedder=self.embedder)
+        self.last_retrieval_notes.extend(info["notes"])
         results: list[dict] = []
+        for v in ranked:
+            if v["kind"] == "document_chunk":
+                results.append({
+                    "entity_id": v["chunk_id"], "entity_type": "document_chunk", "document_id": v["document_id"],
+                    "title": v["title"], "description": v["content"], "department_name": v["department_name"],
+                    "verified_at": None, "source_url": v["source_url"], "page": v["page_number"],
+                    "retrieved_at": v["retrieved_at"].isoformat() if v["retrieved_at"] else None,
+                    "reliability_score": v["reliability"], "verification_status": v["verification_status"],
+                    "source_document_ref": f"{v['source_url']}#page={v['page_number']}" if v["source_url"] else None,
+                    "outdated": v["outdated"], "score": v["score"],
+                })
+                continue
+            rec = {k: v[k] for k in ("entity_id", "title", "description", "department_name", "entity_type", "verified_at",
+                                     "source_url", "verification_status", "source_document_ref", "score")}
+            rec["reliability_score"] = v["reliability"]
+            if v["kind"] == "scheme":
+                rules = v.get("rules_text")
+                rec["description"] = (rec["description"] or "") + (
+                    f" Recorded eligibility criteria: {rules}." if rules else " No eligibility criteria are recorded for this scheme.")
+            results.append(rec)
+        return results
 
-        # Scheme search
-        if intent in ("scheme_search", "eligibility_check", "general_query"):
-            r = await self.db.execute(
-                text("""
-                    SELECT s.scheme_id::text, s.name AS title, s.description,
-                           d.department_name, 'scheme' AS entity_type,
-                           s.verified_at, sr.url AS source_url, sr.reliability_score
-                    FROM schemes.scheme s
-                    LEFT JOIN administration.department d ON d.department_id = s.department_id
-                    LEFT JOIN system.source_registry sr ON sr.source_id = s.source_id
-                    WHERE s.status = 'active'
-                      AND (s.name ILIKE :q OR s.description ILIKE :q)
-                    ORDER BY length(s.name) ASC
-                    LIMIT :lim
-                """),
-                {"q": f"%{query}%", "lim": limit},
-            )
-            cols = list(r.keys())
-            results.extend([dict(zip(cols, row)) for row in r.fetchall()])
-
-        # Document / policy search
-        if intent in ("policy_query", "general_query"):
-            r = await self.db.execute(
-                text("""
-                    SELECT d.document_id::text, d.title,
-                           substring(d.extracted_text, 1, 500) AS description,
-                           dep.department_name, 'document' AS entity_type,
-                           d.verified_at::text AS verified_at, d.source_url,
-                           1.0 AS reliability_score
-                    FROM documents.document d
-                    LEFT JOIN administration.department dep ON dep.department_id = d.department_id
-                    WHERE d.status = 'active'
-                      AND (d.title ILIKE :q OR d.extracted_text ILIKE :q)
-                    LIMIT :lim
-                """),
-                {"q": f"%{query}%", "lim": limit // 2},
-            )
-            cols = list(r.keys())
-            results.extend([dict(zip(cols, row)) for row in r.fetchall()])
-
-        return results[:limit]
-
-    def _build_context(self, retrieved: list[dict]) -> tuple[str, list[Citation]]:
+    def _build_context(self, retrieved: list[dict]) -> tuple[str, list[Citation], list[answering.Source]]:
         citations: list[Citation] = []
-        context_parts: list[str] = []
-
+        sources: list[answering.Source] = []
         for i, item in enumerate(retrieved, 1):
+            status = item.get("verification_status") or "unverified"
             title = item.get("title", "")
             description = item.get("description") or ""
-            dept = item.get("department_name", "")
-            source_url = item.get("source_url")
-            verified_at = item.get("verified_at")
-
-            context_parts.append(
-                f"[{i}] **{title}** ({dept})\n{description[:400]}"
-            )
+            dept = item.get("department_name") or ""
+            sources.append(answering.Source(i, item.get("entity_type", "unknown"), title, description, status,
+                                            bool(item.get("outdated"))))
             citations.append(Citation(
                 index=i,
                 title=title,
-                department=dept,
-                source_url=source_url,
-                verified_at=str(verified_at) if verified_at else None,
+                department=dept or None,
+                source_url=item.get("source_url"),
+                verified_at=str(item["verified_at"]) if item.get("verified_at") else None,
+                verification_status=status,
+                source_document_ref=item.get("source_document_ref"),
+                document_id=item.get("document_id"),
+                chunk_id=item["entity_id"] if item.get("entity_type") == "document_chunk" else None,
+                page=item.get("page"),
+                excerpt=answering.sanitize_passage(description, 300) if item.get("entity_type") == "document_chunk" else None,
+                retrieved_at=item.get("retrieved_at"),
+                outdated=bool(item.get("outdated")),
             ))
-
-        return "\n\n".join(context_parts), citations
+        return answering.build_context(sources), citations, sources
 
     def _compute_trust(self, retrieved: list[dict]) -> float:
-        if not retrieved:
-            return 0.0
-        scores = [float(r.get("reliability_score") or 0.5) for r in retrieved]
-        return round(sum(scores) / len(scores), 3)
+        return compute_trust(retrieved)
 
     async def _generate_answer(
-        self, query: str, intent: str, context: str,
-        language: str, trust_score: float
-    ) -> tuple[str, bool, Optional[str], bool]:
-        """Generate answer — LLM or deterministic fallback."""
+        self, query: str, intent: str, sources: list[answering.Source],
+        language: str, contains_unverified: bool = True,
+    ) -> tuple[str, bool, Optional[str], bool, list[str]]:
+        """Grounded answer: the LLM's text if (and only if) it passes validation, else an extractive answer.
 
-        # Abstain if trust too low and no context
-        if trust_score < settings.TRUST_THRESHOLD and not context:
+        Returns (answer, abstained, abstain_reason, degraded, notes). Abstains when nothing was retrieved.
+        """
+        if not sources:
             msg = (
                 "I couldn't find verified information to answer your question reliably. "
                 "Please visit the official Tamil Nadu government portal at https://www.tn.gov.in "
                 "or contact your nearest e-Sevai centre."
             )
-            return msg, True, "trust_threshold_not_met", False
+            return msg, True, "no_supporting_sources", False, []
 
-        # Try configured LLM provider
-        if settings.LLM_PROVIDER != "none" and settings.LLM_API_KEY:
+        notes: list[str] = []
+        if self.llm is not None:
+            system = answering.SYSTEM_PROMPT.format(language="Tamil" if language == "ta" else "English")
             try:
-                answer = await self._call_llm(query, context, language)
-                return answer, False, None, False
-            except Exception as e:
-                logger.warning("LLM call failed, using template", error=str(e))
-
-        # Deterministic template fallback
-        answer = self._template_answer(query, intent, context, language)
-        return answer, False, None, True
-
-    async def _call_llm(self, query: str, context: str, language: str) -> str:
-        system_prompt = (
-            "You are MyGovt Assistant, a trusted AI for Tamil Nadu government services. "
-            "Answer ONLY from the provided context. If the answer is not in the context, say you don't know. "
-            "Never invent government facts, scheme names, amounts, or eligibility criteria. "
-            f"Respond in {'Tamil' if language == 'ta' else 'English'}."
-        )
-        prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-
-        if settings.LLM_PROVIDER == "openai":
-            import openai
-            client = openai.AsyncOpenAI(api_key=settings.LLM_API_KEY)
-            resp = await client.chat.completions.create(
-                model=settings.LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=settings.LLM_MAX_TOKENS,
-                temperature=settings.LLM_TEMPERATURE,
-            )
-            return resp.choices[0].message.content or ""
-
-        elif settings.LLM_PROVIDER == "google":
-            import google.generativeai as genai
-            genai.configure(api_key=settings.LLM_API_KEY)
-            model = genai.GenerativeModel(settings.LLM_MODEL)
-            resp = await model.generate_content_async(f"{system_prompt}\n\n{prompt}")
-            return resp.text or ""
-
-        raise ValueError(f"Unsupported LLM provider: {settings.LLM_PROVIDER}")
-
-    def _template_answer(self, query: str, intent: str, context: str, language: str) -> str:
-        if not context:
-            if language == "ta":
-                return "மன்னிக்கவும், இந்தக் கேள்விக்கான சரிபார்க்கப்பட்ட தகவல் கிடைக்கவில்லை."
-            return ("I found limited verified information for your query. "
-                    "Please check https://www.tn.gov.in or your nearest e-Sevai centre.")
-
-        lines = [
-            "Based on verified government information, here is what I found:\n",
-            context[:1500],
-            "\n\n*This information is sourced from official government records. "
-            "For official confirmation, please visit the respective department portal.*",
-        ]
-        return "\n".join(lines)
+                raw = await self.llm.generate(system, answering.build_prompt(query, answering.build_context(sources)))
+                answer, problems = answering.validate_answer(raw, sources)
+                if not problems:
+                    return answer, False, None, False, notes
+                logger.warning("llm_answer_rejected", problems=problems)
+                notes.append("The model's draft answer failed grounding checks and was replaced by a direct quotation of the sources.")
+            except Exception as e:  # noqa: BLE001
+                logger.warning("llm_call_failed", error=str(e))
+                notes.append("The language model was unavailable; showing the sources directly.")
+        return answering.extractive_answer(sources, contains_unverified, language), False, None, True, notes
 
     def _suggest_actions(self, intent: str) -> list[str]:
         mapping = {
@@ -266,116 +265,141 @@ class ChatService:
         }
         return mapping.get(intent, ["Browse services", "Contact us"])
 
-    async def _ensure_conversation(self, conversation_id: UUID, user_id) -> None:
+    # -- persistence: each write runs in a savepoint so one failure cannot poison the request --
+    async def _ensure_conversation(self, conversation_id: UUID, citizen_id) -> None:
         try:
-            r = await self.db.execute(
-                text("SELECT conversation_id FROM ai.conversation WHERE conversation_id = :cid"),
-                {"cid": str(conversation_id)},
-            )
-            if not r.fetchone():
+            async with self.db.begin_nested():
                 await self.db.execute(
                     text("""
-                        INSERT INTO ai.conversation (conversation_id, user_id, created_at, updated_at)
-                        VALUES (:cid, :uid, now(), now())
-                        ON CONFLICT DO NOTHING
+                        INSERT INTO ai.conversation (conversation_id, citizen_id)
+                        VALUES (:cid, :uid) ON CONFLICT (conversation_id) DO NOTHING
                     """),
-                    {"cid": str(conversation_id), "uid": str(user_id)},
+                    {"cid": conversation_id, "uid": citizen_id},
                 )
-                await self.db.commit()
-        except Exception as e:
-            logger.warning("Could not persist conversation", error=str(e))
-
-    async def _save_messages(self, conv_id, msg_id, user_msg, answer,
-                              citations, trust_score, intent, decision_id) -> None:
-        try:
-            import json
-            # User message
-            await self.db.execute(
-                text("""
-                    INSERT INTO ai.message (message_id, conversation_id, role, content, created_at)
-                    VALUES (:mid, :cid, 'user', :content, now())
-                """),
-                {"mid": str(uuid.uuid4()), "cid": str(conv_id), "content": user_msg},
-            )
-            # Assistant message
-            await self.db.execute(
-                text("""
-                    INSERT INTO ai.message (message_id, conversation_id, role, content,
-                                           trust_score, intent, decision_id, created_at)
-                    VALUES (:mid, :cid, 'assistant', :content, :ts, :intent, :did, now())
-                """),
-                {
-                    "mid": str(msg_id), "cid": str(conv_id),
-                    "content": answer, "ts": trust_score,
-                    "intent": intent, "did": str(decision_id),
-                },
-            )
             await self.db.commit()
-        except Exception as e:
-            logger.warning("Could not persist messages", error=str(e))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("conversation_persist_failed", error=str(e))
 
-    async def _save_decision(self, decision_id: UUID, lineage: dict) -> None:
+    async def _save_messages(self, conv_id, msg_id, user_msg, answer, language) -> None:
         try:
-            import json
-            await self.db.execute(
-                text("""
-                    INSERT INTO ai.decision_lineage (decision_id, lineage_json, created_at)
-                    VALUES (:did, :lineage, now())
-                """),
-                {"did": str(decision_id), "lineage": json.dumps(lineage)},
-            )
+            async with self.db.begin_nested():
+                await self.db.execute(
+                    text("""
+                        INSERT INTO ai.message (message_id, conversation_id, role, content, language)
+                        SELECT CAST(:u AS uuid), CAST(:cid AS uuid), 'user', CAST(:content AS text), CAST(:lang AS text)
+                        WHERE EXISTS (SELECT 1 FROM ai.conversation WHERE conversation_id = :cid)
+                        UNION ALL
+                        SELECT CAST(:a AS uuid), CAST(:cid AS uuid), 'assistant', CAST(:answer AS text), CAST(:lang AS text)
+                        WHERE EXISTS (SELECT 1 FROM ai.conversation WHERE conversation_id = :cid)
+                    """),
+                    {"u": uuid.uuid4(), "a": msg_id, "cid": conv_id, "content": user_msg,
+                     "answer": answer, "lang": language},
+                )
             await self.db.commit()
-        except Exception as e:
-            logger.warning("Could not persist decision lineage", error=str(e))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("messages_persist_failed", error=str(e))
 
-    async def get_conversations(self, user_id) -> list:
+    async def _save_decision(self, decision_id: UUID, citizen_id, conversation_id, result: dict,
+                             trust_score: float, abstained: bool, retrieved: list[dict]) -> None:
+        """ai.decision + one ai.decision_lineage row per source actually used."""
         try:
-            r = await self.db.execute(
-                text("""
-                    SELECT c.conversation_id, c.created_at, c.updated_at AS last_message_at,
-                           count(m.message_id) AS message_count,
-                           (SELECT content FROM ai.message WHERE conversation_id = c.conversation_id
-                            AND role = 'user' ORDER BY created_at DESC LIMIT 1) AS preview
-                    FROM ai.conversation c
-                    LEFT JOIN ai.message m ON m.conversation_id = c.conversation_id
-                    WHERE c.user_id = :uid
-                    GROUP BY c.conversation_id, c.created_at, c.updated_at
-                    ORDER BY c.updated_at DESC
-                    LIMIT 50
-                """),
-                {"uid": str(user_id)},
-            )
-            cols = list(r.keys())
-            return [dict(zip(cols, row)) for row in r.fetchall()]
-        except Exception:
+            async with self.db.begin_nested():
+                await self.db.execute(
+                    text("""
+                        INSERT INTO ai.decision (decision_id, citizen_id, conversation_id, decision_type,
+                                                 result, confidence_score, abstained, prompt_version)
+                        VALUES (:did, :cit, :conv, 'information_answer',
+                                CAST(:result AS jsonb), :conf, :abst, 'chat-v1')
+                    """),
+                    {"did": decision_id, "cit": citizen_id, "conv": conversation_id,
+                     "result": json.dumps(result), "conf": min(trust_score, 1.0), "abst": abstained},
+                )
+                for item in retrieved:
+                    await self.db.execute(
+                        text("""
+                            INSERT INTO ai.decision_lineage
+                                (decision_id, source_type, source_id, source_reference, reason, contribution)
+                            VALUES (:did, :stype, :sid, :sref, :reason, 'supports')
+                        """),
+                        {"did": decision_id, "stype": item.get("entity_type", "unknown"),
+                         "sid": str(item.get("entity_id")), "sref": item.get("source_document_ref"),
+                         "reason": f"retrieved; verification_status={item.get('verification_status')}"},
+                    )
+            await self.db.commit()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("decision_persist_failed", error=str(e))
+
+    async def get_conversations(self, citizen_id) -> list:
+        if citizen_id is None:
             return []
+        r = await self.db.execute(
+            text("""
+                SELECT c.conversation_id, c.started_at AS created_at,
+                       max(m.created_at) AS last_message_at,
+                       count(m.message_id)::int AS message_count,
+                       (SELECT content FROM ai.message WHERE conversation_id = c.conversation_id
+                        AND role = 'user' ORDER BY created_at DESC LIMIT 1) AS preview
+                FROM ai.conversation c
+                LEFT JOIN ai.message m ON m.conversation_id = c.conversation_id
+                WHERE c.citizen_id = :cid
+                GROUP BY c.conversation_id, c.started_at
+                ORDER BY coalesce(max(m.created_at), c.started_at) DESC
+                LIMIT 50
+            """),
+            {"cid": citizen_id},
+        )
+        return [dict(row._mapping) for row in r.fetchall()]
 
     async def get_messages(self, conversation_id: UUID, current_user) -> Optional[list]:
-        try:
-            r = await self.db.execute(
-                text("""
-                    SELECT message_id, role, content, created_at
-                    FROM ai.message
-                    WHERE conversation_id = :cid
-                    ORDER BY created_at ASC
-                """),
-                {"cid": str(conversation_id)},
-            )
-            cols = list(r.keys())
-            return [dict(zip(cols, row)) for row in r.fetchall()]
-        except Exception:
-            return []
-
-    async def get_decision_lineage(self, decision_id: UUID) -> Optional[dict]:
-        try:
-            import json
-            r = await self.db.execute(
-                text("SELECT lineage_json FROM ai.decision_lineage WHERE decision_id = :did"),
-                {"did": str(decision_id)},
-            )
-            row = r.fetchone()
-            if not row:
-                return None
-            return json.loads(row[0]) if isinstance(row[0], str) else row[0]
-        except Exception:
+        """Messages of a conversation the caller owns; None if absent or not theirs."""
+        citizen_id = getattr(current_user, "citizen_id", None) if current_user else None
+        if citizen_id is None:
             return None
+        own = await self.db.execute(
+            text("SELECT 1 FROM ai.conversation WHERE conversation_id = :cid AND citizen_id = :uid"),
+            {"cid": conversation_id, "uid": citizen_id},
+        )
+        if not own.fetchone():
+            return None
+        r = await self.db.execute(
+            text("""
+                SELECT message_id, role, content, created_at
+                FROM ai.message WHERE conversation_id = :cid
+                ORDER BY created_at ASC
+            """),
+            {"cid": conversation_id},
+        )
+        return [dict(row._mapping) for row in r.fetchall()]
+
+    async def get_decision_lineage(self, decision_id: UUID, current_user=None) -> Optional[dict]:
+        """Sources behind an answer. Anonymous decisions are readable by id; owned ones owner/admin only."""
+        r = await self.db.execute(
+            text("""
+                SELECT decision_id, citizen_id, decision_type, result,
+                       confidence_score::float AS confidence_score, abstained, created_at
+                FROM ai.decision WHERE decision_id = :did
+            """),
+            {"did": decision_id},
+        )
+        d = r.fetchone()
+        if not d:
+            return None
+        if d.citizen_id is not None:
+            caller = getattr(current_user, "citizen_id", None) if current_user else None
+            role = getattr(current_user, "role", "") if current_user else ""
+            if str(caller) != str(d.citizen_id) and role not in ("state_admin", "system_admin"):
+                return None
+        src = await self.db.execute(
+            text("""
+                SELECT source_type, source_id, source_reference, reason, contribution
+                FROM ai.decision_lineage WHERE decision_id = :did ORDER BY created_at, lineage_id
+            """),
+            {"did": decision_id},
+        )
+        result = d.result if not isinstance(d.result, str) else json.loads(d.result)
+        return {
+            "decision_id": str(d.decision_id), "decision_type": d.decision_type,
+            "result": result, "confidence_score": d.confidence_score, "abstained": d.abstained,
+            "created_at": d.created_at.isoformat(),
+            "sources": [dict(s._mapping) for s in src.fetchall()],
+        }

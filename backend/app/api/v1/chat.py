@@ -1,14 +1,13 @@
 """AI Chat / Assistant API endpoints."""
-from typing import Optional
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse, ConversationOut
+from app.security.ratelimit import chat_limiter, rate_limit
 from app.services.chat_service import ChatService
 from app.security.dependencies import get_current_user_optional
 
@@ -16,7 +15,8 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/message", response_model=ChatResponse)
+@router.post("/message", response_model=ChatResponse,
+             dependencies=[Depends(rate_limit(chat_limiter, "chat"))])
 async def chat_message(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
@@ -29,7 +29,7 @@ async def chat_message(
         return response
     except Exception as e:
         logger.error("Chat processing error", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to process message")
+        raise HTTPException(status_code=500, detail="Failed to process message") from e
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
@@ -41,7 +41,7 @@ async def list_conversations(
     if not current_user:
         return []
     service = ChatService(db)
-    return await service.get_conversations(current_user.user_id)
+    return await service.get_conversations(current_user.citizen_id)
 
 
 @router.get("/conversations/{conversation_id}")
@@ -62,10 +62,11 @@ async def get_conversation(
 async def get_decision_lineage(
     decision_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_optional),
 ):
     """Get the 'Why this answer?' lineage for a specific decision."""
     service = ChatService(db)
-    lineage = await service.get_decision_lineage(decision_id)
+    lineage = await service.get_decision_lineage(decision_id, current_user)
     if not lineage:
         raise HTTPException(status_code=404, detail="Decision not found")
     return lineage

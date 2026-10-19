@@ -1,276 +1,274 @@
-"""Complaint service — submission, classification, routing, SLA."""
+"""Complaint service — submission, classification, routing, SLA.
+
+Column names follow database/schema/001_schema.sql (+ migrations 002/003). Status history is
+written by the ``trg_complaint_history`` trigger; this service only annotates the row the
+trigger creates (remarks / changed_by) so history is never duplicated.
+"""
 import math
-import re
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
-from uuid import UUID, uuid4
+from datetime import datetime, timezone
+from typing import Optional
+from uuid import UUID
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.complaints import (
-    ComplaintCreate, ComplaintOut, ComplaintDetail, ComplaintListResponse,
-    ComplaintStatusUpdate, ComplaintTrack, ComplaintHistoryItem,
+    ComplaintCreate, ComplaintDetail, ComplaintHistoryItem, ComplaintListResponse,
+    ComplaintOut, ComplaintStatusUpdate, ComplaintTrack,
 )
+from app.services import complaint_rules as rules
 
 logger = structlog.get_logger(__name__)
 
-# Valid status transitions
-_TRANSITIONS: dict[str, list[str]] = {
-    "submitted":     ["classified", "needs_triage", "rejected"],
-    "needs_triage":  ["classified"],
-    "classified":    ["assigned", "rejected"],
-    "assigned":      ["in_progress", "escalated", "rejected"],
-    "in_progress":   ["resolved", "escalated"],
-    "escalated":     ["in_progress", "resolved"],
-    "resolved":      ["closed", "reopened"],
-    "reopened":      ["in_progress"],
-    "closed":        [],
-    "rejected":      [],
-}
+# Backwards-compatible alias (older imports referenced the private name)
+_TRANSITIONS = rules.TRANSITIONS
 
 
-def _generate_reference(complaint_id: UUID) -> str:
-    year = datetime.now(timezone.utc).year
-    seq = int(str(complaint_id.int)[-6:]) % 999999 + 1
-    return f"MYG-{year}-{seq:06d}"
+class ComplaintNotFound(LookupError):
+    pass
+
+
+class ComplaintForbidden(PermissionError):
+    pass
+
+
+class InvalidTransition(ValueError):
+    pass
+
+
+class EvidenceStorageUnavailable(RuntimeError):
+    pass
+
+
+_HISTORY_COLS = ["changed_at", "old_status", "new_status", "remarks", "changed_by_role"]
 
 
 class ComplaintService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def submit(self, data: ComplaintCreate, user_id: str) -> ComplaintOut:
-        # Get citizen_id from user
+    # ── submit ────────────────────────────────────────────────────────────────
+    async def submit(self, data: ComplaintCreate, user_id) -> ComplaintOut:
         u = await self.db.execute(
-            text("SELECT citizen_id FROM identity.app_user WHERE user_id = :uid"),
-            {"uid": str(user_id)},
+            text("SELECT citizen_id FROM identity.citizen WHERE user_id = :uid"), {"uid": user_id}
         )
         citizen_id = u.scalar()
+        if citizen_id is None:
+            raise ValueError("Only registered citizens can file complaints")
 
-        complaint_id = uuid4()
-        reference = _generate_reference(complaint_id)
-
-        # Basic AI classification stub (deterministic fallback)
-        category_id = data.category_id
-        priority = "medium"
-        ai_confidence = 0.0
-        ai_category = None
-
-        if category_id:
+        category = None
+        if data.category_id is not None:
             cr = await self.db.execute(
-                text("SELECT default_priority FROM complaints.complaint_category WHERE category_id = :cid"),
-                {"cid": str(category_id)},
-            )
-            row = cr.fetchone()
-            if row:
-                priority = row[0]
-            ai_confidence = 1.0
-
-        # Jurisdiction resolution
-        ward_id = None
-        local_body_id = None
-        taluk_id = None
-        district_id = data.district_id
-
-        if data.latitude and data.longitude:
-            try:
-                jr = await self.db.execute(
-                    text("SELECT ward_id, local_body_id, taluk_id, district_id FROM administration.resolve_jurisdiction(:lon, :lat)"),
-                    {"lon": data.longitude, "lat": data.latitude},
-                )
-                jrow = jr.fetchone()
-                if jrow:
-                    ward_id, local_body_id, taluk_id, district_id = jrow
-            except Exception as e:
-                logger.warning("Jurisdiction resolution failed", error=str(e))
-
-        # Routing rule lookup
-        authority_id = await self._route_complaint(category_id, district_id, local_body_id)
-
-        # SLA calculation
-        sla_hours = 72  # default
-        escalation_hours = 48
-        if category_id:
-            sr = await self.db.execute(
                 text("""
-                    SELECT resolution_hours, escalation_hours
-                    FROM complaints.sla_rule
+                    SELECT category_name, default_priority, default_department_id, default_sla_hours
+                    FROM complaints.complaint_category
                     WHERE category_id = :cid AND is_active = true
-                    LIMIT 1
                 """),
-                {"cid": str(category_id)},
+                {"cid": data.category_id},
             )
-            srow = sr.fetchone()
-            if srow:
-                sla_hours, escalation_hours = srow
+            category = cr.fetchone()
+            if category is None:
+                raise ValueError(f"Unknown complaint category {data.category_id}")
+        priority = category.default_priority if category else "medium"
 
+        # Jurisdiction (needs PostGIS). The DB trigger also fills these; resolving here lets us
+        # route on district. Never overwrite a caller-supplied district with NULL.
+        ward_id = local_body_id = taluk_id = None
+        district_id = data.district_id
+        if data.latitude is not None and data.longitude is not None:
+            try:
+                async with self.db.begin_nested():  # savepoint: a failure must not abort the tx
+                    jr = await self.db.execute(
+                        text("SELECT ward_id, local_body_id, taluk_id, district_id "
+                             "FROM administration.resolve_jurisdiction(:lon, :lat)"),
+                        {"lon": data.longitude, "lat": data.latitude},
+                    )
+                    jrow = jr.fetchone()
+                    if jrow:
+                        ward_id, local_body_id, taluk_id = jrow.ward_id, jrow.local_body_id, jrow.taluk_id
+                        district_id = jrow.district_id or district_id
+            except Exception as e:  # noqa: BLE001
+                logger.warning("jurisdiction_resolution_failed", error=str(e))
+
+        department_id, authority_id, placeholder = await self._route_complaint(
+            data.category_id, district_id, category.default_department_id if category else None
+        )
+        resolution_h, escalation_h = await self._sla_hours(
+            data.category_id, priority, department_id, category.default_sla_hours if category else None
+        )
         now = datetime.now(timezone.utc)
-        due_date = now + timedelta(hours=sla_hours)
-        escalation_due_at = now + timedelta(hours=escalation_hours)
-        status = "classified" if ai_confidence >= 0.6 else "needs_triage"
+        due_date, escalation_due_at = rules.compute_deadlines(now, resolution_h, escalation_h)
+        status = rules.initial_status(category is not None)
 
-        # Insert complaint
-        await self.db.execute(
+        ins = await self.db.execute(
             text("""
                 INSERT INTO complaints.complaint (
-                    complaint_id, citizen_id, reference_number, title, description,
-                    category_id, status, priority, latitude, longitude, address,
+                    citizen_id, title, description, category_id, category_confidence,
+                    department_id, authority_id, priority, status, is_anonymous,
+                    latitude, longitude, address,
                     ward_id, local_body_id, taluk_id, district_id,
-                    authority_id, due_date, escalation_due_at,
-                    ai_confidence, ai_category, is_anonymous, created_at, updated_at
+                    due_date, escalation_due_at
                 ) VALUES (
-                    :cid, :citizen_id, :ref, :title, :desc,
-                    :cat_id, :status, :priority, :lat, :lon, :addr,
-                    :ward_id, :lb_id, :taluk_id, :dist_id,
-                    :auth_id, :due_date, :esc_due_at,
-                    :ai_conf, :ai_cat, :anon, now(), now()
-                )
+                    :citizen_id, :title, :description, :category_id, :confidence,
+                    :department_id, :authority_id, :priority, :status, :anon,
+                    :lat, :lon, :address,
+                    :ward_id, :lb_id, :taluk_id, :district_id,
+                    :due_date, :esc_due
+                ) RETURNING complaint_id, complaint_ref, created_at
             """),
             {
-                "cid": str(complaint_id), "citizen_id": str(citizen_id) if citizen_id else None,
-                "ref": reference, "title": data.title, "desc": data.description,
-                "cat_id": str(category_id) if category_id else None,
-                "status": status, "priority": priority,
-                "lat": data.latitude, "lon": data.longitude, "addr": data.address,
+                "citizen_id": citizen_id, "title": data.title, "description": data.description,
+                "category_id": data.category_id, "confidence": 1.0 if category else None,
+                "department_id": department_id, "authority_id": authority_id,
+                "priority": priority, "status": status, "anon": data.is_anonymous,
+                "lat": data.latitude, "lon": data.longitude, "address": data.address,
                 "ward_id": ward_id, "lb_id": local_body_id, "taluk_id": taluk_id,
-                "dist_id": district_id, "auth_id": str(authority_id) if authority_id else None,
-                "due_date": due_date, "esc_due_at": escalation_due_at,
-                "ai_conf": ai_confidence, "ai_cat": ai_category, "anon": data.is_anonymous,
+                "district_id": district_id, "due_date": due_date, "esc_due": escalation_due_at,
             },
         )
-
-        # Insert initial history row
-        await self.db.execute(
-            text("""
-                INSERT INTO complaints.complaint_history (complaint_id, old_status, new_status, remarks, changed_at)
-                VALUES (:cid, NULL, :status, 'Complaint submitted', now())
-            """),
-            {"cid": str(complaint_id), "status": status},
-        )
-
+        new = ins.fetchone()
+        assert new is not None  # INSERT ... RETURNING always yields a row
         await self.db.commit()
 
-        # Fetch category name
-        cat_name = None
-        if category_id:
-            cnr = await self.db.execute(
-                text("SELECT name FROM complaints.complaint_category WHERE category_id = :cid"),
-                {"cid": str(category_id)},
+        dept_name = None
+        if department_id:
+            dn = await self.db.execute(
+                text("SELECT department_name FROM administration.department WHERE department_id = :d"),
+                {"d": department_id},
             )
-            cat_name = cnr.scalar()
-
+            dept_name = dn.scalar()
         return ComplaintOut(
-            complaint_id=complaint_id,
-            reference_number=reference,
+            complaint_id=new.complaint_id,
+            reference_number=new.complaint_ref,
             title=data.title,
             status=status,
-            category_name=cat_name,
-            created_at=now,
+            category_name=category.category_name if category else None,
+            department_name=dept_name,
+            created_at=new.created_at,
             due_date=due_date,
+            assignment_state=rules.assignment_state(authority_id, placeholder, department_id),
         )
 
-    async def _route_complaint(self, category_id, district_id, local_body_id) -> Optional[UUID]:
-        if not category_id:
-            return None
-        try:
-            r = await self.db.execute(
-                text("""
-                    SELECT a.authority_id
-                    FROM complaints.routing_rule rr
-                    JOIN administration.authority a ON a.department_id = rr.department_id
-                    WHERE rr.category_id = :cat_id
-                    LIMIT 1
-                """),
-                {"cat_id": str(category_id)},
-            )
-            row = r.fetchone()
-            return row[0] if row else None
-        except Exception:
-            return None
+    async def _route_complaint(self, category_id, district_id, default_department_id):
+        """Deterministic routing: routing_rule -> department; then nearest authority.
+
+        Authority choice: the district authority of the complaint's own district, else the
+        state-level authority of that department. Returns (department_id, authority_id);
+        either may be None when no rule/authority is configured (no guessing).
+        """
+        if category_id is None:
+            return None, None, False
+        r = await self.db.execute(
+            text("""
+                SELECT department_id FROM complaints.routing_rule
+                WHERE category_id = :cat ORDER BY priority_order, routing_rule_id LIMIT 1
+            """),
+            {"cat": category_id},
+        )
+        department_id = r.scalar() or default_department_id
+        if department_id is None:
+            return None, None, False
+        a = await self.db.execute(
+            text("""
+                SELECT authority_id, is_routing_placeholder FROM administration.authority
+                WHERE department_id = :dep
+                  AND ((jurisdiction_level = 'district' AND jurisdiction_id = :dist)
+                       OR jurisdiction_level = 'state')
+                ORDER BY CASE WHEN jurisdiction_level = 'district' THEN 0 ELSE 1 END,
+                         is_routing_placeholder, authority_id
+                LIMIT 1
+            """),
+            {"dep": department_id, "dist": district_id},
+        )
+        row = a.fetchone()
+        return department_id, (row.authority_id if row else None), bool(row and row.is_routing_placeholder)
+
+    async def _sla_hours(self, category_id, priority, department_id, default_hours):
+        if category_id is None:
+            return None, None
+        r = await self.db.execute(
+            text("""
+                SELECT resolution_hours, escalation_hours FROM complaints.sla_rule
+                WHERE category_id = :cat AND priority = :prio
+                ORDER BY (department_id IS NOT DISTINCT FROM :dep) DESC, sla_id
+                LIMIT 1
+            """),
+            {"cat": category_id, "prio": priority, "dep": department_id},
+        )
+        row = r.fetchone()
+        if row:
+            return row.resolution_hours, row.escalation_hours
+        return default_hours, None
+
+    # ── read ──────────────────────────────────────────────────────────────────
+    async def _history(self, complaint_id) -> list[ComplaintHistoryItem]:
+        hr = await self.db.execute(
+            text("""
+                SELECT changed_at, old_status, new_status, remarks, NULL::text AS changed_by_role
+                FROM complaints.complaint_history
+                WHERE complaint_id = :cid ORDER BY changed_at, history_id
+            """),
+            {"cid": complaint_id},
+        )
+        return [ComplaintHistoryItem(**dict(zip(_HISTORY_COLS, h, strict=True))) for h in hr.fetchall()]
 
     async def track_by_reference(self, reference: str) -> Optional[ComplaintTrack]:
         r = await self.db.execute(
             text("""
-                SELECT c.complaint_id, c.reference_number, c.title, c.status,
-                       cc.name AS category_name, d.department_name,
-                       a.authority_name, c.created_at, c.due_date,
-                       (c.due_date < now() AND c.status NOT IN ('resolved','closed')) AS sla_breached
+                SELECT c.complaint_id, c.complaint_ref AS reference_number, c.title, c.status,
+                       cc.category_name, d.department_name, a.authority_name,
+                       c.created_at, c.due_date,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
+                LEFT JOIN administration.department d ON d.department_id = c.department_id
                 LEFT JOIN administration.authority a ON a.authority_id = c.authority_id
-                LEFT JOIN administration.department d ON d.department_id = a.department_id
-                WHERE c.reference_number = :ref AND c.is_anonymous = false
+                WHERE c.complaint_ref = :ref AND c.is_anonymous = false
             """),
             {"ref": reference},
         )
         row = r.fetchone()
         if not row:
             return None
-
-        cols = list(r.keys())
-        data = dict(zip(cols, row))
-        complaint_id = data["complaint_id"]
-
-        # History
-        hr = await self.db.execute(
-            text("""
-                SELECT changed_at, old_status, new_status, remarks, NULL AS changed_by_role
-                FROM complaints.complaint_history
-                WHERE complaint_id = :cid ORDER BY changed_at
-            """),
-            {"cid": str(complaint_id)},
-        )
-        history = [
-            ComplaintHistoryItem(**dict(zip(["changed_at","old_status","new_status","remarks","changed_by_role"], h)))
-            for h in hr.fetchall()
-        ]
-
         return ComplaintTrack(
-            reference_number=data["reference_number"],
-            title=data["title"],
-            status=data["status"],
-            category_name=data.get("category_name"),
-            department_name=data.get("department_name"),
-            authority_name=data.get("authority_name"),
-            created_at=data["created_at"],
-            due_date=data.get("due_date"),
-            timeline=history,
-            sla_breached=bool(data.get("sla_breached")),
+            reference_number=row.reference_number, title=row.title, status=row.status,
+            category_name=row.category_name, department_name=row.department_name,
+            authority_name=row.authority_name, created_at=row.created_at, due_date=row.due_date,
+            assignment_state=row.assignment_state,
+            timeline=await self._history(row.complaint_id),
+            sla_breached=rules.is_sla_breached(row.due_date, row.status, datetime.now(timezone.utc)),
         )
 
     async def get_citizen_complaints(self, citizen_id, status, page, page_size) -> ComplaintListResponse:
         conditions = ["c.citizen_id = :cid"]
-        params: dict = {"cid": str(citizen_id)}
+        params: dict = {"cid": citizen_id}
         if status:
             conditions.append("c.status = :status")
             params["status"] = status
         where = " AND ".join(conditions)
-
         cnt = await self.db.execute(
             text(f"SELECT count(*) FROM complaints.complaint c WHERE {where}"), params
         )
         total = cnt.scalar() or 0
-
-        offset = (page - 1) * page_size
         r = await self.db.execute(
             text(f"""
-                SELECT c.complaint_id, c.reference_number, c.title, c.status,
-                       cc.name AS category_name, d.department_name,
-                       c.created_at, c.due_date
+                SELECT c.complaint_id, c.complaint_ref AS reference_number, c.title, c.status,
+                       cc.category_name, d.department_name, c.created_at, c.due_date,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
+                LEFT JOIN administration.department d ON d.department_id = c.department_id
                 LEFT JOIN administration.authority a ON a.authority_id = c.authority_id
-                LEFT JOIN administration.department d ON d.department_id = a.department_id
                 WHERE {where}
                 ORDER BY c.created_at DESC
                 LIMIT :lim OFFSET :off
             """),
-            {**params, "lim": page_size, "off": offset},
+            {**params, "lim": page_size, "off": (page - 1) * page_size},
         )
-        cols = list(r.keys())
-        items = [ComplaintOut(**dict(zip(cols, row))) for row in r.fetchall()]
+        items = [ComplaintOut(**row._mapping) for row in r.fetchall()]
         return ComplaintListResponse(
             items=items, total=total, page=page, page_size=page_size,
             pages=math.ceil(total / page_size) if total else 0,
@@ -279,90 +277,96 @@ class ComplaintService:
     async def get_complaint(self, complaint_id: UUID, current_user) -> Optional[ComplaintDetail]:
         r = await self.db.execute(
             text("""
-                SELECT c.complaint_id, c.reference_number, c.title, c.description,
-                       c.status, cc.name AS category_name, d.department_name,
+                SELECT c.complaint_id, c.citizen_id, c.complaint_ref AS reference_number, c.title,
+                       c.description, c.status, cc.category_name, d.department_name,
                        c.latitude, c.longitude, c.address, c.priority,
-                       a.authority_name, NULL AS officer_name,
+                       a.authority_name, o.name AS officer_name,
                        c.created_at, c.due_date, c.escalation_due_at,
-                       c.ai_confidence, c.ai_category
+                       c.category_confidence::float AS ai_confidence, NULL::text AS ai_category,
+                       CASE WHEN c.authority_id IS NOT NULL THEN CASE WHEN a.is_routing_placeholder THEN 'department_level' ELSE 'authority_assigned' END
+                            WHEN c.department_id IS NOT NULL THEN 'department_only' ELSE 'unassigned' END AS assignment_state
                 FROM complaints.complaint c
                 LEFT JOIN complaints.complaint_category cc ON cc.category_id = c.category_id
+                LEFT JOIN administration.department d ON d.department_id = c.department_id
                 LEFT JOIN administration.authority a ON a.authority_id = c.authority_id
-                LEFT JOIN administration.department d ON d.department_id = a.department_id
+                LEFT JOIN administration.officer o ON o.officer_id = c.assigned_officer_id
                 WHERE c.complaint_id = :cid
             """),
-            {"cid": str(complaint_id)},
+            {"cid": complaint_id},
         )
         row = r.fetchone()
         if not row:
             return None
-
-        data = dict(zip(r.keys(), row))
-
-        # History
-        hr = await self.db.execute(
-            text("""
-                SELECT changed_at, old_status, new_status, remarks, NULL AS changed_by_role
-                FROM complaints.complaint_history
-                WHERE complaint_id = :cid ORDER BY changed_at
-            """),
-            {"cid": str(complaint_id)},
-        )
-        history = [
-            ComplaintHistoryItem(**dict(zip(["changed_at","old_status","new_status","remarks","changed_by_role"], h)))
-            for h in hr.fetchall()
-        ]
-
-        detail = ComplaintDetail(**{k: v for k, v in data.items() if k in ComplaintDetail.model_fields})
-        detail.timeline = history
+        if not rules.can_view_complaint(
+            getattr(current_user, "role", ""), getattr(current_user, "citizen_id", None), row.citizen_id
+        ):
+            raise ComplaintForbidden("You may only view your own complaints")
+        data = dict(row._mapping)
+        data.pop("citizen_id")
+        detail = ComplaintDetail(**data)
+        detail.timeline = await self._history(complaint_id)
         return detail
 
+    # ── update ────────────────────────────────────────────────────────────────
     async def update_status(self, complaint_id: UUID, data: ComplaintStatusUpdate, user) -> dict:
         r = await self.db.execute(
             text("SELECT status FROM complaints.complaint WHERE complaint_id = :cid FOR UPDATE"),
-            {"cid": str(complaint_id)},
+            {"cid": complaint_id},
         )
         row = r.fetchone()
         if not row:
-            raise ValueError("Complaint not found")
-
-        current_status = row[0]
-        allowed = _TRANSITIONS.get(current_status, [])
-        if data.new_status not in allowed:
-            raise ValueError(f"Cannot transition from {current_status} to {data.new_status}")
-
-        await self.db.execute(
-            text("UPDATE complaints.complaint SET status = :s, updated_at = now() WHERE complaint_id = :cid"),
-            {"s": data.new_status, "cid": str(complaint_id)},
-        )
+            raise ComplaintNotFound("Complaint not found")
+        current = row[0]
+        if data.new_status not in rules.STATUSES:
+            raise ValueError(f"Unknown status '{data.new_status}'")
+        if not rules.can_transition(current, data.new_status):
+            raise InvalidTransition(f"Cannot transition from {current} to {data.new_status}")
         await self.db.execute(
             text("""
-                INSERT INTO complaints.complaint_history (complaint_id, old_status, new_status, remarks, changed_at)
-                VALUES (:cid, :old, :new, :rem, now())
+                UPDATE complaints.complaint
+                SET status = :s,
+                    resolved_at = CASE WHEN :s = 'resolved' THEN now() ELSE resolved_at END
+                WHERE complaint_id = :cid
             """),
-            {"cid": str(complaint_id), "old": current_status, "new": data.new_status, "rem": data.remarks},
+            {"s": data.new_status, "cid": complaint_id},
+        )
+        # trg_complaint_history just inserted the history row; annotate it.
+        await self.db.execute(
+            text("""
+                UPDATE complaints.complaint_history
+                SET remarks = :rem, changed_by = :uid
+                WHERE history_id = (SELECT max(history_id) FROM complaints.complaint_history
+                                    WHERE complaint_id = :cid)
+            """),
+            {"rem": data.remarks, "uid": getattr(user, "user_id", None), "cid": complaint_id},
         )
         await self.db.commit()
         return {"status": "updated", "new_status": data.new_status}
 
     async def upload_evidence(self, complaint_id: UUID, file, user) -> dict:
-        # Validate MIME
+        """Authorise and validate the upload. Object storage is not wired yet, so a valid upload is refused with
+        EvidenceStorageUnavailable: the caller must never be told a file was saved when it was not."""
+        owner = (await self.db.execute(
+            text("SELECT citizen_id FROM complaints.complaint WHERE complaint_id = :cid"), {"cid": complaint_id})).fetchone()
+        if owner is None:
+            raise ComplaintNotFound("Complaint not found")
+        if not rules.can_view_complaint(getattr(user, "role", ""), getattr(user, "citizen_id", None), owner.citizen_id):
+            raise ComplaintForbidden("You may only add evidence to your own complaints")
         allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf",
                          "audio/mpeg", "audio/wav", "video/mp4"}
         if file.content_type not in allowed_types:
             raise ValueError(f"File type {file.content_type} not allowed")
         if file.size and file.size > 50 * 1024 * 1024:
             raise ValueError("File too large (max 50MB)")
-        return {"message": "Evidence upload requires MinIO configuration", "filename": file.filename}
+        raise EvidenceStorageUnavailable("Evidence storage is not configured on this server; your file was NOT saved.")
 
     async def get_categories(self) -> list:
         r = await self.db.execute(
             text("""
-                SELECT category_id, name, name_ta, description, default_priority
+                SELECT category_id, category_name AS name, name_ta, description, default_priority
                 FROM complaints.complaint_category
                 WHERE is_active = true
-                ORDER BY name
+                ORDER BY category_name
             """)
         )
-        cols = list(r.keys())
-        return [dict(zip(cols, row)) for row in r.fetchall()]
+        return [dict(row._mapping) for row in r.fetchall()]

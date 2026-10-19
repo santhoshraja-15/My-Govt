@@ -1,5 +1,4 @@
 """Auth service — registration, login, token management."""
-from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -16,9 +15,15 @@ from app.security.jwt import (
 logger = structlog.get_logger(__name__)
 
 
+MAX_FAILED_LOGINS = 5
+LOCKOUT_MINUTES = 15
+
+
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        # why the last login() returned None: unknown_user | inactive | locked | bad_password
+        self.last_failure: Optional[str] = None
 
     async def register(self, data: RegisterRequest) -> UserOut:
         # Check email uniqueness
@@ -32,29 +37,25 @@ class AuthService:
         user_id = uuid4()
         citizen_id = uuid4()
 
-        # Create citizen record
+        # app_user first: identity.citizen.user_id references it
         await self.db.execute(
             text("""
-                INSERT INTO identity.citizen (citizen_id, full_name, created_at, updated_at)
-                VALUES (:cid, :name, now(), now())
-            """),
-            {"cid": str(citizen_id), "name": data.full_name},
-        )
-
-        # Create app_user record
-        await self.db.execute(
-            text("""
-                INSERT INTO identity.app_user
-                    (user_id, citizen_id, email, phone, password_hash, role, status, created_at, updated_at)
-                VALUES (:uid, :cid, :email, :phone, :pwd, 'citizen', 'active', now(), now())
+                INSERT INTO identity.app_user (user_id, email, phone, password_hash, role, status)
+                VALUES (:uid, :email, :phone, :pwd, 'citizen', 'active')
             """),
             {
-                "uid": str(user_id),
-                "cid": str(citizen_id),
+                "uid": user_id,
                 "email": data.email,
                 "phone": data.phone,
                 "pwd": hash_password(data.password),
             },
+        )
+        await self.db.execute(
+            text("""
+                INSERT INTO identity.citizen (citizen_id, user_id, name)
+                VALUES (:cid, :uid, :name)
+            """),
+            {"cid": citizen_id, "uid": user_id, "name": data.full_name},
         )
         await self.db.commit()
 
@@ -70,31 +71,46 @@ class AuthService:
         result = await self.db.execute(
             text("""
                 SELECT u.user_id, u.email, u.password_hash, u.role, u.status,
-                       u.citizen_id, c.full_name
+                       c.citizen_id, c.name AS full_name,
+                       (u.failed_logins >= :max_failed
+                        AND u.updated_at > now() - make_interval(mins => :lock_min)) AS locked
                 FROM identity.app_user u
-                LEFT JOIN identity.citizen c ON c.citizen_id = u.citizen_id
+                LEFT JOIN identity.citizen c ON c.user_id = u.user_id
                 WHERE u.email = :email
             """),
-            {"email": email},
+            {"email": email, "max_failed": MAX_FAILED_LOGINS, "lock_min": LOCKOUT_MINUTES},
         )
         row = result.fetchone()
+        self.last_failure = None
         if not row:
+            self.last_failure = "unknown_user"
             return None
-        user_id, email_, pwd_hash, role, status, citizen_id, full_name = row
+        user_id, email_, pwd_hash, role, status, citizen_id, full_name, locked = row
 
         if status != "active":
+            self.last_failure = "inactive"
+            return None
+        if locked:
+            # Temporary lockout: no password check (no oracle) and no counter increment, so the
+            # lock lapses LOCKOUT_MINUTES after the last failed attempt.
+            self.last_failure = "locked"
             return None
         if not verify_password(password, pwd_hash):
+            await self.db.execute(
+                text("UPDATE identity.app_user SET failed_logins = failed_logins + 1 WHERE user_id = :uid"),
+                {"uid": user_id},
+            )
+            await self.db.commit()
+            self.last_failure = "bad_password"
             return None
 
         token_data = {"sub": str(user_id), "role": role}
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token(token_data)
 
-        # Update last login
         await self.db.execute(
-            text("UPDATE identity.app_user SET last_login_at = now() WHERE user_id = :uid"),
-            {"uid": str(user_id)},
+            text("UPDATE identity.app_user SET failed_logins = 0 WHERE user_id = :uid"),
+            {"uid": user_id},
         )
         await self.db.commit()
 

@@ -1,0 +1,90 @@
+[
+  {
+    "question": "Tell me about the Chief Minister breakfast scheme for school children",
+    "expect": "answer",
+    "titles_any": [
+      "Breakfast"
+    ]
+  },
+  {
+    "question": "What is the Kalaignar Magalir Urimai Thogai monthly assistance for women?",
+    "expect": "answer",
+    "titles_any": [
+      "Magalir Urimai"
+    ]
+  },
+  {
+    "question": "How do I get a nativity certificate?",
+    "expect": "answer",
+    "titles_any": [
+      "Nativity"
+    ]
+  },
+  {
+    "question": "How can I apply for a smart ration card?",
+    "expect": "answer",
+    "titles_any": [
+      "Ration Card"
+    ]
+  },
+  {
+    "question": "Which scheme gives free bus travel to women?",
+    "expect": "answer",
+    "titles_any": [
+      "Vidiyal Payanam",
+      "Bus"
+    ]
+  },
+  {
+    "question": "What health insurance scheme does Tamil Nadu have for families?",
+    "expect": "answer",
+    "titles_any": [
+      "Health Insurance",
+      "CMCHIS",
+      "Comprehensive"
+    ]
+  },
+  {
+    "question": "How do I bake a chocolate cake?",
+    "expect": "abstain"
+  },
+  {
+    "question": "What is the capital of France?",
+    "expect": "abstain"
+  },
+  {
+    "question": "Who won the cricket world cup in 2011?",
+    "expect": "abstain"
+  },
+  {
+    "question": "I want my daughter to receive a monthly allowance while she studies at college",
+    "expect": "answer",
+    "titles_any": [
+      "Pudhumai Penn",
+      "Ramamirtham"
+    ]
+  },
+  {
+    "question": "Do poor senior citizens get a regular payment from the government?",
+    "expect": "answer",
+    "titles_any": [
+      "Pension",
+      "IGNOAPS",
+      "Old Age"
+    ]
+  },
+  {
+    "question": "Which paper proves that my family lives in this state for admission purposes?",
+    "expect": "answer",
+    "titles_any": [
+      "Nativity"
+    ]
+  },
+  {
+    "question": "My ration card needs to be replaced with the electronic version",
+    "expect": "answer",
+    "titles_any": [
+      "Ration Card"
+    ]
+  }
+]
