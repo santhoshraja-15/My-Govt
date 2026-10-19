@@ -23,7 +23,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import asyncpg
 
@@ -177,15 +177,16 @@ async def populate(dsn: str, password: str) -> dict:
             "SELECT c.category_id FROM complaints.complaint_category c WHERE c.is_active AND EXISTS "
             "(SELECT 1 FROM administration.authority a WHERE a.department_id = c.default_department_id) ORDER BY 1")]
         dists = [r[0] for r in await conn.fetch("SELECT district_id FROM administration.district ORDER BY 1")]
-        batch, citizens, complaints = synth_data.plan(7, 12, 80, cats, dists)
+        now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        batch, citizens, complaints = synth_data.plan(7, 12, 80, cats, dists, reference_time=now, recent_open=True)
         stats = await synth_data.apply(conn, batch, citizens, complaints, replace=False)
 
         rng = random.Random(99)
         demo = synth_data.PlannedCitizen(cid, uid, citizen_email, "Aarthi (demo citizen)", False, {})
         mine = []
         for i, (ref, title, scenario) in enumerate(DEMO_CITIZEN_COMPLAINTS):
-            age_h = rng.randint(30, 20 * 24) if scenario != "overdue_open" else rng.randint(12 * 24, 30 * 24)
-            created = synth_data.REFERENCE_TIME - timedelta(hours=age_h)
+            age_h = rng.randint(30, 4 * 24) if scenario in ("open_new", "in_progress", "escalated") else rng.randint(6 * 24, 20 * 24)
+            created = now - timedelta(hours=age_h)
             path = synth_data.SCENARIOS[scenario]
             t, times = created, [created]
             for _ in path[1:]:

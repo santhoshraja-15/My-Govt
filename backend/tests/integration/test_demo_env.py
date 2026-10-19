@@ -44,6 +44,12 @@ async def test_demo_environment_is_complete_idempotent_and_labelled(admin_dsn):
                 "SELECT count(*) FROM complaints.complaint k JOIN identity.citizen z ON z.citizen_id=k.citizen_id "
                 "JOIN identity.app_user u ON u.user_id=z.user_id WHERE u.email='citizen@demo.example'")
             assert mine == 6
+            # a believable board: unresolved complaints are a mix of within-target and past-target (not "everything is overdue")
+            open_ = "status NOT IN ('resolved','closed','rejected')"
+            within = await c.fetchval(f"SELECT count(*) FROM complaints.complaint WHERE {open_} AND due_date >= now()")
+            past = await c.fetchval(f"SELECT count(*) FROM complaints.complaint WHERE {open_} AND due_date < now()")
+            assert within > 0 and past > 0, (within, past)
+            assert await c.fetchval("SELECT max(created_at) FROM complaints.complaint") > await c.fetchval("SELECT now() - interval '7 days'")
             # complaint histories follow the state machine (trigger-written, no duplicates)
             assert await c.fetchval(
                 "SELECT count(*) FROM (SELECT complaint_id FROM complaints.complaint_history GROUP BY complaint_id, new_status "

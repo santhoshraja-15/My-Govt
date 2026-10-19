@@ -213,6 +213,25 @@ test.describe("labels, layout and error pages", () => {
   });
 });
 
+test.describe("duplicate submissions", () => {
+  test("a double-clicked Submit files exactly one complaint and the button is disabled while sending", async ({ page, request }) => {
+    const email = await registerViaUI(page, "Double Click");
+    await page.goto("/complaints");
+    await page.getByRole("tab", { name: "File Complaint" }).click();
+    await page.getByLabel(/Subject/).fill("Double submit probe: streetlight not working");
+    await page.getByLabel(/Description/).fill("Clicking submit twice quickly must not create two complaints.");
+    // slow the API a little so the second click really happens while the first request is in flight
+    await page.route("**/api/v1/complaints", async (route) => { if (route.request().method() === "POST") await new Promise((r) => setTimeout(r, 700)); await route.continue(); });
+    const submit = page.getByRole("button", { name: "Submit Complaint" });
+    await submit.dblclick();
+    await expect(page.getByTestId("submit-success")).toBeVisible();
+    const login = await request.post(`${API}/auth/login`, { data: { email, password: "Citizen-test-pass-1" } });
+    const token = (await login.json()).access_token;
+    const mine = await (await request.get(`${API}/complaints/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
+    expect(mine.total).toBe(1);
+  });
+});
+
 test.describe("admin data panels and form semantics", () => {
   test("dataset quality scores are percentages between 0 and 100 and say they are recorded, not computed", async ({ page }) => {
     await loginViaUI(page, ADMIN_EMAIL, STAFF_PASSWORD, "/admin");
