@@ -37,3 +37,13 @@ def test_every_dockerfile_copy_source_exists():
                     continue
                 pattern = src.rstrip("*") if src.endswith("*") else src
                 assert list(ctx.glob(src)) or (ctx / pattern).exists(), f"{df}: COPY source '{src}' not found in build context {ctx}"
+
+
+def test_ci_postgres_containers_create_the_database_the_init_script_grants_on():
+    """The init script runs GRANT ... ON DATABASE mygovt, so a container started without POSTGRES_DB=mygovt
+    aborts initialisation (first hosted CI run failed this way)."""
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    runs = [line for line in workflow.splitlines() if "docker run" in line and "mygovt-postgres" in workflow]
+    starts = workflow.count("docker run -d --name pg")
+    assert starts >= 1
+    assert workflow.count("POSTGRES_DB=mygovt") == starts, runs
