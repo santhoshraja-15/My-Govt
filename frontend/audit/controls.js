@@ -19,13 +19,22 @@ const OUT = process.argv[2] || path.join(__dirname, "out");
 fs.mkdirSync(OUT, { recursive: true });
 
 const PLAN = [
-  { role: "anonymous", routes: ["/", "/login", "/register", "/schemes", "/services", "/documents", "/complaints", "/assistant"] },
+  { role: "anonymous", routes: ["/", "/login", "/register", "/schemes", "/schemes/:id", "/services", "/services/:id", "/documents", "/complaints", "/assistant"] },
   { role: "citizen", routes: ["/dashboard", "/complaints", "/assistant", "/schemes", "/services"] },
   { role: "officer", routes: ["/officer"] },
   { role: "deptadmin", routes: ["/officer"] },
   { role: "admin", routes: ["/admin", "/database-architecture", "/database-architecture?tab=er", "/database-architecture?tab=schema", "/database-architecture?tab=implementation", "/database-architecture?tab=advanced"] },
 ];
 const SKIP_NAMES = /^(sign out|logout)$/i;
+let IDS = null;
+async function resolveRoute(route) {
+  if (!route.includes(":id")) return route;
+  IDS ??= {
+    scheme: (await (await fetch(`${API}/api/v1/schemes?page_size=1`)).json()).items[0].scheme_id,
+    service: (await (await fetch(`${API}/api/v1/services?page_size=1`)).json()).items[0].service_id,
+  };
+  return route.replace(":id", route.startsWith("/services") ? IDS.service : IDS.scheme);
+}
 
 async function tokenFor(role) {
   if (role === "anonymous") return null;
@@ -64,7 +73,7 @@ const LIST = `(() => {
       page.on("request", (r) => { if (!r.url().includes("_rsc") && !r.url().includes("/_next/")) requests++; });
       page.on("dialog", (d) => { dialogs++; d.dismiss().catch(() => {}); });
       const open = async () => {
-        await page.goto(WEB + route, { waitUntil: "load" });
+        await page.goto(WEB + (await resolveRoute(route)), { waitUntil: "load" });
         await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => {});
         await page.waitForTimeout(350);
       };

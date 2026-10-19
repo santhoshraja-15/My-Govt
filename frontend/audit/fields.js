@@ -94,7 +94,8 @@ const ADMIN_PANELS = ["Overview", "Complaints", "Department Performance", "Verif
       if (s.prep) await s.prep(page);
       await page.waitForTimeout(400);
       const list = await page.evaluate(SCAN);
-      for (const f of list) fields.push({ page: s.url.split("?")[0], state: s.label, role: s.role, ...f });
+      const shown = new URL(page.url()).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/, ":id");
+      for (const f of list) fields.push({ page: shown, state: s.label, role: s.role, ...f });
       console.log(`${s.label.padEnd(46)} ${String(list.length).padStart(2)} controls`);
     } catch (e) { console.log(`${s.label.padEnd(46)} FAILED ${String(e).split("\n")[0].slice(0, 100)}`); fields.push({ page: s.url, state: s.label, role: s.role, tag: "ERROR", name: String(e).split("\n")[0].slice(0, 120) }); }
     await ctx.close();

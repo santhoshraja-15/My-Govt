@@ -1,0 +1,10 @@
+page,lang_en,lang_ta,text_nodes,tamil_share_en,tamil_share_ta,nodes_changed,persists_after_reload
+/,en,ta,98,0.2,1,2,True
+/login,en,ta,16,3.9,88.4,12,True
+/register,en,ta,18,3.1,77,13,True
+/schemes,en,ta,101,16.6,18.9,7,True
+/schemes/:id,en,ta,40,5.4,14.8,7,True
+/services,en,ta,82,9.8,12.8,7,True
+/documents,en,ta,23,2.2,28.7,7,True
+/complaints,en,ta,21,2.2,54,12,True
+/assistant,en,ta,22,0.9,12,7,True

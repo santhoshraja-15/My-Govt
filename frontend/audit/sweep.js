@@ -21,7 +21,7 @@ const ALL_VIEWPORTS = { desktop: { width: 1440, height: 900 }, tablet: { width: 
 const VIEWPORTS = Object.fromEntries(Object.entries(ALL_VIEWPORTS).filter(([k]) => (process.env.VIEWPORTS || "desktop,tablet,mobile").split(",").includes(k)));
 // Who is supposed to see the real page (everything else must be redirected or refused). "*" = everyone.
 const EXPECT = {
-  "/": "*", "/login": "*", "/register": "*", "/schemes": "*", "/schemes/:id": "*", "/services": "*", "/documents": "*",
+  "/": "*", "/login": "*", "/register": "*", "/schemes": "*", "/schemes/:id": "*", "/services": "*", "/services/:id": "*", "/documents": "*",
   "/complaints": "*",                      // public tabs (track); filing needs sign-in and says so
   "/assistant": "*",
   "/dashboard": ["citizen"],
@@ -71,7 +71,9 @@ async function inspect(page) {
 (async () => {
   const schemes = await (await fetch(`${API}/api/v1/schemes?page_size=1`)).json();
   const schemeId = schemes.items[0].scheme_id;
-  const ROUTES = Object.keys(EXPECT).map((r) => ({ pattern: r, url: r.replace(":id", schemeId) }));
+  const serviceId = (await (await fetch(`${API}/api/v1/services?page_size=1`)).json()).items[0].service_id;
+  const only = process.env.ONLY_ROUTES ? process.env.ONLY_ROUTES.split(",") : null;
+  const ROUTES = Object.keys(EXPECT).filter((r) => !only || only.includes(r)).map((r) => ({ pattern: r, url: r.replace(":id", r.startsWith("/services") ? serviceId : schemeId) }));
   const tokens = { anonymous: null };
   const emails = { citizen: "citizen", officer: "officer", officer2: "officer2", deptadmin: "deptadmin", admin: "admin", sysadmin: "sysadmin" };
   for (const [role, local] of Object.entries(emails)) tokens[role] = await token(`${local}@demo.example`);
