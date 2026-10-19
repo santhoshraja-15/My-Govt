@@ -9,6 +9,9 @@ async function scan(page: Page) {
     .map((v) => `${v.id} (${v.impact}): ${v.nodes.length} node(s), e.g. ${v.nodes[0]?.target.join(" ")}`);
 }
 
+// Axe samples colours at one instant: freeze animations so a fade-in cannot be scanned half-transparent.
+test.use({ reducedMotion: "reduce" });
+
 const PUBLIC = ["/", "/schemes", "/services", "/documents", "/assistant", "/complaints", "/login", "/register"];
 
 for (const path of PUBLIC) {

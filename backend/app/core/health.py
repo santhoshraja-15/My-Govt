@@ -35,7 +35,7 @@ async def check_neo4j() -> dict:
 async def check_redis() -> dict:
     try:
         import redis.asyncio as aioredis
-        client = aioredis.from_url(settings.REDIS_URL)
+        client = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=3, socket_timeout=3)
         await client.ping()
         await client.aclose()
         return {"status": "healthy"}
@@ -44,18 +44,26 @@ async def check_redis() -> dict:
 
 
 async def check_minio() -> dict:
-    try:
+    def _probe() -> None:
+        import urllib3
         from minio import Minio
+
         client = Minio(
             settings.MINIO_ENDPOINT,
             access_key=settings.MINIO_ACCESS_KEY,
             secret_key=settings.MINIO_SECRET_KEY,
             secure=False,
+            http_client=urllib3.PoolManager(timeout=urllib3.Timeout(connect=2, read=3), retries=urllib3.Retry(total=0)),
         )
         client.list_buckets()
+
+    try:
+        # The MinIO SDK is blocking: run it in a worker thread so a missing optional service cannot stall the event loop
+        # (and thereby make the other, healthy checks time out).
+        await asyncio.wait_for(asyncio.to_thread(_probe), timeout=6)
         return {"status": "healthy"}
     except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+        return {"status": "unhealthy", "error": str(e) or type(e).__name__}
 
 
 def _redact(result: dict) -> dict:
@@ -66,16 +74,16 @@ def _redact(result: dict) -> dict:
 async def get_health_status(detailed: bool = False) -> dict:
     """Aggregate health check for all services."""
     checks = await asyncio.gather(
-        check_postgres(),
-        check_neo4j(),
-        check_redis(),
-        check_minio(),
+        asyncio.wait_for(check_postgres(), timeout=8),
+        asyncio.wait_for(check_neo4j(), timeout=8),
+        asyncio.wait_for(check_redis(), timeout=8),
+        asyncio.wait_for(check_minio(), timeout=8),
         return_exceptions=True,
     )
 
     def _norm(r: object) -> dict:
         if isinstance(r, BaseException):
-            return {"status": "unhealthy", "error": str(r)}
+            return {"status": "unhealthy", "error": str(r) or type(r).__name__}
         return r if isinstance(r, dict) else {"status": "unhealthy", "error": "unexpected result"}
 
     results = {name: _norm(r) for name, r in zip(("postgresql", "neo4j", "redis", "minio"), checks, strict=True)}
