@@ -156,10 +156,10 @@ test.describe("responsive layout", () => {
   test("dashboard and officer console fit a phone screen", async ({ page, request }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const citizen = await apiCitizen(request);
-    await fileComplaint(request, citizen.token, "Mobile layout probe");
+    await fileComplaint(request, citizen.token, "Mobile layout probe with an exceptionally long complaint title that must wrap or truncate rather than widen the page " + "x".repeat(60));
     await loginViaUI(page, citizen.email, CITIZEN_PASSWORD, "/dashboard");
     await expect(page.getByTestId("citizen-dashboard")).toBeVisible();
-    await expect(page.getByTestId("recent-complaints")).toContainText("Mobile layout probe");
+    await expect(page.getByTestId("recent-complaints")).toContainText("Mobile layout probe with an exceptionally long");
     await noHorizontalScroll(page);
     await page.getByRole("button", { name: "Sign out" }).click();
     await loginViaUI(page, OFFICER_EMAIL, STAFF_PASSWORD, "");

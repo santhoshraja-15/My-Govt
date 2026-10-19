@@ -171,16 +171,18 @@ export default function OfficerPage() {
             <StatCard testId="o-resolved" label="Resolved / closed" value={(counts.resolved ?? 0) + (counts.closed ?? 0)} tone="green" icon={<CheckCircle2 size={18} />} />
           </section>
 
-          <div className="grid lg:grid-cols-3 gap-6">
-            <section className="card p-5 min-w-0" aria-labelledby="mix-h">
-              <h2 id="mix-h" className="font-bold text-slate-900 mb-4">By status</h2>
-              {slices.length ? <DonutChart slices={slices} centerLabel="complaints" testId="officer-donut" /> : <EmptyState message="No complaints." />}
-              <div className="mt-6">
+          <section className="card p-5 min-w-0" aria-labelledby="mix-h">
+            <h2 id="mix-h" className="font-bold text-slate-900 mb-4">By status</h2>
+            {slices.length ? (
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <DonutChart slices={slices} centerLabel="complaints" testId="officer-donut" />
                 <BarList bars={slices.map((s) => ({ label: s.label, value: s.value, color: s.color }))} />
               </div>
-            </section>
+            ) : <EmptyState message="No complaints." />}
+          </section>
 
-            <section className="lg:col-span-2 space-y-4 min-w-0" aria-labelledby="list-h">
+          <div>
+            <section className="space-y-4 min-w-0" aria-labelledby="list-h">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 id="list-h" className="font-bold text-slate-900 mr-2 flex items-center gap-2"><ClipboardList size={18} /> Complaints</h2>
                 <div role="group" aria-label="Assignment filter" className="flex gap-2">
@@ -195,8 +197,8 @@ export default function OfficerPage() {
                 </select>
               </div>
 
-              <div className={`grid gap-6 ${sel ? "xl:grid-cols-2" : ""}`}>
-                <div className="card overflow-x-auto min-w-0">
+              <div className={`grid gap-6 ${sel ? "xl:grid-cols-5" : ""}`}>
+                <div className={`card overflow-x-auto min-w-0 ${sel ? "xl:col-span-3" : ""}`}>
                   {data.items.length === 0 ? <EmptyState message="No complaints match this filter." /> : (
                     <table className="data-table text-xs">
                       <thead><tr><th>Reference</th><th>Subject</th><th>Priority</th><th>Status</th><th>Officer</th><th>Target</th></tr></thead>
@@ -219,8 +221,8 @@ export default function OfficerPage() {
                   )}
                   <p className="text-xs text-slate-500 p-3">{data.total} complaint(s). Priority order: past target first, then priority, then newest.</p>
                 </div>
-                {sel && <Detail key={sel.complaint_id} id={sel.complaint_id} listItem={sel} role={user.role} officers={officers}
-                  onClose={() => setSelected(null)} onChanged={load} />}
+                {sel && <div className="xl:col-span-2 min-w-0"><Detail key={sel.complaint_id} id={sel.complaint_id} listItem={sel} role={user.role} officers={officers}
+                  onClose={() => setSelected(null)} onChanged={load} /></div>}
               </div>
             </section>
           </div>

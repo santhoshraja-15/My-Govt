@@ -73,7 +73,7 @@ function OverviewPanel() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Active Schemes" value={stats.schemes} icon={BarChart3} color="bg-emerald-600" subtitle="Live count" />
         <StatCard title="Active Services" value={stats.services} icon={Zap} color="bg-amber-500" subtitle="Live count" />
-        <StatCard title="Complaints (real)" value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
+        <StatCard title={stats.demo_data_included ? "Complaints (incl. demo data)" : "Complaints (real)"} value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
         <StatCard title="SLA target missed" value={stats.complaints_sla_breached} icon={AlertTriangle} color="bg-red-600" subtitle={`${stats.complaints_unassigned ?? "—"} without an authority`} />
       </div>
 
@@ -88,7 +88,9 @@ function OverviewPanel() {
             </div>
           ))}
         </div>
-        {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3">{stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.</p>}
+        {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3" data-testid="synthetic-note">{stats.demo_data_included
+          ? `Demonstration mode: ${stats.synthetic_complaints} clearly labelled synthetic complaints are INCLUDED in the complaint figures above.`
+          : `${stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.`}</p>}
       </div>
 
       {/* Service health */}

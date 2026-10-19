@@ -75,6 +75,7 @@ class AdminService:
                 verification[label] = {r[0]: r[1] for r in rows}
             except Exception:
                 verification[label] = None
+        stats["demo_data_included"] = settings.DEMO_INCLUDE_SYNTHETIC
         overview["database_stats"] = stats
         overview["verification"] = verification
         return overview

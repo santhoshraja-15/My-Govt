@@ -68,7 +68,7 @@ export default function DashboardPage() {
           </section>
 
           <div className="grid lg:grid-cols-5 gap-6">
-            <section className="card p-5 lg:col-span-3" aria-labelledby="recent-h">
+            <section className="card p-5 lg:col-span-3 min-w-0" aria-labelledby="recent-h">
               <div className="flex items-center justify-between mb-4">
                 <h2 id="recent-h" className="font-bold text-slate-900">Recent complaints</h2>
                 <Link href="/complaints" className="text-sm text-brand-700 flex items-center gap-1">All complaints <ArrowRight size={14} /></Link>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
               )}
             </section>
 
-            <section className="card p-5 lg:col-span-2" aria-labelledby="mix-h">
+            <section className="card p-5 lg:col-span-2 min-w-0" aria-labelledby="mix-h">
               <h2 id="mix-h" className="font-bold text-slate-900 mb-4">Status overview</h2>
               {slices.length === 0 ? <EmptyState message="Nothing to chart yet." /> : <DonutChart slices={slices} centerLabel="complaints" testId="status-donut" />}
             </section>
@@ -106,7 +106,7 @@ export default function DashboardPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {featured.map((s) => (
             <Link key={s.scheme_id} href={`/schemes/${s.scheme_id}`} className="card p-4 block" data-testid="featured-scheme">
-              <p className="font-semibold text-slate-800 text-sm line-clamp-2">{s.scheme_name}</p>
+              <p className="font-semibold text-slate-800 text-sm line-clamp-2">{s.name}</p>
               <div className="mt-3 flex items-center justify-between">
                 <VerificationBadge status={s.verification_status} />
                 <span className="text-xs text-brand-700 flex items-center gap-1">Eligibility <ArrowRight size={12} /></span>
