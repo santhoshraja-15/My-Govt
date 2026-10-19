@@ -325,3 +325,65 @@ jobs:
       - name: Report failure as annotation
         if: failure()
         run: echo "::error title=image ${{ matrix.name }} failed::see the failing step above (build or property check)"
+
+  compose:
+    # Runs the real development Compose stack and the Makefile database workflow on a hosted runner with a throw-away
+    # .env. This is the first execution of docker-compose.yml and of the `make db-init / db-verify / seed-verify` paths.
+    name: Compose stack (up, db-init, db-verify, health)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
+
+      - name: Throw-away .env from .env.example
+        run: python3 .github/scripts/make_ci_env.py
+
+      - name: docker compose config
+        run: docker compose config -q
+
+      - name: docker compose up --build
+        run: |
+          set -o pipefail
+          docker compose up -d --build 2>&1 | tee compose-up.log
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 90); do
+            st="$(docker inspect --format '{{.State.Health.Status}}' mygovt_backend 2>/dev/null || echo none)"
+            echo "backend health: $st"
+            [ "$st" = healthy ] && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: make db-init (schema, migrations, seed)
+        run: make db-init 2>&1 | tee dbinit.log
+
+      - name: make db-verify
+        run: make db-verify 2>&1 | tee dbverify.log
+
+      - name: make seed-verify
+        run: make seed-verify 2>&1 | tee seedverify.log
+
+      - name: Probe health, public stats and frontend
+        run: |
+          set -e
+          curl -fsS http://localhost:8000/health | tee health.json; echo
+          curl -fsS http://localhost:8000/api/v1/public/stats | tee stats.json; echo
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/ || true)"; echo "frontend GET / -> $code"
+          [ "$code" != 000 ] && [ "${code#5}" = "$code" ]
+          docker compose ps
+
+      - name: Report failure as annotation
+        if: failure()
+        run: |
+          { docker compose ps; for s in backend postgres worker frontend; do echo "== $s"; docker compose logs --tail=25 $s 2>&1; done; \
+            for f in compose-up.log dbinit.log dbverify.log seedverify.log; do [ -f $f ] && { echo "== $f"; tail -n 15 $f; }; done; } > compose-failure.log 2>&1 || true
+          python3 .github/scripts/annotate_failure.py "compose job failed" compose-failure.log 60
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans
