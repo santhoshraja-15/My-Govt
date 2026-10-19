@@ -13,9 +13,10 @@ MyGovt is an AI-assisted platform that makes Tamil Nadu government schemes, serv
 
 | Capability | Description |
 |---|---|
-| 🏛️ **Scheme Discovery** | 12 curated TN/central schemes, each labelled with its verification status; deterministic eligibility engine (rules not yet loaded) |
+| 🏛️ **Scheme Discovery** | 12 curated TN/central schemes, each labelled with its verification status; deterministic eligibility engine (official rules not yet loaded; 8 labelled demo rules in the demo dataset) |
 | 🤖 **AI Assistant** | Hybrid (keyword + vector) retrieval, passage-level citations, abstention, validated answers |
-| 📋 **Complaint Management** | File, track, escalate civic complaints with SLA timelines |
+| 📋 **Complaint Management** | File, track, escalate civic complaints with SLA timelines; officers assign and progress them inside their own department |
+| 🧑‍💼 **Citizen dashboard & officer console** | Role-based home pages with live counts, status charts, assignment and status updates (see [docs/demo.md](docs/demo.md)) |
 | 📜 **Document Library** | Search GOs, acts, policies, and circulars |
 | 🗺️ **GIS & Jurisdiction** | PostGIS point-in-polygon resolution (tested on synthetic boundaries; real boundary data not loaded) |
 | 🏥 **e-Sevai Services** | 10 curated services (fees / processing times shown as *unconfirmed* until verified) |
@@ -99,12 +100,24 @@ My-Govt/
 
 ---
 
+## Quick demo (university presentation)
+
+```bash
+cp .env.example .env     # set every secret
+make demo                # Compose stack + labelled demonstration data (synthetic accounts, officers and complaints)
+```
+
+Open http://localhost:3000. Demo logins, a 10-minute presentation script and the list of limitations are in **[docs/demo.md](docs/demo.md)**. Demo data is synthetic and labelled; government records stay *Provisional*.
+
+---
+
 ## Getting Started
 
-> The Docker stack and `make` targets below have **not been executed** by the maintainers of this branch (no Docker on the
-> development machine). Everything else in this repository was verified against a locally installed PostgreSQL 16 +
-> PostGIS + pgvector, Neo4j 5 and Node — see [docs/audit/final_build_validation.md](docs/audit/final_build_validation.md).
-> For a step-by-step local setup without Docker see [docs/development.md](docs/development.md).
+> The Compose stack, the four application images and `make db-init / db-verify / seed-verify / demo` run in GitHub Actions
+> (see [docs/audit/deployment_reproducibility_audit.md](docs/audit/deployment_reproducibility_audit.md)); the development machine
+> itself has no Docker, so the Docker path has not been run locally. Locally installed PostgreSQL 16 + PostGIS + pgvector,
+> Neo4j 5 and Node were used for development — see [docs/audit/final_build_validation.md](docs/audit/final_build_validation.md)
+> and [docs/development.md](docs/development.md) for a setup without Docker.
 
 ### Prerequisites
 - Docker Desktop 24+ (for the compose stack), Node.js 22, Python 3.12
@@ -133,6 +146,8 @@ make db-verify        # optional: replays the whole sequence in a throw-away dat
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | API docs (development only) | http://localhost:8000/api/docs |
+| Citizen dashboard | http://localhost:3000/dashboard |
+| Officer console | http://localhost:3000/officer (officers, department and state admins) |
 | Admin console | http://localhost:3000/admin (state/system administrators only) |
 
 Data stores (PostgreSQL, Neo4j, Redis, MinIO) are bound to `127.0.0.1` only.
@@ -206,8 +221,8 @@ ingested from approved sources with `make ingest` (provenance, hash and retrieva
 
 ```bash
 cd backend && TEST_ADMIN_DSN=postgresql://postgres@localhost:5432/postgres TEST_POSTGIS=1 \
-  TEST_NEO4J_URI=bolt://localhost:7687 TEST_NEO4J_PASSWORD=... pytest tests -q -rs     # 428 tests
-cd frontend && npx playwright test                                                      # 53 browser tests
+  TEST_NEO4J_URI=bolt://localhost:7687 TEST_NEO4J_PASSWORD=... pytest tests -q -rs     # 459 tests
+cd frontend && npx playwright test                                                      # 61 browser tests (build with the API URL the config expects: see playwright.config.ts)
 ```
 `TEST_ADMIN_DSN` must point at a **disposable** server (tests create/drop `mygovt_test_*` databases). Without PostGIS /
 Neo4j configured the dependent tests are skipped and reported as such. Current results: [docs/audit/test_inventory.md](docs/audit/test_inventory.md).
