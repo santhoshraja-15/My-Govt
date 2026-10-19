@@ -9,8 +9,8 @@
 | Date | 2026-10-19 |
 | Environment | Windows 11, Python 3.11.9 (project targets 3.12), Node 25.6.0 (CI uses 22), GNU Make 4.4.1 (WSL2 Ubuntu). **No Docker** (not on Windows, not in WSL; WSL `sudo` needs a password). |
 | Branch | `audit/tn-data-verification` (never merged to `main`) |
-| HEAD at time of writing | `780eb61` |
-| Hosted CI result for `780eb61` | **UNVERIFIED** — GitHub API rate limit exhausted (resets ≈ 30 min after the last check); a single status check is scheduled. The Postgres image fix is **unconfirmed**. |
+| HEAD at time of writing | `3e42db4` |
+| Hosted CI result | **PASS — all 5 jobs green** for `3e42db4` (run 39220815138, GitHub Actions, reproduced on GitHub, not locally). Earlier runs failed; causes in D. Counts per job were not retrieved; the workflow itself fails on any skipped test. |
 
 Why blocked, independent of CI: no government record is `official_verified` (0 of 77), the Docker/Compose stack has never been
 built or started by anyone, and production security controls remain open (see E).
@@ -24,16 +24,16 @@ built or started by anyone, and production security controls remain open (see E)
 | Repo baseline | `git status`, `git log` | PASS (reproduced now) | clean tree, branch above, HEAD `780eb61` | — |
 | Compose validation | `docker compose config` | NOT RUN — PREREQUISITE UNAVAILABLE | no Docker | YAML parse-checked only (historical) |
 | Backend image build | `docker build docker/backend` | NOT RUN locally. **Defect found and fixed**: invalid `build-backend` (historical repro via `pip install -e .`, now guarded by `test_packaging.py`, 4 pass now) | hosted CI does not build this image | Build once with Docker |
-| Postgres image build | `docker build docker/postgres` | **FAILED on hosted CI in runs `3ae63b9`, `be07fb5`, `5b5a9c0`, `13b49c8`** (reproduced on GitHub, not locally). Cause (from the build's own annotation): `postgis/postgis:16-3.4` and `16-3.5` are Debian bullseye; `apt.postgresql.org bullseye-pgdg` returns 404 so `postgresql-16-pgvector` cannot install. Fix `780eb61` (base `postgres:16-bookworm` + pgdg `postgresql-16-postgis-3`, `-scripts`, `-pgvector`). | annotations of runs 39213304212/39213525821/39213844357 | **Fix unverified** — result of run for `780eb61` pending |
+| Postgres image build | `docker build docker/postgres` | **PASS on hosted CI (run 39220815138, image built in the Backend and E2E jobs)**. Failed in earlier runs `3ae63b9`, `be07fb5`, `5b5a9c0`, `13b49c8`. Cause (from the build's own annotation): `postgis/postgis:16-3.4` and `16-3.5` are Debian bullseye; `apt.postgresql.org bullseye-pgdg` returns 404 so `postgresql-16-pgvector` cannot install. Fixed by `780eb61` (base `postgres:16-bookworm` + pgdg `postgresql-16-postgis-3`, `-scripts`, `-pgvector`). | annotations of runs 39213304212/39213525821/39213844357 | Fix confirmed on hosted CI. Local image build still NOT RUN (no Docker) |
 | Stack startup / health | `make up`, `make health` | NOT RUN — PREREQUISITE UNAVAILABLE | no Docker | — |
-| DB init / migrations | `make db-init`, `migrate-sql`, `db_verify` | Historical PASS on local PG16/PostGIS 3.6.2 (not the project image) | `final_build_validation.md` | Re-run on the project image (hosted CI will, once it builds) |
+| DB init / migrations | `make db-init`, `migrate-sql`, `db_verify` | Historical PASS locally; **hosted PASS** (Backend job runs `db_verify` and schema/SQL conformance on the project image) | `final_build_validation.md`, run 39220815138 | Compose-based `make db-init` still NOT RUN |
 | Seed idempotency | `scripts.seed` twice | Historical PASS (tests) | `milestone_2_validation.md` | — |
 | Makefile workflows | `make -n <target>` ×35 | **PASS (reproduced now): expansion exit 0 for all targets.** Dry-run only; no target executed. `migrate`/`migrate-down` intentionally print a message and exit 1 when really run. | GNU Make 4.4.1 | Real execution needs Docker |
-| Backend tests | `pytest` | Historical PASS: 428 passed, 0 skipped, 87% coverage. Hosted: unverified | `final_build_validation.md` | Infra currently stopped; hosted result pending |
+| Backend tests | `pytest` | Historical PASS: 428 passed, 0 skipped, 87% coverage. **Hosted PASS** (job success, includes PostGIS and Neo4j service tests; skipped tests fail the job) | `final_build_validation.md` | Infra currently stopped; hosted result pending |
 | Frontend checks/build | `tsc`, `next lint`, `next build` | **PASS on hosted CI** (3 consecutive runs) + historical local | CI jobs | — |
-| Playwright | `npx playwright test` | Historical PASS: 53/53 incl. axe. Hosted: blocked at Postgres step in all runs | — | pending image fix |
-| GitHub Actions | `.github/workflows/ci.yml` | Ran 4 times: jobs Security, SQL provenance, Frontend PASS; Backend and E2E FAIL at the Postgres image step. Run for `780eb61`: unknown. | Actions API | check after rate-limit reset |
-| Dependency audits | pip-audit, npm audit, gitleaks | PASS on hosted CI (Security job) + historical 0 findings | CI | — |
+| Playwright | `npx playwright test` | Historical PASS: 53/53 incl. axe. **Hosted PASS** | run 39220815138 | — |
+| GitHub Actions | `.github/workflows/ci.yml` | Latest run: Security, SQL provenance, Frontend, Backend, E2E all PASS. Earlier runs failed (see D). | Actions API, run 39220815138 | — |
+| Dependency audits | pip-audit, npm audit, gitleaks | PASS on hosted CI (Security job; `pip-audit` on the pinned CI requirements) + historical 0 findings | CI | — |
 | Auth / complaint workflows | API + E2E tests | Historical PASS | tests | not re-run now |
 | Retrieval / AI | 13-question eval, real BGE model | Historical PASS; no real LLM | — | no API keys |
 | Official data verification | — | **FAIL / unresolved**: official_verified 0; externally_referenced 1 (PM-Kisan); provisional 76; documents `unverified`; ₹60/"Free" fees unconfirmed | `master_implementation_status.md`, decisions CSV | needs human-validated authoritative evidence |
@@ -62,22 +62,28 @@ A successful local build, if one is later possible, would not prove the hosted r
 | `be07fb5` | CI: `POSTGRES_DB=mygovt` for the container, readiness loop fails with container logs (this was a hypothesis, **not** the root cause); test that CI containers set it |
 | `5b5a9c0` | CI: publish the image-build failure as an annotation (diagnosis aid) |
 | `13b49c8` | Dockerfile base `postgis/postgis:16-3.5` — **wrong**: still bullseye (superseded) |
-| `780eb61` | Dockerfile base `postgres:16-bookworm` + pgdg PostGIS/pgvector packages — unverified |
+| `780eb61` | Dockerfile base `postgres:16-bookworm` + pgdg PostGIS/pgvector packages — confirmed on hosted CI |
+
+| `5a9fd9e` | CI: `.github/scripts/annotate_failure.py` publishes failed-step summaries as annotations |
+| `6a29e90` | `greenlet==3.5.6` added to `requirements-ci.txt` — its absence broke the backend tests (coverage `concurrency=greenlet`) and the E2E API server (SQLAlchemy asyncio). Reproduced in a clean venv built from the file; production already gets it via `sqlalchemy[asyncio]` |
+| `e088b9e` | `setuptools` added to `requirements-ci.txt` — `test_packaging.py` imports the build backend and py3.12 venvs lack setuptools (hosted: 434 passed, 1 failed before this) |
+| `3e42db4` | `setuptools` pinned to 83.0.0 — 80.9.0 failed `pip-audit` (PYSEC-2026-3447), reproduced locally |
+| `a824e5c`, `7a2f468` | Production images `docker/backend/Dockerfile.prod`, `docker/frontend/Dockerfile.prod` + static tests; LF endings for `Dockerfile.*`. **Not built anywhere** |
 
 Consequence to watch: PostGIS version on the new image is whatever pgdg ships for bookworm (not 3.4); earlier PostGIS tests ran on 3.6.2.
 
 ## E. Remaining blockers
 
 * **Critical:** no officially verified government data; do not present as verified.
-* **High:** Postgres image build fix unverified; Docker Compose stack, backend image and every `docker compose`-based Make target never executed.
+* **High:** Docker Compose stack, the backend/frontend images (dev and production) and every `docker compose`-based Make target never executed (no Docker).
 * **High:** production security controls (E list above); no TLS, backups, monitoring.
 * **Medium:** no real boundary data; evidence upload intentionally returns 503; no officer UI; Python 3.11 locally vs 3.12 target.
 * **Low:** Node 20 deprecation notice for `actions/checkout@v4`/`upload-artifact@v4`.
 
 ## F. Ordered next steps
 
-1. After the rate limit resets, read the hosted result for `780eb61`; if the image build still fails, read the new annotation and fix the demonstrated cause.
-2. If it passes, confirm Backend and E2E jobs completed (pytest 0 skipped, Playwright) and compare with the historical numbers.
+1. Retrieve per-job counts (tests passed, Playwright count) for the green run, and compare with the historical 428 + 53.
+2. Add a hosted job that builds the backend, frontend and production images.
 3. Install Docker (Docker Desktop or WSL), then run `docker compose config`, `make up`, `make health`, `make db-verify`, `make test`; record exit codes.
 4. Obtain human-validated official evidence for schemes, departments, services, districts; record `source_document_ref`; promote through reviewed seed changes.
 5. Load authoritative boundaries; re-run PostGIS tests on the project image.
@@ -85,4 +91,4 @@ Consequence to watch: PostGIS version on the new image is whatever pgdg ships fo
 
 ## G. Release decision
 
-`BLOCKED`. Removing the Postgres-image blocker alone would not change this.
+`BLOCKED`. Green hosted CI shows the code builds and its tests pass on a PostGIS/pgvector image; it does not show the data is accurate, the Compose stack works, or the system is production-ready.
