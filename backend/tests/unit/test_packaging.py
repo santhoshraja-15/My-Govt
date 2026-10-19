@@ -102,3 +102,17 @@ def test_compose_does_not_pull_the_removed_dockerhub_minio_image_by_default():
     svc = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["minio"]
     assert not svc["image"].startswith("minio/minio")
     assert svc.get("profiles") == ["storage"]
+
+
+def test_demo_overlay_targets_the_database_that_demo_env_builds():
+    import yaml
+
+    from scripts import demo_env, synth_data
+
+    overlay = yaml.safe_load((ROOT / "docker-compose.demo.yml").read_text(encoding="utf-8"))["services"]
+    assert overlay["backend"]["environment"]["POSTGRES_DB"] == demo_env.DB == overlay["worker"]["environment"]["POSTGRES_DB"]
+    assert overlay["backend"]["environment"]["DEMO_INCLUDE_SYNTHETIC"] == "true"
+    assert synth_data.ALLOWED_DB.match(demo_env.DB)                        # the synthetic-data guard accepts it, `mygovt` stays refused
+    assert not synth_data.ALLOWED_DB.match("mygovt")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "demo:" in makefile and "docker-compose.demo.yml" in makefile and "scripts.demo_env" in makefile

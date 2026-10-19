@@ -1,4 +1,4 @@
-.PHONY: ingest e2e synth-db seed-synthetic eval up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
+.PHONY: demo demo-check ingest e2e synth-db seed-synthetic eval up down build migrate schema migrate-sql db-init db-verify seed seed-verify embed graph-rebuild test eval lint clean logs shell-db shell-backend
 
 # ── Docker ───────────────────────────────────────────────────
 up:
@@ -15,6 +15,15 @@ logs:
 
 logs-backend:
 	docker compose logs -f backend
+
+# ── Demonstration (synthetic, clearly labelled data; see docs/demo.md) ───────────────────
+demo:
+	docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
+	docker compose exec -T backend sh -c 'python -m scripts.demo_env --admin-dsn postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@postgres:5432/postgres'
+	@echo "Frontend: http://localhost:3000   API docs: http://localhost:8000/docs   logins: docs/demo.md"
+
+demo-check:
+	python .github/scripts/check_demo.py http://localhost:8000
 
 # ── Database ─────────────────────────────────────────────────
 migrate:
