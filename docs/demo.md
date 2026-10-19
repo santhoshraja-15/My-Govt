@@ -68,8 +68,9 @@ You can also register a new citizen on `/register`.
 6. **Back to the citizen.** The new status and the officer's remark appear in the complaint history; the dashboard counters changed.
 7. **Isolation.** As the Revenue officer, `GET /api/v1/complaints/{id}` of a Health complaint → **403**; a citizen cannot open another citizen's complaint (403) nor `/officer` (redirected).
 8. **Admin** (`admin@demo.example`). Overview (live counts from the database, the *demonstration mode* notice), complaints with overdue / unassigned filters, department performance, **verification queue** (what still needs official evidence), audit log, service health.
-9. **Assistant** (`/assistant`). Ask *"What is the Kalaignar Magalir Urimai Thogai?"* — answers cite the records and show their verification status; ask something outside the data (*"Who won the cricket match?"*) — it abstains instead of inventing an answer.
-10. **Close** with the limitations below.
+9. **Database Architecture** (admin → *Database Architecture* in the top navigation): the live architecture diagram, the ER diagram of the 50 real tables (search *complaint*, select `complaints.complaint`, tick *Focus on selection*), the relational schema, example queries you can run and explain, and which advanced database concepts exist and which do not. See [database-architecture.md](database-architecture.md).
+10. **Assistant** (`/assistant`). Ask *"What is the Kalaignar Magalir Urimai Thogai?"* — answers cite the records and show their verification status; ask something outside the data (*"Who won the cricket match?"*) — it abstains instead of inventing an answer.
+11. **Close** with the limitations below.
 
 ## 4. What is real and what is demonstration
 

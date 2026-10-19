@@ -21,6 +21,7 @@ MyGovt is an AI-assisted platform that makes Tamil Nadu government schemes, serv
 | 🗺️ **GIS & Jurisdiction** | PostGIS point-in-polygon resolution (tested on synthetic boundaries; real boundary data not loaded) |
 | 🏥 **e-Sevai Services** | 10 curated services (fees / processing times shown as *unconfirmed* until verified) |
 | 🔐 **RBAC Auth** | JWT (PyJWT) + Argon2, role checks, lockout, rate limits, audit trail |
+| 🗄️ **Database Architecture Explorer** | Admin-only interactive view of the real schema: architecture diagram, ER diagram, relational schema, normalization notes, example queries ([docs/database-architecture.md](docs/database-architecture.md)) |
 | 🖥️ **Admin Console** | Live metrics, complaint backlog, department performance, verification queue, schema explorer, audited SQL workspace, audit logs |
 
 ---
@@ -149,6 +150,7 @@ make db-verify        # optional: replays the whole sequence in a throw-away dat
 | Citizen dashboard | http://localhost:3000/dashboard |
 | Officer console | http://localhost:3000/officer (officers, department and state admins) |
 | Admin console | http://localhost:3000/admin (state/system administrators only) |
+| Database Architecture Explorer | http://localhost:3000/database-architecture (state/system administrators only) |
 
 Data stores (PostgreSQL, Neo4j, Redis, MinIO) are bound to `127.0.0.1` only.
 
