@@ -16,8 +16,9 @@ const PASSWORD = process.env.DEMO_PASSWORD || "Demo@12345";
 const OUT = process.argv[2] || path.join(__dirname, "out");
 fs.mkdirSync(OUT, { recursive: true });
 
-const ROLES = ["anonymous", "citizen", "officer", "officer2", "deptadmin", "admin", "sysadmin"];
-const VIEWPORTS = { desktop: { width: 1440, height: 900 }, tablet: { width: 820, height: 1100 }, mobile: { width: 390, height: 844 } };
+const ROLES = (process.env.ROLES || "anonymous,citizen,officer,officer2,deptadmin,admin,sysadmin").split(",");
+const ALL_VIEWPORTS = { desktop: { width: 1440, height: 900 }, tablet: { width: 820, height: 1100 }, mobile: { width: 390, height: 844 } };
+const VIEWPORTS = Object.fromEntries(Object.entries(ALL_VIEWPORTS).filter(([k]) => (process.env.VIEWPORTS || "desktop,tablet,mobile").split(",").includes(k)));
 // Who is supposed to see the real page (everything else must be redirected or refused). "*" = everyone.
 const EXPECT = {
   "/": "*", "/login": "*", "/register": "*", "/schemes": "*", "/schemes/:id": "*", "/services": "*", "/documents": "*",
@@ -46,13 +47,13 @@ async function inspect(page) {
     const inputs = [...document.querySelectorAll("input,select,textarea")].filter((e) => vis(e) && e.type !== "hidden");
     const labelled = (el) => !!(el.getAttribute("aria-label") || el.getAttribute("aria-labelledby") || (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) || el.closest("label") || el.getAttribute("title"));
     const imgs = [...document.images].filter(vis);
-    const headings = [...document.querySelectorAll("h1,h2,h3")].map((h) => `${h.tagName}:${h.textContent.trim().slice(0, 60)}`);
+    const headings = [...document.querySelectorAll("h1,h2,h3")].filter((h) => !h.classList.contains("sr-only") || true).map((h) => `${h.tagName}:${h.textContent.trim().slice(0, 60)}`);
     const levels = headings.map((h) => +h[1]);
     let skipped = 0; for (let i = 1; i < levels.length; i++) if (levels[i] - levels[i - 1] > 1) skipped++;
     const tw = getComputedStyle(document.body).backgroundColor;
     return {
       title: document.title, h1: (document.querySelector("h1")?.textContent || "").trim().slice(0, 80),
-      h1_count: document.querySelectorAll("h1").length, heading_skips: skipped,
+      h1_count: document.querySelectorAll("h1").length, heading_skips: skipped, headings: headings, sections: headings.filter((h) => !h.startsWith("H1")).length,
       overflow_px: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       links: links.length, dead_links: links.filter((a) => { const h = a.getAttribute("href"); return !h || h === "#" || h.startsWith("javascript:"); }).map((a) => name(a).slice(0, 40)),
       links_without_name: links.filter((a) => !name(a) && !a.querySelector("img[alt]")).length,
@@ -114,7 +115,7 @@ async function inspect(page) {
   }
   await browser.close();
   fs.writeFileSync(path.join(OUT, "route_sweep.json"), JSON.stringify(rows, null, 1));
-  const cols = ["role", "route", "expected_access", "http_status", "final_path", "redirected", "title", "h1", "h1_count", "heading_skips", "links", "dead_links", "links_without_name", "buttons", "buttons_without_name",
+  const cols = ["role", "route", "expected_access", "http_status", "final_path", "redirected", "title", "h1", "h1_count", "heading_skips", "sections", "links", "dead_links", "links_without_name", "buttons", "buttons_without_name",
     "inputs", "inputs_without_label", "images", "broken_images", "tailwind_applied", "font", "overflow_desktop", "overflow_tablet", "overflow_mobile", "console_errors", "page_errors", "failed_requests", "placeholder_text", "body_text"];
   const esc = (v) => `"${String(Array.isArray(v) ? v.join("; ") : v ?? "").replace(/"/g, '""')}"`;
   fs.writeFileSync(path.join(OUT, "route_inventory.csv"), [cols.join(","), ...rows.map((r) => cols.map((c) => esc(r[c])).join(","))].join("\n"));
