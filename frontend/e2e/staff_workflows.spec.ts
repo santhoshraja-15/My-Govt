@@ -1,18 +1,18 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { ADMIN_EMAIL, API, CITIZEN_PASSWORD, OFFICER_EMAIL, STAFF_PASSWORD, apiCitizen, bearer, loginViaUI, registerViaUI } from "./helpers";
+import { ADMIN_EMAIL, API, CITIZEN_PASSWORD, DEPTADMIN_EMAIL, OFFICER_EMAIL, STAFF_PASSWORD, apiCitizen, bearer, loginViaUI, registerViaUI } from "./helpers";
 
 const OFFICER2_EMAIL = "e2e-officer2@example.com";
 
 /** First category by name: the fixture officer (e2e_env) belongs to that category's department. */
-async function firstCategoryId(request: APIRequestContext): Promise<number> {
+async function firstCategoryId(request: APIRequestContext, index = 0): Promise<number> {
   const cats = await (await request.get(`${API}/complaints/categories/list`)).json();
-  return cats[0].category_id;
+  return cats[index].category_id;
 }
 
-async function fileComplaint(request: APIRequestContext, token: string, title: string) {
+async function fileComplaint(request: APIRequestContext, token: string, title: string, categoryIndex = 0) {
   const r = await request.post(`${API}/complaints`, {
     headers: bearer(token),
-    data: { title, description: "Created by an automated browser test to exercise the officer workflow.", category_id: await firstCategoryId(request) },
+    data: { title, description: "Created by an automated browser test to exercise the officer workflow.", category_id: await firstCategoryId(request, categoryIndex) },
   });
   expect(r.status()).toBe(201);
   return (await r.json()) as { complaint_id: string; reference_number: string; status: string };
@@ -165,5 +165,52 @@ test.describe("responsive layout", () => {
     await loginViaUI(page, OFFICER_EMAIL, STAFF_PASSWORD, "");
     await expect(page.getByTestId("officer-console")).toBeVisible();
     await noHorizontalScroll(page);
+  });
+});
+
+test.describe("department administrator", () => {
+  test("sees and manages only their own department, assigns its officers, and is refused elsewhere", async ({ page, request }) => {
+    const citizen = await apiCitizen(request);
+    const mine = await fileComplaint(request, citizen.token, "Department admin scope probe");
+    const dtoken = await staffToken(request, DEPTADMIN_EMAIL);
+    const otherDept = await staffToken(request, OFFICER2_EMAIL);
+
+    await loginViaUI(page, DEPTADMIN_EMAIL, STAFF_PASSWORD, "");
+    await expect(page).toHaveURL(/\/officer/);                                          // department admins work in the officer console
+    const api = await (await request.get(`${API}/complaints/assigned?limit=200`, { headers: bearer(dtoken) })).json();
+    await expect(page.getByTestId("officer-scope")).toHaveText(api.department_name);
+    // the statistics on screen are the department's, not the whole state's
+    const openCount = Object.entries(api.status_counts as Record<string, number>).filter(([s]) => !["resolved", "closed", "rejected"].includes(s)).reduce((a, [, v]) => a + v, 0);
+    await expect(page.getByTestId("o-open")).toContainText(String(openCount));
+    await expect(page.getByTestId("o-unassigned")).toContainText(String(api.unassigned));
+
+    // assign an officer of the department (a department admin may pick any of them)
+    await page.getByTestId("staff-row").filter({ hasText: mine.reference_number }).getByRole("button", { name: mine.reference_number }).click();
+    const detail = page.getByTestId("complaint-detail");
+    const options = await detail.getByLabel("Officer to assign").locator("option").allInnerTexts();
+    const label = options.find((o) => o.startsWith("E2E Officer ("));
+    expect(label, options.join(" | ")).toBeTruthy();
+    await detail.getByLabel("Officer to assign").selectOption({ label });
+    await detail.getByTestId("assign-btn").click();
+    await expect(detail.getByTestId("detail-officer")).toHaveText("E2E Officer");
+    // the officer list offers only this department's officers
+    expect(options.some((o) => o.startsWith("E2E Officer Two"))).toBeFalsy();
+
+    // outside the department: refused by the API, not merely hidden in the UI
+    const theirs = await fileComplaint(request, citizen.token, "Other department probe", 1);     // second category routes elsewhere
+    expect((await request.get(`${API}/complaints/${theirs.complaint_id}`, { headers: bearer(otherDept) })).status()).toBe(200);   // it IS the other department's
+    expect((await request.get(`${API}/complaints/${theirs.complaint_id}`, { headers: bearer(dtoken) })).status()).toBe(403);
+    expect((await request.patch(`${API}/complaints/${theirs.complaint_id}/status`, { headers: bearer(dtoken), data: { new_status: "assigned" } })).status()).toBe(403);
+    expect((await request.post(`${API}/complaints/${theirs.complaint_id}/assign`, { headers: bearer(dtoken), data: { officer_id: "00000000-0000-0000-0000-000000000000" } })).status()).toBe(403);
+    const ownList = await (await request.get(`${API}/complaints/assigned?limit=200`, { headers: bearer(dtoken) })).json();
+    expect(ownList.items.map((i: any) => i.reference_number)).not.toContain(theirs.reference_number);
+    // and from the administrator-only areas
+    expect((await request.get(`${API}/admin/overview`, { headers: bearer(dtoken) })).status()).toBe(403);
+    expect((await request.get(`${API}/architecture/overview`, { headers: bearer(dtoken) })).status()).toBe(403);
+    await page.goto("/admin");
+    await expect(page.getByTestId("admin-forbidden")).toBeVisible();
+    await page.goto("/database-architecture");
+    await expect(page).toHaveURL(/\/officer/);
+    await expect(page.getByTestId("nav-database-architecture")).toHaveCount(0);
   });
 });

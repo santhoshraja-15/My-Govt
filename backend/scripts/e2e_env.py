@@ -68,14 +68,15 @@ async def main() -> int:
         first_dept = await conn.fetchval(
             "SELECT default_department_id FROM complaints.complaint_category WHERE is_active ORDER BY category_name LIMIT 1")
         other_dept = next(d for d in depts if d != first_dept)
-        for email, dept, label in (("e2e-officer@example.com", first_dept, "E2E Officer"), ("e2e-officer2@example.com", other_dept, "E2E Officer Two")):
+        for email, dept, label, role in (("e2e-officer@example.com", first_dept, "E2E Officer", "officer"), ("e2e-officer2@example.com", other_dept, "E2E Officer Two", "officer"),
+                                         ("e2e-deptadmin@example.com", first_dept, "E2E Department Admin", "department_admin")):
             authority = await conn.fetchval(
                 "SELECT authority_id FROM administration.authority WHERE department_id=$1 ORDER BY authority_id LIMIT 1", dept)
             oid = await conn.fetchval(
                 "INSERT INTO administration.officer (department_id,authority_id,name,designation,status) "
                 "VALUES ($1,$2,$3,'Test Officer (E2E fixture)','active') RETURNING officer_id", dept, authority, label)
-            await conn.execute("INSERT INTO identity.app_user (email,password_hash,role,officer_id) VALUES ($1,$2,'officer',$3)",
-                               email, hash_password(password), oid)
+            await conn.execute("INSERT INTO identity.app_user (email,password_hash,role,officer_id) VALUES ($1,$2,$3,$4)",
+                               email, hash_password(password), role, oid)
     finally:
         await conn.close()
     print(f"ready: {DB}")
