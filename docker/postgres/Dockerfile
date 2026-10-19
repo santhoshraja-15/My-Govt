@@ -1,4 +1,5 @@
-FROM postgis/postgis:16-3.4
+# postgis 16-3.4 is Debian bullseye, whose pgdg apt repo is gone (pgvector cannot be installed); 3.5 is bookworm-based.
+FROM postgis/postgis:16-3.5
 
 # Install pgvector
 RUN apt-get update \
