@@ -31,7 +31,7 @@ def call(method, path, token=None, body=None):
     req = urllib.request.Request(BASE + path, method=method, data=data,
                                  headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})})
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=25) as r:
             raw = r.read()
             return r.status, raw
     except urllib.error.HTTPError as e:
@@ -60,6 +60,21 @@ def expectation(method, path):
     return "public"
 
 
+def judge(need: str, role: str, method: str, s: int) -> str | None:
+    """The access decision a response must show for this endpoint class, or None when it is acceptable."""
+    if s >= 500 or s == 0:
+        return f"{role}:server-error({s})"
+    if role == "anonymous":
+        return f"anonymous:expected-401({s})" if need in ("auth", "staff", "admin") and s != 401 else None
+    if need == "admin" and role not in ADMIN:
+        return None if s == 403 else (f"{role}:allowed-but-admin-only({s})" if s < 400 else f"{role}:expected-403({s})")
+    if need == "staff" and role not in STAFF:
+        return None if s == 403 else f"{role}:expected-403({s})"
+    if need == "public" and s in (401, 403) and method == "GET":
+        return f"{role}:public-endpoint-refused({s})"
+    return None
+
+
 def main() -> int:
     tokens: dict[str, str | None] = {"anonymous": None}
     for role in ROLES[1:]:
@@ -83,30 +98,13 @@ def main() -> int:
                     "example_id": "schemes_by_department"}.get(param, UUID0))
             if "{schema}" in path and "{table}" in path:
                 url = url.replace(UUID0, "scheme")
-            body = {} if method.upper() in ("POST", "PUT", "PATCH") else None
+            body: dict | None = {} if method.upper() in ("POST", "PUT", "PATCH") else None
             need = expectation(method.upper(), path)
             statuses: dict[str, int] = {}
             for role in ROLES:
                 s, raw = call(method.upper(), url, tokens[role], body)
                 statuses[role] = s
-            verdicts = []
-            for role, s in statuses.items():
-                if s >= 500 or s == 0:
-                    verdicts.append(f"{role}:server-error({s})")
-                elif need == "admin" and role not in ADMIN and s < 400:
-                    verdicts.append(f"{role}:allowed-but-admin-only({s})")
-                elif need == "admin" and role == "anonymous" and s != 401:
-                    verdicts.append(f"anonymous:expected-401({s})")
-                elif need == "admin" and role not in ADMIN and role != "anonymous" and s != 403:
-                    verdicts.append(f"{role}:expected-403({s})")
-                elif need == "staff" and role not in STAFF and role != "anonymous" and s != 403:
-                    verdicts.append(f"{role}:expected-403({s})")
-                elif need == "staff" and role == "anonymous" and s != 401:
-                    verdicts.append(f"anonymous:expected-401({s})")
-                elif need in ("auth", "staff", "admin") and role == "anonymous" and s != 401:
-                    verdicts.append(f"anonymous:expected-401({s})")
-                elif need == "public" and s in (401, 403) and method.upper() == "GET":
-                    verdicts.append(f"{role}:public-endpoint-refused({s})")
+            verdicts = [v for role, s in statuses.items() if (v := judge(need, role, method.upper(), s))]
             row = {"method": method.upper(), "path": path, "operation": op.get("summary") or op.get("operationId", ""), "access_rule": need,
                    **{f"status_{r}": statuses[r] for r in ROLES}, "result": "PASS" if not verdicts else "ANOMALY", "anomalies": "; ".join(verdicts)}
             anomalies += bool(verdicts)

@@ -55,6 +55,8 @@ async def main() -> int:
         await conn.execute(
             "INSERT INTO documents.document_chunk (document_id,chunk_number,content,page_number) VALUES ($1,0,$2,2)", did,
             "The Zorblax scholarship test notice describes a fictional monthly grant used only by automated tests.")
+        from scripts.demo_env import load_demo_rules   # labelled DEMO rules so the eligibility checker has something to evaluate
+        await load_demo_rules(conn)
         for email, role in (("e2e-admin@example.com", "state_admin"), ("e2e-sysadmin@example.com", "system_admin")):
             await conn.execute("INSERT INTO identity.app_user (email,password_hash,role) VALUES ($1,$2,$3)",
                                email, hash_password(password), role)

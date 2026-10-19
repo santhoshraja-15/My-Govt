@@ -203,8 +203,8 @@ export default function HomePage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search schemes, services, or ask a question…"
-                  className="flex-1 bg-transparent text-white placeholder-blue-300 text-sm outline-none"
+                  placeholder="Search schemes, services, or ask a question…" aria-label="Search schemes, services, or ask a question" data-testid="landing-search"
+                  className="flex-1 min-w-0 bg-transparent text-white placeholder-blue-300 text-sm outline-none"
                 />
               </div>
               <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">

@@ -57,25 +57,24 @@ const LIST = `(() => {
     const tok = await tokenFor(role);
     for (const route of routes) {
       if (process.env.ONLY && !process.env.ONLY.split(",").includes(route)) continue;
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+      if (tok) await ctx.addInitScript(({ a, r }) => { localStorage.setItem("access_token", a); localStorage.setItem("refresh_token", r); }, tok);
+      const page = await ctx.newPage();
+      let requests = 0, dialogs = 0;
+      page.on("request", (r) => { if (!r.url().includes("_rsc") && !r.url().includes("/_next/")) requests++; });
+      page.on("dialog", (d) => { dialogs++; d.dismiss().catch(() => {}); });
       const open = async () => {
-        const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
-        if (tok) await ctx.addInitScript(({ a, r }) => { localStorage.setItem("access_token", a); localStorage.setItem("refresh_token", r); }, tok);
-        const page = await ctx.newPage();
         await page.goto(WEB + route, { waitUntil: "load" });
-        await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-        await page.waitForTimeout(700);
-        return { ctx, page };
+        await page.waitForLoadState("networkidle", { timeout: 6000 }).catch(() => {});
+        await page.waitForTimeout(350);
       };
-      let { ctx, page } = await open();
+      await open();
       const controls = await page.evaluate(LIST);
-      await ctx.close();
       for (const c of controls.slice(0, 80)) {
         if (SKIP_NAMES.test(c.name)) { rows.push({ role, route, ...c, effect: "skipped", detail: "sign-out" }); continue; }
-        ({ ctx, page } = await open());
+        await open();
         await page.evaluate(LIST);
-        let requests = 0, dialogs = 0;
-        page.on("request", (r) => { if (!r.url().includes("_rsc") && !r.url().includes("/_next/")) requests++; });
-        page.on("dialog", (d) => { dialogs++; d.dismiss().catch(() => {}); });
+        requests = 0; dialogs = 0;
         await page.evaluate(() => { window.__mut = 0; new MutationObserver((m) => { window.__mut += m.length; }).observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true }); });
         const before = page.url();
         const el = page.locator(`[data-audit-idx="${c.idx}"]`).first();
@@ -87,14 +86,14 @@ const LIST = `(() => {
             const other = opts.find((v) => v !== cur);
             if (other === undefined) { note = "single option"; } else await el.selectOption(other, { timeout: 3000 });
           } else await el.click({ timeout: 3000, force: true });
-        } catch (e) { note = "click failed: " + String(e).split("\n")[0].slice(0, 80); }
-        await page.waitForTimeout(650);
+        } catch (e) { note = "click failed: " + String(e).slice(0, 80).split(" ").join(" "); }
+        await page.waitForTimeout(450);
         const mut = await page.evaluate(() => window.__mut || 0).catch(() => -1);
         const changedUrl = page.url() !== before;
         const effect = note.startsWith("click failed") ? "error" : (changedUrl || mut > 0 || requests > 0 || dialogs > 0) ? "ok" : "NO EFFECT";
         rows.push({ role, route, ...c, effect, detail: [changedUrl ? `navigated:${new URL(page.url()).pathname}` : "", mut > 0 ? `dom:${mut}` : "", requests ? `req:${requests}` : "", dialogs ? "dialog" : "", note].filter(Boolean).join(" ") });
-        await ctx.close();
       }
+      await ctx.close();
       const bad = rows.filter((r) => r.route === route && r.role === role && (r.effect === "NO EFFECT" || r.effect === "error"));
       console.log(`${role.padEnd(10)} ${route.padEnd(44)} controls=${controls.length} noEffect/error=${bad.length}${bad.length ? "  -> " + bad.map((b) => `${b.tag}:"${b.name}"`).join(", ").slice(0, 200) : ""}`);
     }

@@ -20,10 +20,11 @@ export default function DatabaseArchitecturePage() {
   const user = useGuard((r) => r === "state_admin" || r === "system_admin");
   const [tab, setTab] = useState<Tab>("architecture");
   const [selected, setSelected] = useState<string | null>(null);
-  const overview = useAsync(() => architectureApi.overview(), [user?.user_id]);
-  const components = useAsync(() => architectureApi.components(), [user?.user_id]);
-  const tables = useAsync(() => architectureApi.tables(), [user?.user_id]);
-  const rels = useAsync(() => architectureApi.relationships(), [user?.user_id]);
+  const ok = !!user;                               // no API calls until the guard has confirmed an administrator
+  const overview = useAsync(() => architectureApi.overview(), [user?.user_id], ok);
+  const components = useAsync(() => architectureApi.components(), [user?.user_id], ok);
+  const tables = useAsync(() => architectureApi.tables(), [user?.user_id], ok);
+  const rels = useAsync(() => architectureApi.relationships(), [user?.user_id], ok);
 
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
@@ -76,6 +77,7 @@ export default function DatabaseArchitecturePage() {
       </div>
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} data-testid={`panel-${tab}`}>
+        <h2 className="sr-only">{TABS.find(([k]) => k === tab)?.[1]}</h2>
         {tab === "architecture" && (components.data ? <ArchitectureDiagram data={components.data} /> : components.error ? null : <PanelSkeleton label="Loading architecture" />)}
 
         {tab === "er" && (tables.data && rels.data && o ? (

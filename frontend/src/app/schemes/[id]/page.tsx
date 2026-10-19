@@ -6,11 +6,13 @@ import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, ExternalLink, Award, Fil
 import { schemes as schemesAPI } from "@/lib/api";
 import { use } from "react";
 import { VerificationBadge } from "@/components/ui/VerificationBadge";
+import { EligibilityChecker } from "@/components/schemes/EligibilityChecker";
 
 function RuleBadge({ outcome }: { outcome: string }) {
-  if (outcome === "PASS") return <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />;
-  if (outcome === "FAIL") return <XCircle size={14} className="text-red-500 shrink-0" />;
-  return <AlertCircle size={14} className="text-amber-400 shrink-0" />;
+  if (outcome === "PASS") return <span title="You meet this criterion"><CheckCircle2 size={14} className="text-emerald-600 shrink-0" aria-hidden /><span className="sr-only">You meet this criterion</span></span>;
+  if (outcome === "FAIL") return <span title="You do not meet this criterion"><XCircle size={14} className="text-red-600 shrink-0" aria-hidden /><span className="sr-only">You do not meet this criterion</span></span>;
+  if (outcome === "UNKNOWN") return <span title="Unknown: not enough information"><AlertCircle size={14} className="text-amber-700 shrink-0" aria-hidden /><span className="sr-only">Unknown: not enough information</span></span>;
+  return <span title="Not checked yet"><AlertCircle size={14} className="text-slate-500 shrink-0" aria-hidden /><span className="sr-only">Not checked yet</span></span>;
 }
 
 export default function SchemeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,10 +20,15 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
   const [scheme, setScheme] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "eligibility" | "documents" | "benefits">("overview");
+  const [check, setCheck] = useState<any>(null);
 
   useEffect(() => {
     schemesAPI.get(id).then(setScheme).catch(() => setScheme(null)).finally(() => setLoading(false));
   }, [id]);
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "eligibility" || t === "benefits" || t === "documents") setTab(t);
+  }, []);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -53,21 +60,24 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
             <ArrowLeft size={16} /> All Schemes
           </Link>
           <div className="flex flex-wrap gap-3 mb-3">
-            {scheme.department_name && <span className="badge badge-blue">{scheme.department_name}</span>}
+            {scheme.department_name && <span className="badge badge-blue max-w-full truncate" title={scheme.department_name}>{scheme.department_name}</span>}
             {scheme.category && <span className="badge badge-slate capitalize">{scheme.category.replace(/_/g," ")}</span>}
             <span className="badge badge-green capitalize">{scheme.scheme_level}</span>
             <VerificationBadge status={scheme.verification_status} />
           </div>
           <h1 className="text-2xl md:text-3xl font-black mb-2">{scheme.name}</h1>
-          {scheme.name_ta && <p className="text-blue-300 font-tamil text-lg">{scheme.name_ta}</p>}
+          {scheme.name_ta && <p className="text-blue-100 font-tamil text-lg">{scheme.name_ta}</p>}
+          <button type="button" className="btn-primary bg-saffron-500 hover:bg-saffron-600 mt-4" data-testid="check-my-eligibility" onClick={() => { setTab("eligibility"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+            Check my eligibility
+          </button>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Tabs */}
-        <div className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 mb-6 overflow-x-auto">
+        <div role="tablist" aria-label="Scheme sections" className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 mb-6 overflow-x-auto">
           {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as any)}
+            <button key={t.key} role="tab" aria-selected={tab === t.key} data-testid={`scheme-tab-${t.key}`} onClick={() => setTab(t.key as any)}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                 tab === t.key ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}>
               {t.label}
@@ -96,18 +106,26 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                   <p className="font-mono font-semibold text-slate-800">{scheme.scheme_code}</p>
                 </div>
               )}
+              <div className="card p-4 sm:col-span-2" data-testid="source-info">
+                <p className="text-xs text-slate-500 mb-1">Source and verification</p>
+                <p className="text-sm text-slate-700">
+                  {scheme.verification_status === "official_verified"
+                    ? <>Verified against: <span className="font-mono">{scheme.source_document_ref}</span></>
+                    : <>Not yet verified against an official document.{scheme.source_document_ref ? <> The dataset asserts <span className="font-mono">{scheme.source_document_ref}</span>, which has <b>not</b> been confirmed.</> : " No source document is recorded."} Confirm with the department before acting.</>}
+                </p>
+              </div>
             </div>
 
             {(scheme.application_url || scheme.official_source_url) && (
               <div className="card p-5 flex flex-wrap gap-3">
                 {scheme.application_url && (
                   <a href={scheme.application_url} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                    Apply Online <ExternalLink size={14} />
+                    Apply on the official site <ExternalLink size={14} aria-hidden /><span className="sr-only"> (opens an external website)</span>
                   </a>
                 )}
                 {scheme.official_source_url && (
                   <a href={scheme.official_source_url} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-                    Official Source <ExternalLink size={14} />
+                    Official source <ExternalLink size={14} aria-hidden /><span className="sr-only"> (opens an external website)</span>
                   </a>
                 )}
               </div>
@@ -117,6 +135,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
 
         {tab === "eligibility" && (
           <div className="space-y-4 animate-fade-in">
+            <EligibilityChecker scheme={scheme} onResult={setCheck} />
             {!scheme.eligibility_rules?.length ? (
               <div className="card p-8 text-center text-slate-500">
                 <Shield size={36} className="mx-auto mb-2 opacity-40" />
@@ -150,7 +169,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                     <div className="space-y-3">
                       {rules.map((rule: any) => (
                         <div key={rule.rule_id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
-                          <RuleBadge outcome="UNKNOWN" />
+                          <RuleBadge outcome={(check?.rule_results ?? []).find((r: any) => r.rule_id === rule.rule_id)?.outcome ?? "UNCHECKED"} />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-slate-800">{rule.human_readable}</p>
                             {rule.human_readable_ta && (

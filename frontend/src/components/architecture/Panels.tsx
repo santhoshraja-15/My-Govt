@@ -6,12 +6,12 @@ import { architectureApi, matchesTable } from "@/lib/architecture";
 import { EmptyState, ErrorState } from "@/components/ui/AsyncState";
 import { TableDetail } from "@/components/architecture/TableDetail";
 
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], enabled = true) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
-  const run = useCallback(() => { setData(null); setError(""); fn().then(setData).catch((e) => setError(e.message)); },
+  const run = useCallback(() => { if (!enabled) return; setData(null); setError(""); fn().then(setData).catch((e) => setError(e.message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    deps);
+    [enabled, ...deps]);
   useEffect(() => { run(); }, [run]);
   return { data, error, reload: run };
 }

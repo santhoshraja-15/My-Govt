@@ -108,6 +108,7 @@ export const services = {
     return request<any>(`/api/v1/services?${q}`);
   },
   get: (id: string) => request<any>(`/api/v1/services/${id}`),
+  categories: () => request<string[]>("/api/v1/services/categories/list"),
 };
 
 // ── Documents ─────────────────────────────────────────────────

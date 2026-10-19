@@ -78,6 +78,22 @@ async def _upsert_user(conn, email: str, role: str, password: str, officer_id=No
         email, hash_password(password), role, officer_id)
 
 
+async def load_demo_rules(conn) -> int:
+    """(Re)load the labelled DEMO eligibility rules; replaces only rules whose source starts with 'DEMO RULE'."""
+    await conn.execute("DELETE FROM schemes.eligibility_rule WHERE source_reference LIKE 'DEMO RULE%'")
+    n = 0
+    for scheme_id, rules in DEMO_RULES.items():
+        if not await conn.fetchval("SELECT 1 FROM schemes.scheme WHERE scheme_id=$1::uuid", scheme_id):
+            continue
+        for attribute, operator, value, text in rules:
+            await conn.execute(
+                "INSERT INTO schemes.eligibility_rule (scheme_id,rule_group,attribute,operator,value,mandatory,human_readable,source_reference) "
+                "VALUES ($1::uuid,1,$2,$3,$4::jsonb,true,$5,'DEMO RULE - not an official criterion')",
+                scheme_id, attribute, operator, json.dumps(value), f"[DEMO RULE] {text}")
+            n += 1
+    return n
+
+
 async def build_database(admin_dsn: str, reset: bool, db: str = DB) -> str:
     admin = await asyncpg.connect(admin_dsn)
     try:
@@ -153,18 +169,7 @@ async def populate(dsn: str, password: str) -> dict:
                 "VALUES ($1,'female','farmer',180000,'BC','rural',$2,4,false,false,false)", cid, district)
             await conn.execute("INSERT INTO identity.consent (citizen_id,purpose,granted) VALUES ($1,'profile_based_scheme_matching',true)", cid)
 
-        # --- demo eligibility rules (replace previous demo rules only) --------------------------
-        await conn.execute("DELETE FROM schemes.eligibility_rule WHERE source_reference LIKE 'DEMO RULE%'")
-        n_rules = 0
-        for scheme_id, rules in DEMO_RULES.items():
-            if not await conn.fetchval("SELECT 1 FROM schemes.scheme WHERE scheme_id=$1::uuid", scheme_id):
-                continue
-            for attribute, operator, value, text in rules:
-                await conn.execute(
-                    "INSERT INTO schemes.eligibility_rule (scheme_id,rule_group,attribute,operator,value,mandatory,human_readable,source_reference) "
-                    "VALUES ($1::uuid,1,$2,$3,$4::jsonb,true,$5,'DEMO RULE - not an official criterion')",
-                    scheme_id, attribute, operator, json.dumps(value), f"[DEMO RULE] {text}")
-                n_rules += 1
+        n_rules = await load_demo_rules(conn)
         out["demo_eligibility_rules"] = n_rules
 
         # --- synthetic complaints ------------------------------------------------------------------
