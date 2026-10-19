@@ -31,7 +31,7 @@ const NODE_TYPES = { component: ComponentNode };
 function Detail({ c, byId, onSelect }: { c: any; byId: Record<string, any>; onSelect: (id: string) => void }) {
   const st = STATUS_STYLE[c.status] ?? STATUS_STYLE.unknown;
   return (
-    <div className="card p-5 space-y-3 text-sm" data-testid="arch-detail" data-component={c.id}>
+    <div className="card p-5 space-y-3 text-sm min-w-0 [overflow-wrap:anywhere]" data-testid="arch-detail" data-component={c.id}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-lg font-bold text-slate-900">{c.name}</h3>
         <span className={`badge ${st.cls}`}>{st.label}</span>

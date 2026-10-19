@@ -35,7 +35,7 @@ export function TableDetail({ tableKey, inferred = [], onSelect }: { tableKey: s
   const mine = inferred.filter((r) => r.from_table === d.key || r.to_table === d.key);
 
   return (
-    <div className="space-y-5 text-sm" data-testid="table-detail" data-table={d.key}>
+    <div className="space-y-5 text-sm min-w-0 [overflow-wrap:anywhere]" data-testid="table-detail" data-table={d.key}>
       <header>
         <p className="text-xs text-slate-500 flex items-center gap-1"><Table2 size={12} aria-hidden /> {d.domain}</p>
         <h3 className="text-lg font-bold text-slate-900 font-mono break-all" data-testid="detail-title">{d.key}</h3>

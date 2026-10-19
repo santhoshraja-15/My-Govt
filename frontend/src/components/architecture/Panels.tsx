@@ -62,7 +62,7 @@ export function RelationalSchemaPanel({ schemas }: { schemas: any[] }) {
         {rows.length > 0 && (
           <ul className="space-y-3" data-testid="relation-list">
             {rows.map((r: any) => (
-              <li key={r.table} className="card p-4" data-relation={r.table}>
+              <li key={r.table} className="card p-4 min-w-0 [overflow-wrap:anywhere]" data-relation={r.table}>
                 <p className="font-mono text-sm break-words text-slate-900">{r.notation}</p>
                 <p className="text-xs text-slate-500 mt-1 font-mono">{r.table}</p>
                 <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-700">
@@ -127,7 +127,7 @@ function ExampleCard({ ex }: { ex: any }) {
     setBusy(false);
   };
   return (
-    <article className="card p-4 space-y-2" data-testid="example-card" data-example={ex.id}>
+    <article className="card p-4 space-y-2 min-w-0 [overflow-wrap:anywhere]" data-testid="example-card" data-example={ex.id}>
       <h3 className="font-bold text-slate-900">{ex.title}</h3>
       <p className="text-sm text-slate-700"><b>Purpose:</b> {ex.purpose}</p>
       <p className="text-xs text-slate-600"><b>Tables:</b> <span className="font-mono">{ex.tables.join(", ")}</span></p>
@@ -191,7 +191,7 @@ export function ImplementationPanel({ tables, schemas, selected, onSelect, infer
         {impl.data && (
           <div className="grid md:grid-cols-3 gap-4 text-xs" data-testid="database-files">
             {([["Baseline schema", impl.data.files.schema], ["Migrations (applied in order)", impl.data.files.migrations], ["Seed scripts", impl.data.files.seeds]] as const).map(([title, files]) => (
-              <div key={title} className="card p-4"><h3 className="font-semibold text-slate-800 mb-2">{title} ({files.length})</h3>
+              <div key={title} className="card p-4 min-w-0 [overflow-wrap:anywhere]"><h3 className="font-semibold text-slate-800 mb-2">{title} ({files.length})</h3>
                 <ul className="font-mono space-y-0.5">{files.map((f: any) => <li key={f.file}>{f.file.split("/").pop()} <span className="text-slate-500">· {(f.bytes / 1024).toFixed(1)} KB</span></li>)}{files.length === 0 && <li className="text-slate-500 font-sans">Not found in this deployment.</li>}</ul></div>))}
             <div className="md:col-span-3 card p-4"><h3 className="font-semibold text-slate-800 mb-1">Engine</h3>
               <p>{impl.data.engine}. Extensions: {Object.entries(impl.data.extensions).map(([k, v]) => `${k} ${v}`).join(", ") || "—"}.</p></div>
@@ -218,7 +218,7 @@ export function AdvancedPanel() {
       <p className="text-sm text-slate-600 max-w-3xl">Only mechanisms that exist in this repository are shown as <b>Implemented</b>. Anything absent is labelled <b>Not implemented</b> and explained.</p>
       <div className="grid lg:grid-cols-2 gap-4">
         {adv.data.concepts.map((c: any) => (
-          <article key={c.concept} className="card p-4 space-y-2" data-testid="concept-card" data-concept={c.concept} data-status={c.status}>
+          <article key={c.concept} className="card p-4 space-y-2 min-w-0 [overflow-wrap:anywhere]" data-testid="concept-card" data-concept={c.concept} data-status={c.status}>
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-bold text-slate-900">{c.concept}</h3>
               <span className={`badge ${c.status === "Implemented" ? "badge-green" : "badge-slate"}`}>{c.status}</span>

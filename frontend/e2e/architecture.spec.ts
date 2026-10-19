@@ -247,6 +247,20 @@ test.describe("responsive and accessible", () => {
     expect(box && box.width > 300 && box.height > 400).toBeTruthy();
   });
 
+  test("very long unbreakable strings (paths, identifiers) never widen the page on a phone", async ({ page }) => {
+    const long = "backend/app/services/" + "very_long_unbreakable_identifier_".repeat(8) + ".py";
+    await page.route("**/api/v1/architecture/advanced", async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      body.concepts = body.concepts.map((c: any) => ({ ...c, location: long, summary: long }));
+      await route.fulfill({ response: res, json: body });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAsAdmin(page, ADMIN_EMAIL, "advanced");
+    await expect(page.getByTestId("concept-card").first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  });
+
   test("tablet width keeps the tabs and diagram usable", async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1100 });
     await openAsAdmin(page, ADMIN_EMAIL, "er");
