@@ -69,6 +69,15 @@ def is_sla_breached(due_date: datetime | None, status: str, now: datetime) -> bo
     return due_date is not None and due_date < now and status not in ("resolved", "closed", "rejected")
 
 
+def staff_can_act_on(role: str, user_department_id, complaint_department_id) -> bool:
+    """State/system admins act on every complaint; officers and department admins only inside their own department."""
+    if role in ("state_admin", "system_admin"):
+        return True
+    if role in ("officer", "department_admin"):
+        return user_department_id is not None and user_department_id == complaint_department_id
+    return False
+
+
 def can_view_complaint(role: str, user_citizen_id, complaint_citizen_id) -> bool:
     """Staff may read any complaint; citizens only their own."""
     if role in STAFF_ROLES:

@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     # Features
     FEATURE_VOICE: bool = False
     FEATURE_GRAPH: bool = True
+    # Demo databases only: include is_synthetic complaints in staff lists and admin statistics (always labelled).
+    DEMO_INCLUDE_SYNTHETIC: bool = False
     FEATURE_VECTOR_SEARCH: bool = True
 
     @model_validator(mode="after")

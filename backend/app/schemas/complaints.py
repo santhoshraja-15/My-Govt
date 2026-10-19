@@ -91,6 +91,11 @@ class ComplaintStatusUpdate(BaseModel):
     is_public_note: bool = True
 
 
+class ComplaintAssign(BaseModel):
+    officer_id: Optional[str] = Field(default=None, max_length=64)
+    remarks: Optional[str] = Field(default=None, max_length=500)
+
+
 class CategoryOut(BaseModel):
     category_id: int
     name: str

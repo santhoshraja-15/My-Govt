@@ -77,3 +77,25 @@ async def make_citizen(client):
         return {"email": email, "user": r.json(), "login": body, "headers": auth(body["access_token"])}
 
     return _make
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def make_officer(conn):
+    """Create an officer record in a department plus a linked login; returns (user_id, headers, officer_id)."""
+    async def _make(department_id: int, role: str = "officer"):
+        authority = await conn.fetchval(
+            "SELECT authority_id FROM administration.authority WHERE department_id=$1 ORDER BY authority_id LIMIT 1", department_id)
+        if authority is None:
+            authority = await conn.fetchval(
+                "INSERT INTO administration.authority (department_id, authority_type, authority_name, jurisdiction_level) "
+                "VALUES ($1,'state','Test authority','state') RETURNING authority_id", department_id)
+        oid = await conn.fetchval(
+            "INSERT INTO administration.officer (department_id, authority_id, name, designation, status) "
+            "VALUES ($1,$2,'Test Officer','Junior Engineer','active') RETURNING officer_id", department_id, authority)
+        uid = uuid.uuid4()
+        await conn.execute(
+            "INSERT INTO identity.app_user (user_id, email, password_hash, role, status, officer_id) VALUES ($1,$2,$3,$4,'active',$5)",
+            uid, f"{role}-{uid.hex[:8]}@example.com", hash_password(PASSWORD), role, oid)
+        return uid, auth(create_access_token({"sub": str(uid), "role": role})), oid
+
+    return _make

@@ -64,15 +64,17 @@ async def _events(conn, action, since_id):
     return await conn.fetch("SELECT * FROM audit.audit_log WHERE action=$1 AND audit_id>$2 ORDER BY audit_id", action, since_id)
 
 
-async def test_sensitive_actions_are_audited_without_secrets(client, make_citizen, make_staff, conn):
+async def test_sensitive_actions_are_audited_without_secrets(client, make_citizen, make_officer, conn):
     mark = await conn.fetchval("SELECT coalesce(max(audit_id),0) FROM audit.audit_log")
     c = await make_citizen("Audit Person")
     await client.post(f"{API}/auth/login", json={"email": c["email"], "password": "wrong-password"})
 
     comp = (await client.post(f"{API}/complaints", headers=c["headers"],
                               json={"title": "Audit me", "description": "A complaint to check the audit trail"})).json()
-    _, officer = await make_staff("officer")
+    dept = await conn.fetchval("SELECT department_id FROM administration.department ORDER BY 1 LIMIT 1")
+    _, officer, _ = await make_officer(dept)
     cid = await conn.fetchval("SELECT complaint_id FROM complaints.complaint WHERE complaint_ref=$1", comp["reference_number"])
+    await conn.execute("UPDATE complaints.complaint SET department_id=$1 WHERE complaint_id=$2", dept, cid)
     await client.patch(f"{API}/complaints/{cid}/status", headers=officer, json={"new_status": "classified", "remarks": "ok"})
     await client.patch(f"{API}/complaints/{cid}/status", headers=officer, json={"new_status": "closed"})   # illegal -> failure event
     await client.put(f"{API}/citizens/profile", headers=c["headers"],

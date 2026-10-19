@@ -130,11 +130,13 @@ async def test_my_complaints_pagination_and_isolation(client, make_citizen):
     assert (await client.get(f"{API}/mine")).status_code == 401
 
 
-async def test_complaint_detail_authorization(client, make_citizen, make_staff, conn):
+async def test_complaint_detail_authorization(client, make_citizen, make_officer, conn):
     owner, other = await make_citizen(), await make_citizen()
-    _, officer = await make_staff("officer")
+    dept = await conn.fetchval("SELECT department_id FROM administration.department ORDER BY 1 LIMIT 1")
+    _, officer, _ = await make_officer(dept)
     out = await _submit(client, owner["headers"], address="12 Anna Salai")
     cid = await conn.fetchval("SELECT complaint_id FROM complaints.complaint WHERE complaint_ref=$1", out["reference_number"])
+    await conn.execute("UPDATE complaints.complaint SET department_id=$1 WHERE complaint_id=$2", dept, cid)
     url = f"{API}/{cid}"
     mine = await client.get(url, headers=owner["headers"])
     assert mine.status_code == 200 and mine.json()["address"] == "12 Anna Salai" and mine.json()["timeline"]
@@ -145,11 +147,13 @@ async def test_complaint_detail_authorization(client, make_citizen, make_staff, 
 
 
 # -- status transitions ----------------------------------------------------------------
-async def test_status_update_rbac_and_state_machine(client, make_citizen, make_staff, conn):
+async def test_status_update_rbac_and_state_machine(client, make_citizen, make_officer, conn):
     owner = await make_citizen()
-    uid, officer = await make_staff("officer")
+    dept = await conn.fetchval("SELECT department_id FROM administration.department ORDER BY 1 LIMIT 1")
+    uid, officer, _ = await make_officer(dept)
     out = await _submit(client, owner["headers"])
     cid = await conn.fetchval("SELECT complaint_id FROM complaints.complaint WHERE complaint_ref=$1", out["reference_number"])
+    await conn.execute("UPDATE complaints.complaint SET department_id=$1 WHERE complaint_id=$2", dept, cid)
     url = f"{API}/{cid}/status"
 
     assert (await client.patch(url, headers=owner["headers"], json={"new_status": "classified"})).status_code == 403
@@ -210,3 +214,110 @@ async def test_scheduler_escalates_only_legal_overdue_complaints(client, make_ci
     assert (esc["from_authority_id"], esc["to_authority_id"], esc["status"]) == (child, parent, "open")
 
     assert await escalate_overdue_complaints(session_factory) == 0   # idempotent: nothing left to escalate
+
+
+# -- staff scoping, listing and assignment ------------------------------------------------
+async def _complaint_in(client, conn, headers, dept, status="classified"):
+    out = await _submit(client, headers)
+    cid = await conn.fetchval("SELECT complaint_id FROM complaints.complaint WHERE complaint_ref=$1", out["reference_number"])
+    await conn.execute("UPDATE complaints.complaint SET department_id=$1, status=$2 WHERE complaint_id=$3", dept, status, cid)
+    return str(cid), out["reference_number"]
+
+
+async def _two_departments(conn):
+    rows = await conn.fetch("SELECT department_id FROM administration.department ORDER BY 1 LIMIT 2")
+    return rows[0][0], rows[1][0]
+
+
+async def test_officer_cannot_read_or_update_another_departments_complaint(client, make_citizen, make_officer, conn):
+    d1, d2 = await _two_departments(conn)
+    _, off1, _ = await make_officer(d1)
+    cid, _ref = await _complaint_in(client, conn, (await make_citizen())["headers"], d2)
+    assert (await client.get(f"{API}/{cid}", headers=off1)).status_code == 403
+    r = await client.patch(f"{API}/{cid}/status", headers=off1, json={"new_status": "assigned"})
+    assert r.status_code == 403
+    assert await conn.fetchval("SELECT status FROM complaints.complaint WHERE complaint_id=$1::uuid", cid) == "classified"
+
+
+async def test_state_admin_acts_across_departments(client, make_citizen, make_staff, conn):
+    d1, d2 = await _two_departments(conn)
+    _, admin = await make_staff("state_admin")
+    for d in (d1, d2):
+        cid, _ = await _complaint_in(client, conn, (await make_citizen())["headers"], d)
+        assert (await client.get(f"{API}/{cid}", headers=admin)).status_code == 200
+        assert (await client.patch(f"{API}/{cid}/status", headers=admin, json={"new_status": "assigned"})).status_code == 200
+
+
+async def test_staff_list_is_scoped_to_the_department_and_citizens_are_refused(client, make_citizen, make_officer, make_staff, conn):
+    d1, d2 = await _two_departments(conn)
+    _, off1, _ = await make_officer(d1)
+    c = (await make_citizen())["headers"]
+    _in1, ref1 = await _complaint_in(client, conn, c, d1)
+    _in2, ref2 = await _complaint_in(client, conn, c, d2)
+    body = (await client.get(f"{API}/assigned?limit=200", headers=off1)).json()
+    refs = {i["reference_number"] for i in body["items"]}
+    assert ref1 in refs and ref2 not in refs and body["department_scope"] == d1
+    assert {"status_counts", "demo_data_included"} <= set(body) and all("allowed_next" in i for i in body["items"])
+    assert (await client.get(f"{API}/assigned", headers=c)).status_code == 403
+    assert (await client.get(f"{API}/assigned")).status_code == 401
+    _, admin = await make_staff("state_admin")
+    all_refs = {i["reference_number"] for i in (await client.get(f"{API}/assigned?limit=200", headers=admin)).json()["items"]}
+    assert {ref1, ref2} <= all_refs
+
+
+async def test_unlinked_officer_account_is_refused_not_given_everything(client, make_staff):
+    _, officer = await make_staff("officer")                   # no officer record -> no department
+    assert (await client.get(f"{API}/assigned", headers=officer)).status_code == 403
+    assert (await client.get(f"{API}/officers", headers=officer)).status_code == 403
+
+
+async def test_officer_self_assigns_and_the_complaint_moves_to_assigned_with_history(client, make_citizen, make_officer, conn):
+    d1, _ = await _two_departments(conn)
+    uid, off, oid = await make_officer(d1)
+    cid, _ = await _complaint_in(client, conn, (await make_citizen())["headers"], d1)
+    r = await client.post(f"{API}/{cid}/assign", headers=off, json={})
+    assert r.status_code == 200 and r.json()["status"] == "assigned"
+    row = await conn.fetchrow("SELECT status, assigned_officer_id FROM complaints.complaint WHERE complaint_id=$1::uuid", cid)
+    assert row["status"] == "assigned" and row["assigned_officer_id"] == oid
+    hist = await conn.fetch("SELECT new_status, remarks, changed_by FROM complaints.complaint_history WHERE complaint_id=$1::uuid ORDER BY history_id", cid)
+    assert hist[-1]["new_status"] == "assigned" and hist[-1]["changed_by"] == uid and hist[-1]["remarks"].startswith("Assigned to")
+    mine = (await client.get(f"{API}/assigned?mine=true", headers=off)).json()
+    assert [i["complaint_id"] for i in mine["items"]] == [cid] and mine["items"][0]["officer_id"] == str(oid)
+
+
+async def test_assignment_rules(client, make_citizen, make_officer, conn):
+    d1, d2 = await _two_departments(conn)
+    _, off1, _ = await make_officer(d1)
+    _, _other_headers, other_oid = await make_officer(d1)
+    _, _, foreign_oid = await make_officer(d2)
+    c = await make_citizen()
+    cid, _ = await _complaint_in(client, conn, c["headers"], d1)
+    # an officer may not assign to someone else, citizens may not assign at all
+    assert (await client.post(f"{API}/{cid}/assign", headers=off1, json={"officer_id": str(other_oid)})).status_code == 403
+    assert (await client.post(f"{API}/{cid}/assign", headers=c["headers"], json={})).status_code == 403
+    assert (await client.post(f"{API}/{cid}/assign", json={})).status_code == 401
+    # a department admin may assign to any officer of that department, but not to another department's officer
+    _, dadm, _ = await make_officer(d1, role="department_admin")
+    assert (await client.post(f"{API}/{cid}/assign", headers=dadm, json={"officer_id": str(foreign_oid)})).status_code == 400
+    ok = await client.post(f"{API}/{cid}/assign", headers=dadm, json={"officer_id": str(other_oid)})
+    assert ok.status_code == 200 and ok.json()["officer_id"] == str(other_oid)
+    # another department's staff cannot touch it
+    _, off2, _ = await make_officer(d2)
+    assert (await client.post(f"{API}/{cid}/assign", headers=off2, json={})).status_code == 403
+    assert (await client.post(f"{API}/00000000-0000-0000-0000-000000000000/assign", headers=off1, json={})).status_code == 404
+    listed = (await client.get(f"{API}/officers", headers=dadm)).json()
+    ids = {o["officer_id"] for o in listed}
+    assert str(other_oid) in ids and str(foreign_oid) not in ids
+
+
+async def test_citizen_sees_officer_remarks_and_new_status_after_staff_update(client, make_citizen, make_officer, conn):
+    d1, _ = await _two_departments(conn)
+    _, off, _ = await make_officer(d1)
+    c = await make_citizen()
+    cid, ref = await _complaint_in(client, conn, c["headers"], d1, status="assigned")
+    patch = await client.patch(f"{API}/{cid}/status", headers=off, json={"new_status": "in_progress", "remarks": "Crew dispatched"})
+    assert patch.status_code == 200
+    detail = (await client.get(f"{API}/{cid}", headers=c["headers"])).json()
+    assert detail["status"] == "in_progress" and detail["timeline"][-1]["remarks"] == "Crew dispatched"
+    mine = (await client.get(f"{API}/mine", headers=c["headers"])).json()
+    assert any(i["reference_number"] == ref and i["status"] == "in_progress" for i in mine["items"])
