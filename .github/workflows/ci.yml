@@ -382,7 +382,10 @@ jobs:
       - name: Report failure as annotation
         if: failure()
         run: |
-          { docker compose ps; for s in backend postgres worker frontend; do echo "== $s"; docker compose logs --tail=25 $s 2>&1; done; \
+          { docker compose ps; echo '== detailed health'; \
+            docker compose exec -T backend python -c "import asyncio,json; from app.core.health import get_health_status; print(json.dumps(asyncio.run(get_health_status(True)), default=str))" 2>&1 | tail -n 5; \
+            echo '== redis from backend'; docker compose exec -T backend python -c "import asyncio,redis.asyncio as r,os; u=os.environ.get('REDIS_URL'); print('REDIS_URL host:', u.split('@')[-1] if u else None); print(asyncio.run(r.from_url(u).ping()))" 2>&1 | tail -n 5; \
+            for s in backend postgres worker frontend redis; do echo "== $s"; docker compose logs --tail=25 $s 2>&1; done; \
             for f in compose-up.log dbinit.log dbverify.log seedverify.log; do [ -f $f ] && { echo "== $f"; tail -n 15 $f; }; done; } > compose-failure.log 2>&1 || true
           python3 .github/scripts/annotate_failure.py "compose job failed" compose-failure.log 60
 

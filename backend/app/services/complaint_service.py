@@ -402,8 +402,18 @@ class ComplaintService:
             m = dict(r._mapping)
             m["allowed_next"] = list(rules.TRANSITIONS.get(m["status"], ()))
             items.append(m)
+        scope_params = {"dept": scope} if scope is not None else {}
+        extra = (await self.db.execute(text(f"""
+            SELECT count(*) FILTER (WHERE c.due_date < now() AND c.status NOT IN ('resolved','closed','rejected'))::int,
+                   count(*) FILTER (WHERE c.assigned_officer_id IS NULL AND c.status NOT IN ('resolved','closed','rejected'))::int
+            FROM complaints.complaint c WHERE {base}"""), scope_params)).fetchone()
+        dept_name = None
+        if scope is not None:
+            dept_name = (await self.db.execute(
+                text("SELECT department_name FROM administration.department WHERE department_id = :d"), {"d": scope})).scalar()
         return {"total": total, "items": items, "limit": limit, "offset": offset,
-                "status_counts": {k: v for k, v in counts}, "department_scope": scope,
+                "status_counts": {k: v for k, v in counts}, "department_scope": scope, "department_name": dept_name,
+                "overdue": extra[0] if extra else 0, "unassigned": extra[1] if extra else 0,
                 "demo_data_included": settings.DEMO_INCLUDE_SYNTHETIC}
 
     async def officers_for(self, user) -> list:

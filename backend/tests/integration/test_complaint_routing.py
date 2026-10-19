@@ -22,7 +22,8 @@ async def test_seed_creates_placeholder_authority_per_department(conn):
     assert {r["verification_status"] for r in rows} == {"provisional"}
     assert all(r["jurisdiction_level"] == "state" and r["parent_authority_id"] is None for r in rows)
     # nothing invented: no officers were created
-    assert await conn.fetchval("SELECT count(*) FROM administration.officer") == 0
+    # (the shared test database also holds officers that other tests create through the make_officer fixture)
+    assert await conn.fetchval("SELECT count(*) FROM administration.officer WHERE name <> 'Test Officer'") == 0
 
 
 async def test_every_category_has_a_routing_rule(conn):

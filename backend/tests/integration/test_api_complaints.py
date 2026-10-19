@@ -257,7 +257,10 @@ async def test_staff_list_is_scoped_to_the_department_and_citizens_are_refused(c
     body = (await client.get(f"{API}/assigned?limit=200", headers=off1)).json()
     refs = {i["reference_number"] for i in body["items"]}
     assert ref1 in refs and ref2 not in refs and body["department_scope"] == d1
-    assert {"status_counts", "demo_data_included"} <= set(body) and all("allowed_next" in i for i in body["items"])
+    assert {"status_counts", "demo_data_included", "overdue", "unassigned", "department_name"} <= set(body)
+    assert all("allowed_next" in i for i in body["items"])
+    assert body["department_name"] == await conn.fetchval("SELECT department_name FROM administration.department WHERE department_id=$1", d1)
+    assert body["unassigned"] >= 1 and isinstance(body["overdue"], int)
     assert (await client.get(f"{API}/assigned", headers=c)).status_code == 403
     assert (await client.get(f"{API}/assigned")).status_code == 401
     _, admin = await make_staff("state_admin")
