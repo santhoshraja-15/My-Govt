@@ -62,13 +62,13 @@ export function nodeHeight(t: any, compact: boolean): number {
 }
 
 /** Domain-grouped layout: tables of one schema form a block; blocks flow left to right and wrap. Deterministic. */
-export function layoutTables(tables: any[], schemaOrder: string[], compact: boolean): { positions: Record<string, Positioned>; labels: { schema: string; x: number; y: number; w: number }[] } {
+export function layoutTables(tables: any[], schemaOrder: string[], compact: boolean, maxRowWidth = 2700): { positions: Record<string, Positioned>; labels: { schema: string; x: number; y: number; w: number }[] } {
   const bySchema = new Map<string, any[]>();
   for (const t of tables) bySchema.set(t.schema, [...(bySchema.get(t.schema) ?? []), t]);
   const order = [...schemaOrder.filter((s) => bySchema.has(s)), ...[...bySchema.keys()].filter((s) => !schemaOrder.includes(s))];
   const positions: Record<string, Positioned> = {};
   const labels: { schema: string; x: number; y: number; w: number }[] = [];
-  const GAP_X = 50, GAP_Y = 24, BLOCK_GAP = 90, MAX_ROW_WIDTH = 3300, LABEL_H = 46;
+  const GAP_X = 50, GAP_Y = 24, BLOCK_GAP = 90, MAX_ROW_WIDTH = maxRowWidth, LABEL_H = 46;
   let cursorX = 0, cursorY = 0, rowHeight = 0;
   for (const schema of order) {
     const group = bySchema.get(schema)!.slice().sort((a, b) => a.name.localeCompare(b.name));

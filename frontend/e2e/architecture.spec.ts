@@ -123,6 +123,23 @@ test.describe("real metadata", () => {
     await expect(page.getByTestId("table-detail")).not.toHaveAttribute("data-table", key);
   });
 
+  test("ER diagram: focus mode shows exactly the selected table and its related tables", async ({ page, request }) => {
+    const token = await adminToken(request);
+    const rels = await get(request, token, "/relationships");
+    const key = "complaints.complaint_category";
+    const connected = new Set<string>([key]);
+    for (const f of rels.foreign_keys) if (f.from_table === key || f.to_table === key) { connected.add(f.from_table); connected.add(f.to_table); }
+    await openAsAdmin(page, ADMIN_EMAIL, "er");
+    await page.getByTestId("er-focus").check();
+    await expect(page.getByTestId("er-counts")).toContainText("Select a table to focus on it");
+    await page.locator(`[data-testid="er-node"][data-table="${key}"]`).dispatchEvent("click");
+    await expect(page.getByTestId("er-node")).toHaveCount(connected.size);
+    for (const t of connected) await expect(page.locator(`[data-testid="er-node"][data-table="${t}"]`)).toHaveCount(1);
+    await page.getByTestId("er-focus").uncheck();
+    await expect(page.getByTestId("er-node").first()).toBeVisible();
+    expect(await page.getByTestId("er-node").count()).toBeGreaterThan(connected.size);
+  });
+
   test("ER diagram: search, schema filter, compact mode, fit and reset", async ({ page, request }) => {
     const token = await adminToken(request);
     const total = (await get(request, token, "/tables")).total;

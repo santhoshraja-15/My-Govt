@@ -62,11 +62,20 @@ function Diagram({ tables, relationships, schemas, selected, onSelect }: Props) 
   const [compact, setCompact] = useState(false);
   const [labels, setLabels] = useState(false);
   const [inferred, setInferred] = useState(false);
+  const [focus, setFocus] = useState(false);
   const [version, setVersion] = useState(0);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const fitTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const visible = useMemo(() => tables.filter((t) => active.has(t.schema) && (matchesTable(t, search) || t.key === selected)), [tables, active, search, selected]);
+  // focus mode: only the selected table and the tables it is directly related to (schema/search filters are ignored)
+  const focusSet = useMemo(() => {
+    if (!focus || !selected) return null;
+    const every = [...relationships.foreign_keys, ...relationships.many_to_many, ...(inferred ? relationships.inferred : [])];
+    return neighbours(selected, every).tables;
+  }, [focus, selected, relationships, inferred]);
+  const visible = useMemo(() => tables.filter((t) => (focusSet
+    ? focusSet.has(t.key)
+    : active.has(t.schema) && (matchesTable(t, search) || t.key === selected))), [tables, active, search, selected, focusSet]);
   const visibleKeys = useMemo(() => new Set(visible.map((t) => t.key)), [visible]);
   const colorOf = useMemo(() => Object.fromEntries(schemas.map((s) => [s.name, s.color])), [schemas]);
 
@@ -82,9 +91,9 @@ function Diagram({ tables, relationships, schemas, selected, onSelect }: Props) 
   const near = useMemo(() => neighbours(selected, rels), [selected, rels]);
 
   // structure: rebuilt when the visible set, density or layout version changes (user-dragged positions survive highlighting)
-  const structureKey = `${[...visibleKeys].sort().join("|")}#${compact}#${version}`;
+  const structureKey = `${[...visibleKeys].sort().join("|")}#${compact}#${version}#${focusSet ? "f" : "a"}`;
   useEffect(() => {
-    const { positions, labels: heads } = layoutTables(visible, schemas.map((s) => s.name), compact);
+    const { positions, labels: heads } = layoutTables(visible, schemas.map((s) => s.name), compact, focusSet ? 1300 : 2700);
     const next: Node[] = [
       ...heads.map((h) => ({ id: `label:${h.schema}`, type: "domain", position: { x: h.x, y: h.y }, draggable: false, selectable: false, focusable: false,
         data: { label: `${schemas.find((s) => s.name === h.schema)?.domain ?? h.schema} (${h.schema})`, color: colorOf[h.schema] ?? "#64748b", w: h.w } })),
@@ -101,6 +110,14 @@ function Diagram({ tables, relationships, schemas, selected, onSelect }: Props) 
   useEffect(() => {
     setNodes((nds) => nds.map((n) => (n.type !== "table" ? n : { ...n, data: { ...n.data, selected: n.id === selected, dim: !!selected && !near.tables.has(n.id) } })));
   }, [selected, near, setNodes]);
+
+  // zoom to the selected table and its neighbours so names and types are readable (the full diagram is wide)
+  useEffect(() => {
+    if (!selected || near.tables.size === 0) return;
+    const t = setTimeout(() => flow.fitView({ nodes: [...near.tables].map((id) => ({ id })), padding: 0.25, maxZoom: 1, duration: 450 }), 90);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   const edges: Edge[] = useMemo(() => rels.map((r: any, i: number) => {
     const hot = near.edges.has(i);
@@ -136,6 +153,8 @@ function Diagram({ tables, relationships, schemas, selected, onSelect }: Props) 
         <button type="button" className="btn-secondary py-1.5" onClick={() => { setSearch(""); setActive(new Set(schemas.map((s) => s.name))); setVersion((v) => v + 1); onSelect(null); }} data-testid="er-reset">
           <RotateCcw size={14} /> Reset layout
         </button>
+        <label className="flex items-center gap-1.5 text-sm text-slate-700" title="Show only the selected table and the tables it is related to">
+          <input type="checkbox" checked={focus} onChange={(e) => setFocus(e.target.checked)} data-testid="er-focus" /> Focus on selection</label>
         <label className="flex items-center gap-1.5 text-sm text-slate-700"><input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} data-testid="er-compact" /> Compact</label>
         <label className="flex items-center gap-1.5 text-sm text-slate-700"><input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> Cardinality labels</label>
         <label className="flex items-center gap-1.5 text-sm text-slate-700"><input type="checkbox" checked={inferred} onChange={(e) => setInferred(e.target.checked)} data-testid="er-inferred" /> Conceptual links ({relationships.inferred.length})</label>
@@ -159,10 +178,10 @@ function Diagram({ tables, relationships, schemas, selected, onSelect }: Props) 
 
       <p className="text-xs text-slate-600" data-testid="er-counts" aria-live="polite">
         Showing {visible.length} of {tables.length} tables and {rels.length} relationship{rels.length === 1 ? "" : "s"}
-        {selected ? ` · ${selected}: ${near.tables.size - 1} connected table(s)` : ""}.
+        {selected ? ` · ${selected}: ${near.tables.size - 1} connected table(s)` : ""}.{focus && !selected ? " Select a table to focus on it." : ""}
       </p>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 h-[560px] sm:h-[640px] relative overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 h-[600px] sm:h-[72vh] sm:min-h-[640px] relative overflow-hidden">
         {visible.length === 0 && <p className="absolute inset-0 flex items-center justify-center text-slate-500" data-testid="er-empty">No tables match the current search and filters.</p>}
         <ReactFlow
           nodes={nodes} edges={edges} onNodesChange={onNodesChange} nodeTypes={NODE_TYPES}

@@ -6,8 +6,8 @@ import { Background, Controls, Handle, MarkerType, Position, ReactFlow, ReactFlo
 import { STATUS_STYLE } from "@/lib/architecture";
 
 const POSITIONS: Record<string, { x: number; y: number }> = {
-  frontend: { x: 300, y: 0 }, api: { x: 300, y: 125 }, services: { x: 300, y: 250 }, postgresql: { x: 300, y: 410 },
-  postgis: { x: 20, y: 580 }, pgvector: { x: 320, y: 580 }, neo4j: { x: 640, y: 410 }, redis: { x: 640, y: 200 }, minio: { x: 640, y: 320 },
+  frontend: { x: 330, y: 0 }, api: { x: 330, y: 130 }, services: { x: 330, y: 270 }, postgresql: { x: 330, y: 450 },
+  postgis: { x: -30, y: 640 }, pgvector: { x: 430, y: 640 }, neo4j: { x: 780, y: 450 }, redis: { x: 780, y: 190 }, minio: { x: 780, y: 320 },
 };
 const LAYER_COLOR: Record<string, string> = { client: "#2563eb", application: "#0f766e", data: "#7c3aed" };
 
