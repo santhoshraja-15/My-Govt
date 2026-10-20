@@ -70,3 +70,4 @@ data/raw/ingested/
 backend/pytest-report.xml
 .next-e2e/
 frontend/.next-e2e/
+.cache/
