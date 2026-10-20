@@ -9,7 +9,7 @@ import { useLang } from "@/lib/i18n";
 
 function Inner({ mode }: { mode: "login" | "register" }) {
   const { login, register } = useAuth();
-  const { t } = useLang();
+  const { t, apiError } = useLang();
   const router = useRouter();
   const nextParam = useSearchParams().get("next");
   const [email, setEmail] = useState("");
@@ -31,7 +31,7 @@ function Inner({ mode }: { mode: "login" | "register" }) {
         router.push(nextParam && nextParam.startsWith("/") ? nextParam : homeFor("citizen"));
       }
     } catch (err: any) {
-      setError(err.status === 401 ? "Invalid email or password." : err.status === 429 ? "Too many attempts. Please wait and try again." : err.message || t("common.error"));
+      setError(err.status === 401 ? t("authf.invalid") : apiError(err));
     }
     setBusy(false);
   };
@@ -57,15 +57,15 @@ function Inner({ mode }: { mode: "login" | "register" }) {
           <label htmlFor="password" className="label">{t("auth.password")}</label>
           <input id="password" type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)}
             required minLength={mode === "register" ? 8 : undefined} autoComplete={mode === "login" ? "current-password" : "new-password"} />
-          {mode === "register" && <p className="text-xs text-slate-500 mt-1">At least 8 characters.</p>}
+          {mode === "register" && <p className="text-xs text-slate-500 mt-1">{t("authf.minChars")}</p>}
         </div>
         <button type="submit" disabled={busy} className="btn-primary w-full justify-center">
           {busy ? <Loader2 size={16} className="animate-spin" /> : mode === "login" ? t("auth.signin") : t("auth.register")}
         </button>
         <p className="text-sm text-slate-500 text-center">
           {mode === "login"
-            ? <>No account? <Link href="/register" className="text-brand-700 underline">{t("auth.register")}</Link></>
-            : <>Already registered? <Link href="/login" className="text-brand-700 underline">{t("auth.signin")}</Link></>}
+            ? <>{t("authf.noAccount")} <Link href="/register" className="text-brand-700 underline">{t("auth.register")}</Link></>
+            : <>{t("authf.haveAccount")} <Link href="/login" className="text-brand-700 underline">{t("auth.signin")}</Link></>}
         </p>
       </form>
     </main>

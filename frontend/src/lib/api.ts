@@ -120,6 +120,11 @@ export const documents = {
     return request<any>(`/api/v1/documents?${q}`);
   },
   get: (id: string) => request<any>(`/api/v1/documents/${id}`),
+  /** Official policy-document catalogue (Government Orders, policies, circulars, notifications, Acts). */
+  policy: (params: Record<string, any> = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== "").map(([k, v]) => [k, String(v)]));
+    return request<any>(`/api/v1/documents/policy?${q}`);
+  },
   search: (q: string, doc_type?: string) =>
     request<any>(`/api/v1/documents/search/full-text?q=${encodeURIComponent(q)}${doc_type ? `&doc_type=${doc_type}` : ""}`),
 };
@@ -150,10 +155,10 @@ export const complaints = {
 
 // ── Chat ──────────────────────────────────────────────────────
 export const chat = {
-  send: (message: string, conversation_id?: string) =>
+  send: (message: string, conversation_id?: string, language?: "en" | "ta") =>
     request<any>("/api/v1/chat/message", {
       method: "POST",
-      body: JSON.stringify({ message, conversation_id }),
+      body: JSON.stringify({ message, conversation_id, language }),
     }),
   conversations: () => request<any[]>("/api/v1/chat/conversations"),
   messages: (id: string) => request<any[]>(`/api/v1/chat/conversations/${id}`),

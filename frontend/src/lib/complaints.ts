@@ -7,3 +7,17 @@ export function assignmentText(state: string, department?: string | null, author
     default:                   return "Not yet routed to a department. It is awaiting triage.";
   }
 }
+
+import type { TKey, Vars } from "@/lib/i18n";
+
+/** Same wording as assignmentText(), translated through the locale dictionaries. */
+export function assignmentTextT(t: (k: TKey, v?: Vars) => string, state: string, department?: string | null, authority?: string | null): string {
+  switch (state) {
+    case "authority_assigned":
+      if (!authority) return t("cmp.asg.authorityDefault");
+      return department ? t("cmp.asg.authority", { authority, department }) : t("cmp.asg.authorityNoDept", { authority });
+    case "department_level": return t("cmp.asg.department_level", { department: department ?? t("cmp.thisDepartment") });
+    case "department_only": return t("cmp.asg.department_only", { department: department ?? "—" });
+    default: return t("cmp.asg.pending");
+  }
+}
