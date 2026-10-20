@@ -38,7 +38,7 @@ export const en = {
   "home.footer.place": "Tamil Nadu, India.",
   "home.footer.citizen": "Citizen Services", "home.footer.info": "Information", "home.footer.account": "Account",
   "home.footer.l.schemes": "Find schemes", "home.footer.l.services": "Government services", "home.footer.l.file": "File a complaint", "home.footer.l.track": "Track a complaint",
-  "home.footer.l.documents": "Policy documents", "home.footer.l.assistant": "AI assistant", "home.footer.l.signin": "Sign in", "home.footer.l.register": "Register",
+  "home.footer.l.documents": "Policy documents", "home.footer.l.assistant": "AI assistant", "home.footer.l.architecture": "Database architecture (administrators)", "home.footer.l.signin": "Sign in", "home.footer.l.register": "Register",
   "home.footer.demo": "MyGovt is a university demonstration project. It is not an official Government of Tamil Nadu website.",
   "home.footer.labels": "Records are labelled by verification status. Provisional items have not yet been verified against an official document; confirm with the department before acting.",
 } as const;
@@ -82,7 +82,7 @@ export const ta: Record<keyof typeof en, string> = {
   "home.footer.place": "தமிழ்நாடு, இந்தியா.",
   "home.footer.citizen": "குடிமக்கள் சேவைகள்", "home.footer.info": "தகவல்", "home.footer.account": "கணக்கு",
   "home.footer.l.schemes": "திட்டங்களைக் கண்டறிக", "home.footer.l.services": "அரசுச் சேவைகள்", "home.footer.l.file": "புகார் அளிக்க", "home.footer.l.track": "புகாரைக் கண்காணிக்க",
-  "home.footer.l.documents": "கொள்கை ஆவணங்கள்", "home.footer.l.assistant": "AI உதவியாளர்", "home.footer.l.signin": "உள்நுழைய", "home.footer.l.register": "பதிவு செய்ய",
+  "home.footer.l.documents": "கொள்கை ஆவணங்கள்", "home.footer.l.assistant": "AI உதவியாளர்", "home.footer.l.architecture": "தரவுத்தளக் கட்டமைப்பு (நிர்வாகிகள்)", "home.footer.l.signin": "உள்நுழைய", "home.footer.l.register": "பதிவு செய்ய",
   "home.footer.demo": "MyGovt ஒரு பல்கலைக்கழக செயல்விளக்கத் திட்டம். இது தமிழ்நாடு அரசின் அதிகாரப்பூர்வ இணையதளம் அல்ல.",
   "home.footer.labels": "பதிவுகள் சரிபார்ப்பு நிலையால் குறிக்கப்பட்டுள்ளன. தற்காலிகப் பதிவுகள் அதிகாரப்பூர்வ ஆவணத்துடன் இன்னும் சரிபார்க்கப்படவில்லை; செயல்படும் முன் துறையிடம் உறுதிசெய்யவும்.",
 };

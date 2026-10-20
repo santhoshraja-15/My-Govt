@@ -4,6 +4,7 @@ import Link from "next/link";
 import { publicStats } from "@/lib/api";
 import { AuthNav } from "@/components/layout/AuthNav";
 import { LangToggle } from "@/components/layout/LangToggle";
+import { useAuth } from "@/lib/auth";
 import { useLang, type TKey } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import {
@@ -53,6 +54,7 @@ function TypedWord() {
 // ── Navigation ────────────────────────────────────────────────
 function Navbar() {
   const { t } = useLang();
+  const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -84,6 +86,7 @@ function Navbar() {
               { href: "/documents", label: t("nav.documents") },
               { href: "/complaints", label: t("nav.complaints") },
               { href: "/assistant", label: t("nav.assistant") },
+              ...(isAdmin ? [{ href: "/database-architecture", label: t("nav.architecture") }] : []),
             ].map((item) => (
               <Link key={item.href} href={item.href}
                 className="px-3 py-2 rounded-lg text-sm font-medium text-blue-100 hover:text-white hover:bg-white/10 transition-all">
@@ -366,7 +369,7 @@ export default function HomePage() {
             </div>
             {[
               { title: "home.footer.citizen", links: [["home.footer.l.schemes", "/schemes"], ["home.footer.l.services", "/services"], ["home.footer.l.file", "/complaints"], ["home.footer.l.track", "/complaints"]] },
-              { title: "home.footer.info", links: [["home.footer.l.documents", "/documents"], ["home.footer.l.assistant", "/assistant"]] },
+              { title: "home.footer.info", links: [["home.footer.l.documents", "/documents"], ["home.footer.l.assistant", "/assistant"], ["home.footer.l.architecture", "/database-architecture"]] },
               { title: "home.footer.account", links: [["home.footer.l.signin", "/login"], ["home.footer.l.register", "/register"]] },
             ].map(({ title, links }) => (
               <div key={title}>
