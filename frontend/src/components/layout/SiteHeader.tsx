@@ -31,7 +31,10 @@ export function SiteHeader() {
   return (
     <header className="bg-brand-800 text-white" data-testid="site-header">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <Link href="/" className="font-black tracking-tight">MyGovt</Link>
+        <Link href="/" className="font-black tracking-tight inline-flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-128.png" alt="" width={32} height={32} className="w-8 h-8 rounded-full bg-white" />MyGovt
+        </Link>
         <nav aria-label={t("nav.main")} className="flex flex-wrap gap-4 text-sm text-blue-100">
           {items.map((i) => (
             <Link key={i.href} href={i.href} aria-current={path.startsWith(i.href) ? "page" : undefined}

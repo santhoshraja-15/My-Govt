@@ -68,9 +68,8 @@ function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-saffron-400 to-brand-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-sm">MG</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-128.png" alt="" width={40} height={40} className="w-10 h-10 rounded-full bg-white shadow-lg" />
             <div className="flex flex-col leading-tight">
               <span className="text-white font-bold text-base">MyGovt</span>
               <span className="text-blue-200 text-[10px] font-medium">{t("home.brand.sub")}</span>
@@ -356,9 +355,8 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-saffron-400 to-brand-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">MG</span>
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-128.png" alt="" width={36} height={36} className="w-9 h-9 rounded-full bg-white" />
                 <span className="text-white font-bold">MyGovt</span>
               </div>
               <p className="text-sm leading-relaxed">
