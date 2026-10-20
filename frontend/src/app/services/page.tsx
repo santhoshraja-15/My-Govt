@@ -70,7 +70,7 @@ export default function ServicesPage() {
       setTotal(res.total || 0);
       setPages(res.pages || 1);
       setPage(pg);
-    } catch (e: any) { setItems([]); setTotal(0); setError(t("services.loadFailed")); }
+    } catch (e: any) { setItems([]); setTotal(0); setError("load"); }
     setLoading(false);
   }, [q, category]);
 
@@ -123,7 +123,7 @@ export default function ServicesPage() {
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-brand-600" /></div>
         ) : error ? (
-          <ErrorState message={error} onRetry={() => load(1)} />
+          <ErrorState message={t("services.loadFailed")} onRetry={() => load(1)} />
         ) : items.length === 0 ? (
           <div className="text-center py-20" data-testid="empty-state">
             <FileText size={48} className="text-slate-300 mx-auto mb-3" />

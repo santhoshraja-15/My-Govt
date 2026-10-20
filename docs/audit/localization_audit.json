@@ -1,0 +1,686 @@
+[
+ {
+  "lang": "ta",
+  "state": "Landing",
+  "url": "/",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Login",
+  "url": "/login",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Register",
+  "url": "/register",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Schemes list",
+  "url": "/schemes",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Schemes filters",
+  "url": "/schemes",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Scheme detail",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Scheme eligibility",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=eligibility",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Scheme benefits",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=benefits",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Scheme documents",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Services list",
+  "url": "/services",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Service detail",
+  "url": "/services/815f544b-f212-4768-bcfc-60a7b33f6540",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Policy documents",
+  "url": "/documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Policy documents (details open)",
+  "url": "/documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Complaints (citizen) file",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Complaints track",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Complaints mine",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Complaints (signed out)",
+  "url": "/complaints",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Assistant",
+  "url": "/assistant",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Citizen dashboard",
+  "url": "/dashboard",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Officer console",
+  "url": "/officer",
+  "role": "officer",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Officer detail",
+  "url": "/officer",
+  "role": "officer",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Department admin console",
+  "url": "/officer",
+  "role": "deptadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Overview",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Complaints",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Department Performance",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Verification Queue",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Schema Explorer",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: SQL Workspace",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Datasets",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Data Quality",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Audit Logs",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Admin: Knowledge Graph",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Architecture",
+  "url": "/database-architecture?tab=architecture",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "ER diagram",
+  "url": "/database-architecture?tab=er",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Relational schema",
+  "url": "/database-architecture?tab=schema",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Implementation",
+  "url": "/database-architecture?tab=implementation",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "Advanced concepts",
+  "url": "/database-architecture?tab=advanced",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "ta",
+  "state": "404",
+  "url": "/this-page-does-not-exist",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Landing",
+  "url": "/",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Login",
+  "url": "/login",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Register",
+  "url": "/register",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Schemes list",
+  "url": "/schemes",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Schemes filters",
+  "url": "/schemes",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Scheme detail",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Scheme eligibility",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=eligibility",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Scheme benefits",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=benefits",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Scheme documents",
+  "url": "/schemes/b0000001-0000-0000-0000-000000000012?tab=documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Services list",
+  "url": "/services",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Service detail",
+  "url": "/services/815f544b-f212-4768-bcfc-60a7b33f6540",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Policy documents",
+  "url": "/documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Policy documents (details open)",
+  "url": "/documents",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Complaints (citizen) file",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Complaints track",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Complaints mine",
+  "url": "/complaints",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Complaints (signed out)",
+  "url": "/complaints",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Assistant",
+  "url": "/assistant",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Citizen dashboard",
+  "url": "/dashboard",
+  "role": "citizen",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Officer console",
+  "url": "/officer",
+  "role": "officer",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Officer detail",
+  "url": "/officer",
+  "role": "officer",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Department admin console",
+  "url": "/officer",
+  "role": "deptadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Overview",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Complaints",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Department Performance",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Verification Queue",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Schema Explorer",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: SQL Workspace",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Datasets",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Data Quality",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Audit Logs",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Admin: Knowledge Graph",
+  "url": "/admin",
+  "role": "sysadmin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Architecture",
+  "url": "/database-architecture?tab=architecture",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "ER diagram",
+  "url": "/database-architecture?tab=er",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Relational schema",
+  "url": "/database-architecture?tab=schema",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Implementation",
+  "url": "/database-architecture?tab=implementation",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "Advanced concepts",
+  "url": "/database-architecture?tab=advanced",
+  "role": "admin",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ },
+ {
+  "lang": "en",
+  "state": "404",
+  "url": "/this-page-does-not-exist",
+  "role": "anonymous",
+  "issues": [],
+  "missing_keys": [],
+  "error": null
+ }
+]

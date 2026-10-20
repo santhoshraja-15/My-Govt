@@ -78,7 +78,7 @@ export default function SchemesPage() {
       setTotal(res.total || 0);
       setPages(res.pages || 1);
       setPage(pg);
-    } catch (e: any) { setItems([]); setTotal(0); setError(t("schemes.loadFailed")); }
+    } catch (e: any) { setItems([]); setTotal(0); setError("load"); }
     setLoading(false);
   }, [q, category, level]);
 
@@ -161,7 +161,7 @@ export default function SchemesPage() {
             ))}
           </div>
         ) : error ? (
-          <ErrorState message={error} onRetry={() => load(1)} />
+          <ErrorState message={t("schemes.loadFailed")} onRetry={() => load(1)} />
         ) : items.length === 0 ? (
           <div className="text-center py-20" data-testid="empty-state">
             <Award size={48} className="text-slate-300 mx-auto mb-4" />
