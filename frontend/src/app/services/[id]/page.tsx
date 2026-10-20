@@ -10,7 +10,7 @@ import { useLang } from "@/lib/i18n";
 
 export default function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t, label, names, pickL, fmtDate, fmtNumber } = useLang();
+  const { t, label, dept, names, pickL, fmtDate, fmtNumber } = useLang();
   const [svc, setSvc] = useState<any>(null);
   const [state, setState] = useState<"loading" | "ok" | "missing" | "error">("loading");
 
@@ -21,7 +21,7 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  const money = (n: number) => (n === 0 ? t("common.free") : `₹${fmtNumber(n)}`);
+  const money = (n: number) => `₹${fmtNumber(n)}`;   // 0 is the e-Sevai application fee, not "free": a service charge may still apply
 
   if (state === "loading") return <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-label={t("service.loading")}><Loader2 size={32} className="animate-spin text-brand-600" /></div>;
   if (state === "error") return <main className="max-w-3xl mx-auto px-4 py-16"><ErrorState message={t("common.loadFailed")} onRetry={load} /></main>;
@@ -54,12 +54,12 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
         <div className="max-w-4xl mx-auto px-4">
           <Link href="/services" className="inline-flex items-center gap-1.5 text-emerald-100 hover:text-white text-sm mb-5"><ArrowLeft size={16} aria-hidden /> {t("service.allServices")}</Link>
           <div className="flex flex-wrap gap-2 mb-3">
-            {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={svc.department_name}>{svc.department_name}</span>}
+            {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={dept(svc.department_name)}>{dept(svc.department_name)}</span>}
             {svc.category && <span className="badge badge-slate">{label("cat", svc.category)}</span>}
             <VerificationBadge status={svc.verification_status} />
           </div>
           <h1 className="text-2xl md:text-3xl font-black" data-testid="service-name">{nm.primary}</h1>
-          {nm.secondary && <p className="text-emerald-100 text-lg mt-1" data-testid="service-secondary-name">{nm.secondary}</p>}
+          {nm.secondary && <p className="text-emerald-100 text-lg mt-1" data-testid="service-secondary-name" data-i18n-skip lang={nm.secondaryLang}>{nm.secondary}</p>}
         </div>
       </div>
 

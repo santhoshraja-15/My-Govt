@@ -12,22 +12,23 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { LoadingState } from "@/components/ui/AsyncState";
 import { ComplaintsPanel, DepartmentPerformancePanel, VerificationQueuePanel } from "@/components/admin/OperationsPanels";
+import { useLang, type TKey } from "@/lib/i18n";
 
 /** Quality scores are stored on a 0-100 scale in the dataset registry. */
 const pct = (v: unknown) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 
 // ── Sidebar items ──────────────────────────────────────────────
 const NAV_ITEMS = [
-  { key: "overview",   icon: BarChart3, label: "Overview" },
-  { key: "complaints", icon: Activity,  label: "Complaints" },
-  { key: "departments", icon: BarChart3, label: "Department Performance" },
-  { key: "verification", icon: CheckCircle2, label: "Verification Queue" },
-  { key: "schemas",    icon: Database,  label: "Schema Explorer" },
-  { key: "query",      icon: Play,      label: "SQL Workspace", systemOnly: true },
-  { key: "datasets",   icon: HardDrive, label: "Datasets" },
-  { key: "quality",    icon: Shield,    label: "Data Quality" },
-  { key: "audit",      icon: Activity,  label: "Audit Logs" },
-  { key: "graph",      icon: GitBranch, label: "Knowledge Graph" },
+  { key: "overview",   icon: BarChart3, label: "ad.nav.overview" as TKey },
+  { key: "complaints", icon: Activity,  label: "ad.nav.complaints" as TKey },
+  { key: "departments", icon: BarChart3, label: "ad.nav.departments" as TKey },
+  { key: "verification", icon: CheckCircle2, label: "ad.nav.verification" as TKey },
+  { key: "schemas",    icon: Database,  label: "ad.nav.schemas" as TKey },
+  { key: "query",      icon: Play,      label: "ad.nav.query" as TKey, systemOnly: true },
+  { key: "datasets",   icon: HardDrive, label: "ad.nav.datasets" as TKey },
+  { key: "quality",    icon: Shield,    label: "ad.nav.quality" as TKey },
+  { key: "audit",      icon: Activity,  label: "ad.nav.audit" as TKey },
+  { key: "graph",      icon: GitBranch, label: "ad.nav.graph" as TKey },
 ];
 
 // ── Stat card ──────────────────────────────────────────────────
@@ -57,6 +58,7 @@ function HealthDot({ status }: { status: string }) {
 
 // ── Overview ───────────────────────────────────────────────────
 function OverviewPanel() {
+  const { t, fmtNumber, label } = useLang();
   const [data, setData] = useState<any>(null);
   const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -74,41 +76,41 @@ function OverviewPanel() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Active Schemes" value={stats.schemes} icon={BarChart3} color="bg-emerald-600" subtitle="Live count" />
-        <StatCard title="Active Services" value={stats.services} icon={Zap} color="bg-amber-500" subtitle="Live count" />
-        <StatCard title={stats.demo_data_included ? "Complaints (incl. demo data)" : "Complaints (real)"} value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={`${stats.complaints_open ?? "—"} open`} />
-        <StatCard title="SLA target missed" value={stats.complaints_sla_breached} icon={AlertTriangle} color="bg-red-600" subtitle={`${stats.complaints_unassigned ?? "—"} without an authority`} />
+        <StatCard title={t("ad.ov.schemes")} value={stats.schemes} icon={BarChart3} color="bg-emerald-600" subtitle={t("ad.ov.live")} />
+        <StatCard title={t("ad.ov.services")} value={stats.services} icon={Zap} color="bg-amber-500" subtitle={t("ad.ov.live")} />
+        <StatCard title={stats.demo_data_included ? t("ad.ov.complaintsDemo") : t("ad.ov.complaintsReal")} value={stats.complaints_total} icon={Activity} color="bg-rose-500" subtitle={t("ad.ov.openN", { n: stats.complaints_open ?? "—" })} />
+        <StatCard title={t("ad.ov.sla")} value={stats.complaints_sla_breached} icon={AlertTriangle} color="bg-red-600" subtitle={t("ad.ov.noAuthority", { n: stats.complaints_unassigned ?? "—" })} />
       </div>
 
       <div className="card p-6" data-testid="verification-breakdown">
-        <h2 className="font-bold text-slate-900 mb-1">Verification status of catalogue records</h2>
-        <p className="text-xs text-slate-500 mb-4">Only <b>official_verified</b> records have a recorded source document. Everything else is provisional or external.</p>
+        <h2 className="font-bold text-slate-900 mb-1">{t("ad.ov.verifTitle")}</h2>
+        <p className="text-xs text-slate-500 mb-4">{t("ad.ov.verifNote")}</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
           {Object.entries(data?.verification || {}).map(([k, v]: any) => (
             <div key={k}>
-              <p className="font-semibold capitalize">{k}</p>
-              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{status}: {n}</p>) : <p className="text-slate-500">unavailable</p>}
+              <p className="font-semibold capitalize">{label("ad.vq.kind", k.replace(/s$/, ""))}</p>
+              {v ? Object.entries(v).map(([status, n]: any) => <p key={status} className="text-slate-600">{label("vs", status)}: {n}</p>) : <p className="text-slate-500">{t("ad.ov.unavailable")}</p>}
             </div>
           ))}
         </div>
         {stats.synthetic_complaints > 0 && <p className="text-xs text-amber-700 mt-3" data-testid="synthetic-note">{stats.demo_data_included
-          ? `Demonstration mode: ${stats.synthetic_complaints} clearly labelled synthetic complaints are INCLUDED in the complaint figures above.`
-          : `${stats.synthetic_complaints} synthetic test complaints exist and are excluded from the figures above.`}</p>}
+          ? t("ad.ov.synthIncluded", { n: stats.synthetic_complaints })
+          : t("ad.ov.synthExcluded", { n: stats.synthetic_complaints })}</p>}
       </div>
 
       {/* Service health */}
       {health && (
         <div className="card p-6">
           <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <Server size={18} className="text-brand-600" /> Service Health
+            <Server size={18} className="text-brand-600" /> {t("ad.ov.health")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Object.entries(health.services || {}).map(([svc, st]: any) => (
               <div key={svc} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                 <HealthDot status={st.status} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 capitalize">{svc}</p>
-                  <p className="text-xs text-slate-500">{st.latency_ms ? `${st.latency_ms}ms` : st.status}</p>
+                  <p className="text-sm font-semibold text-slate-800 capitalize" lang="en">{svc}</p>
+                  <p className="text-xs text-slate-500">{st.latency_ms ? `${st.latency_ms}ms` : label("hs", st.status)}</p>
                 </div>
               </div>
             ))}
@@ -119,19 +121,19 @@ function OverviewPanel() {
       {/* Dataset registry summary */}
       {data?.datasets?.length > 0 && (
         <div className="card p-6">
-          <h2 className="font-bold text-slate-900 mb-4">Dataset Registry</h2>
+          <h2 className="font-bold text-slate-900 mb-4">{t("ad.ov.registry")}</h2>
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead><tr>
-                <th>Dataset</th><th>Format</th><th>Records</th><th>Status</th><th>Quality</th>
+                <th>{t("ad.ov.col.dataset")}</th><th>{t("ad.ov.col.format")}</th><th>{t("ad.ov.col.records")}</th><th>{t("ad.ov.col.status")}</th><th>{t("ad.ov.col.quality")}</th>
               </tr></thead>
               <tbody>
                 {data.datasets.slice(0,10).map((d: any) => (
                   <tr key={d.dataset_id}>
-                    <td className="font-medium max-w-xs truncate">{d.dataset_name}</td>
-                    <td><span className="badge badge-slate uppercase">{d.file_format}</span></td>
-                    <td>{d.record_count?.toLocaleString()}</td>
-                    <td><span className={`badge ${d.processing_status === "loaded" ? "badge-green" : "badge-yellow"}`}>{d.processing_status}</span></td>
+                    <td className="font-medium max-w-xs truncate" lang="en">{d.dataset_name}</td>
+                    <td><span className="badge badge-slate uppercase" lang="en">{d.file_format}</span></td>
+                    <td>{d.record_count != null ? fmtNumber(d.record_count) : ""}</td>
+                    <td><span className={`badge ${d.processing_status === "loaded" ? "badge-green" : "badge-yellow"}`}>{label("ds", d.processing_status)}</span></td>
                     <td>
                       <div className="flex items-center gap-1.5">
                         <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
@@ -153,6 +155,7 @@ function OverviewPanel() {
 
 // ── Schema Explorer ────────────────────────────────────────────
 function SchemaExplorer() {
+  const { t, fmtNumber } = useLang();
   const [schemas, setSchemas] = useState<any[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [tables, setTables] = useState<any[]>([]);
@@ -194,7 +197,7 @@ function SchemaExplorer() {
           <button key={s.schema_name} onClick={() => setSelected(s.schema_name)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${
               selected === s.schema_name ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-600 border-slate-200 hover:border-brand-300"}`}>
-            {s.schema_name}
+            <span className="font-mono">{s.schema_name}</span>
             <span className="ml-1.5 text-xs opacity-60">{s.table_count}</span>
           </button>
         ))}
@@ -203,14 +206,14 @@ function SchemaExplorer() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Table list */}
         <div className="card p-4 lg:col-span-1">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Tables in {selected}</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{t("ad.sc.tablesIn")} <span className="font-mono normal-case">{selected}</span></p>
           <div className="space-y-1">
-            {tables.map((t: any) => (
-              <button key={t.table_name} onClick={() => selectTable(t.table_name)}
+            {tables.map((tb: any) => (
+              <button key={tb.table_name} onClick={() => selectTable(tb.table_name)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all ${
-                  selectedTable === t.table_name ? "bg-brand-50 text-brand-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
-                <span className="truncate">{t.table_name}</span>
-                <span className="text-xs text-slate-500 shrink-0 ml-1">{t.row_count_estimate?.toLocaleString()}</span>
+                  selectedTable === tb.table_name ? "bg-brand-50 text-brand-700 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>
+                <span className="truncate font-mono">{tb.table_name}</span>
+                <span className="text-xs text-slate-500 shrink-0 ml-1">{tb.row_count_estimate != null ? fmtNumber(tb.row_count_estimate) : ""}</span>
               </button>
             ))}
           </div>
@@ -224,17 +227,17 @@ function SchemaExplorer() {
             <div className="card p-5">
               <h3 className="font-bold text-slate-900 mb-1">{selected}.{selectedTable}</h3>
               <p className="text-sm text-slate-500 mb-4">
-                {tableDetail.estimated_rows?.toLocaleString()} rows (estimate) · {tableDetail.columns?.length} columns
+                {t("ad.sc.rowsEst", { rows: fmtNumber(tableDetail.estimated_rows ?? 0), cols: tableDetail.columns?.length ?? 0 })}
               </p>
               <div className="overflow-x-auto">
                 <table className="data-table">
-                  <thead><tr><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th></tr></thead>
+                  <thead><tr><th>{t("ad.sc.col.column")}</th><th>{t("ad.sc.col.type")}</th><th>{t("ad.sc.col.nullable")}</th><th>{t("ad.sc.col.default")}</th></tr></thead>
                   <tbody>
                     {tableDetail.columns?.map((c: any) => (
                       <tr key={c.column_name}>
                         <td className="font-mono text-xs font-semibold text-brand-700">{c.column_name}</td>
                         <td className="font-mono text-xs text-slate-500">{c.data_type}</td>
-                        <td>{c.is_nullable === "YES" ? <span className="badge badge-slate">nullable</span> : <span className="badge badge-blue">required</span>}</td>
+                        <td>{c.is_nullable === "YES" ? <span className="badge badge-slate">{t("ad.sc.nullable")}</span> : <span className="badge badge-blue">{t("ad.sc.required")}</span>}</td>
                         <td className="font-mono text-xs text-slate-500 max-w-xs truncate">{c.column_default}</td>
                       </tr>
                     ))}
@@ -247,7 +250,7 @@ function SchemaExplorer() {
           {sample && !loading && sample.rows?.length > 0 && (
             <div className="card p-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                Sample Data ({sample.rows.length} rows)
+                {t("ad.sc.sample", { n: sample.rows.length })}
               </p>
               <div className="overflow-x-auto max-h-72">
                 <table className="data-table text-xs">
@@ -277,6 +280,7 @@ function SchemaExplorer() {
 
 // ── SQL Workspace ──────────────────────────────────────────────
 function SQLWorkspace() {
+  const { t, apiError } = useLang();
   const [sql, setSql] = useState("SELECT * FROM schemes.scheme LIMIT 10;");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -289,7 +293,7 @@ function SQLWorkspace() {
       const res = await adminAPI.query(sql);
       if (res.error) { setError(res.error); setResult(null); } else { setResult(res); }
     } catch (e: any) {
-      setError(e.message || "Query failed");
+      setError(e?.status ? apiError(e) : t("ad.q.failed"));
       setResult(null);
     }
     setLoading(false);
@@ -306,28 +310,28 @@ function SQLWorkspace() {
     <div className="animate-fade-in space-y-4">
       <div className="card p-4 bg-amber-50 border-amber-200 text-sm text-amber-700 flex items-start gap-2">
         <Shield size={16} className="shrink-0 mt-0.5" />
-        Read-only workspace. Only SELECT queries are permitted. No DML operations allowed.
+        {t("ad.q.readonly")}
       </div>
 
       <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-slate-700">SQL Query</p>
+          <p className="text-sm font-semibold text-slate-700">{t("ad.q.title")}</p>
           <button onClick={run} disabled={loading} className="btn-primary py-1.5 text-sm">
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-            {loading ? "Running…" : "Run Query"}
+            {loading ? t("ad.q.running") : t("ad.q.run")}
           </button>
         </div>
-        <textarea value={sql} onChange={e => setSql(e.target.value)} aria-label="SQL query (read-only, SELECT statements only)"
+        <textarea value={sql} onChange={e => setSql(e.target.value)} aria-label={t("ad.q.aria")}
           className="input font-mono text-sm resize-none" rows={5}
           placeholder="SELECT * FROM schemes.scheme LIMIT 10;" />
 
         <div className="mt-3">
-          <p className="text-xs text-slate-500 mb-2">Quick examples:</p>
+          <p className="text-xs text-slate-500 mb-2">{t("ad.q.examples")}</p>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex, i) => (
               <button key={i} onClick={() => setSql(ex)}
                 className="text-xs bg-slate-50 hover:bg-brand-50 text-slate-500 hover:text-brand-700 px-3 py-1.5 rounded-lg border border-slate-200 transition-all font-mono">
-                Example {i+1}
+                {t("ad.q.example", { n: i + 1 })}
               </button>
             ))}
           </div>
@@ -344,7 +348,7 @@ function SQLWorkspace() {
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              {result.row_count} rows · {result.execution_time_ms}ms
+              {t("ad.q.rows", { rows: result.row_count, ms: result.execution_time_ms })}
             </p>
           </div>
           {result.rows?.length > 0 ? (
@@ -365,7 +369,7 @@ function SQLWorkspace() {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-500 py-4 text-center">Query executed — no rows returned.</p>
+            <p className="text-sm text-slate-500 py-4 text-center">{t("ad.q.noRows")}</p>
           )}
         </div>
       )}
@@ -375,6 +379,7 @@ function SQLWorkspace() {
 
 // ── Audit Logs ─────────────────────────────────────────────────
 function AuditLogsPanel() {
+  const { t, lang } = useLang();
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -389,24 +394,24 @@ function AuditLogsPanel() {
     <div className="animate-fade-in">
       <div className="card p-5">
         <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-          <Activity size={18} className="text-brand-600" /> Audit Logs
+          <Activity size={18} className="text-brand-600" /> {t("ad.au.title")}
         </h2>
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-10 text-slate-500">No audit logs yet.</div>
+          <div className="text-center py-10 text-slate-500">{t("ad.au.none")}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table text-xs">
               <thead><tr>
-                <th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Outcome</th><th>IP</th>
+                <th>{t("ad.au.col.time")}</th><th>{t("ad.au.col.actor")}</th><th>{t("ad.au.col.action")}</th><th>{t("ad.au.col.resource")}</th><th>{t("ad.au.col.outcome")}</th><th>{t("ad.au.col.ip")}</th>
               </tr></thead>
               <tbody>
                 {logs.map((log: any) => (
                   <tr key={log.log_id}>
-                    <td className="font-mono whitespace-nowrap">{new Date(log.created_at).toLocaleString("en-IN")}</td>
-                    <td className="font-mono">{log.actor_role ? `${log.actor_role} ` : ""}{log.actor_id?.slice(0,8) || (log.actor_role ? "" : "anonymous")}</td>
-                    <td><span className="badge badge-blue">{log.action}</span></td>
+                    <td className="font-mono whitespace-nowrap">{new Date(log.created_at).toLocaleString(lang === "ta" ? "ta-IN" : "en-IN")}</td>
+                    <td>{log.actor_role || log.actor_id ? <span className="font-mono">{log.actor_role ? `${log.actor_role} ` : ""}{log.actor_id?.slice(0,8)}</span> : t("ad.au.anonymous")}</td>
+                    <td><span className="badge badge-blue" lang="en">{log.action}</span></td>
                     <td className="font-mono max-w-xs truncate">{log.entity_type} {log.entity_id?.slice(0,12)}</td>
                     <td>
                       {log.outcome !== "failure"
@@ -427,6 +432,7 @@ function AuditLogsPanel() {
 
 // ── Data Quality ───────────────────────────────────────────────
 function DataQualityPanel() {
+  const { t, fmtNumber, label } = useLang();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -435,10 +441,10 @@ function DataQualityPanel() {
   }, []);
 
   const qMetrics = (dataset: any) => [
-    { label: "Completeness", score: dataset.quality_completeness },
-    { label: "Accuracy", score: dataset.quality_accuracy },
-    { label: "Consistency", score: dataset.quality_consistency },
-    { label: "Freshness", score: dataset.quality_freshness },
+    { label: t("ad.dq.completeness"), score: dataset.quality_completeness },
+    { label: t("ad.dq.accuracy"), score: dataset.quality_accuracy },
+    { label: t("ad.dq.consistency"), score: dataset.quality_consistency },
+    { label: t("ad.dq.freshness"), score: dataset.quality_freshness },
   ];
 
   return (
@@ -446,22 +452,21 @@ function DataQualityPanel() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-brand-600" /></div>
       ) : !data?.datasets?.length ? (
-        <div className="card p-10 text-center text-slate-500">No dataset quality data available.</div>
+        <div className="card p-10 text-center text-slate-500">{t("ad.dq.none")}</div>
       ) : (
         <>
         <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900" data-testid="quality-disclaimer">
-          These scores are values <b>recorded in the dataset registry</b> when the data was loaded. The platform does not compute them, and they do not mean the
-          data has been verified against official documents (see the Verification Queue).
+          {t("ad.dq.disclaimer")}
         </p>
         {data.datasets.map((d: any) => (
           <div key={d.dataset_id} className="card p-5">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
-                <h3 className="font-bold text-slate-900">{d.dataset_name}</h3>
-                <p className="text-xs text-slate-500">{d.record_count?.toLocaleString()} records</p>
+                <h3 className="font-bold text-slate-900" lang="en">{d.dataset_name}</h3>
+                <p className="text-xs text-slate-500">{t("ad.dq.records", { n: d.record_count != null ? fmtNumber(d.record_count) : 0 })}</p>
               </div>
               <span className={`badge ${d.validation_status === "validated" ? "badge-green" : "badge-yellow"}`}>
-                {d.validation_status}
+                {label("ds", d.validation_status)}
               </span>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -491,38 +496,39 @@ function DataQualityPanel() {
 
 // ── Knowledge Graph ────────────────────────────────────────────
 function KnowledgeGraphPanel() {
+  const { t, fmtNumber } = useLang();
   const [stats, setStats] = useState<any>(null);
   useEffect(() => { adminAPI.kgStats().then(setStats).catch(() => {}); }, []);
 
   return (
     <div className="animate-fade-in card p-6">
       <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-        <GitBranch size={18} className="text-brand-600" /> Knowledge Graph (Neo4j)
+        <GitBranch size={18} className="text-brand-600" /> {t("ad.kg.title")}
       </h2>
       {!stats ? (
         <div className="flex justify-center py-10"><Loader2 size={24} className="animate-spin text-brand-600" /></div>
       ) : stats.status === "disabled" ? (
-        <div className="text-center py-10 text-slate-500">Knowledge Graph feature is not enabled.</div>
+        <div className="text-center py-10 text-slate-500">{t("ad.kg.disabled")}</div>
       ) : stats.status !== "healthy" ? (
-        <div className="text-center py-10 text-amber-500">Knowledge Graph unavailable: {stats.error}</div>
+        <div className="text-center py-10 text-amber-500">{t("ad.kg.unavailable")}</div>
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="card p-4">
-              <p className="text-xs text-slate-500 mb-2">Node Counts by Label</p>
+              <p className="text-xs text-slate-500 mb-2">{t("ad.kg.nodes")}</p>
               {Object.entries(stats.node_counts || {}).map(([label, count]: any) => (
                 <div key={label} className="flex justify-between text-sm py-1 border-b border-slate-50">
                   <span className="font-medium text-slate-700">{label}</span>
-                  <span className="font-bold text-brand-600">{count?.toLocaleString()}</span>
+                  <span className="font-bold text-brand-600">{count != null ? fmtNumber(count) : ""}</span>
                 </div>
               ))}
             </div>
             <div className="card p-4">
-              <p className="text-xs text-slate-500 mb-2">Relationship Counts by Type</p>
+              <p className="text-xs text-slate-500 mb-2">{t("ad.kg.rels")}</p>
               {Object.entries(stats.relationship_counts || {}).map(([type, count]: any) => (
                 <div key={type} className="flex justify-between text-sm py-1 border-b border-slate-50">
                   <span className="font-medium text-slate-700">{type}</span>
-                  <span className="font-bold text-brand-600">{count?.toLocaleString()}</span>
+                  <span className="font-bold text-brand-600">{count != null ? fmtNumber(count) : ""}</span>
                 </div>
               ))}
             </div>
@@ -536,6 +542,7 @@ function KnowledgeGraphPanel() {
 // ── Main admin layout ──────────────────────────────────────────
 function AdminConsole() {
   const { user } = useAuth();
+  const { t } = useLang();
   const navItems = NAV_ITEMS.filter((n: any) => !n.systemOnly || user?.role === "system_admin");
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
@@ -564,12 +571,12 @@ function AdminConsole() {
                 <Database size={16} className="text-white" />
               </div>
               <div>
-                <p className="font-bold text-slate-900 text-sm">Admin Console</p>
-                <p className="text-xs text-slate-500">Intelligence Hub</p>
+                <p className="font-bold text-slate-900 text-sm">{t("ad.console")}</p>
+                <p className="text-xs text-slate-500">{t("ad.hub")}</p>
               </div>
             </>
           )}
-          <button onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          <button onClick={() => setCollapsed(c => !c)} aria-label={collapsed ? t("ad.expand") : t("ad.collapse")}
             className={`ml-auto btn-ghost p-1.5 ${collapsed ? "mx-auto" : ""}`}>
             <ChevronRight size={16} className={`transition-transform ${collapsed ? "" : "rotate-180"}`} />
           </button>
@@ -579,9 +586,9 @@ function AdminConsole() {
           {navItems.map(({ key, icon: Icon, label }) => (
             <button key={key} onClick={() => setActive(key)}
               className={`admin-sidebar-item w-full ${active === key ? "active" : ""} ${collapsed ? "justify-center px-2" : ""}`}
-              title={collapsed ? label : undefined}>
+              title={collapsed ? t(label) : undefined}>
               <Icon size={18} className="shrink-0" />
-              {!collapsed && <span>{label}</span>}
+              {!collapsed && <span>{t(label)}</span>}
             </button>
           ))}
         </nav>
@@ -590,11 +597,11 @@ function AdminConsole() {
           <Link href="/database-architecture" data-testid="admin-database-architecture"
             className={`admin-sidebar-item w-full bg-brand-50 text-brand-700 font-semibold ${collapsed ? "justify-center px-2" : ""}`}>
             <Database size={18} className="shrink-0" />
-            {!collapsed && <span>Database Architecture</span>}
+            {!collapsed && <span>{t("nav.architecture")}</span>}
           </Link>
           <Link href="/" className={`admin-sidebar-item w-full ${collapsed ? "justify-center px-2" : ""}`}>
             <ChevronRight size={18} className="rotate-180 shrink-0" />
-            {!collapsed && <span>Exit Admin</span>}
+            {!collapsed && <span>{t("ad.exit")}</span>}
           </Link>
         </div>
       </aside>
@@ -603,7 +610,7 @@ function AdminConsole() {
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-10">
           <h1 className="font-bold text-slate-900 text-lg capitalize">
-            {NAV_ITEMS.find(n => n.key === active)?.label || "Dashboard"}
+            {t(NAV_ITEMS.find(n => n.key === active)?.label || "ad.dashboard")}
           </h1>
         </header>
         <div className="flex-1 p-6 overflow-auto">
@@ -617,20 +624,21 @@ function AdminConsole() {
 /** Route guard: only state/system administrators see the console; everyone else gets an explanation. */
 export default function AdminPage() {
   const { user, loading, isAdmin } = useAuth();
+  const { t } = useLang();
   if (loading) return <LoadingState />;
   if (!user) {
     return (
       <main className="max-w-md mx-auto px-4 py-16 text-center" data-testid="admin-login-required">
-        <h1 className="text-xl font-bold mb-3">Administrator sign-in required</h1>
-        <Link href="/login?next=/admin" className="btn-primary">Sign in</Link>
+        <h1 className="text-xl font-bold mb-3">{t("ad.signinRequired")}</h1>
+        <Link href="/login?next=/admin" className="btn-primary">{t("auth.signin")}</Link>
       </main>
     );
   }
   if (!isAdmin) {
     return (
       <main className="max-w-md mx-auto px-4 py-16 text-center" data-testid="admin-forbidden">
-        <h1 className="text-xl font-bold mb-3">Access denied</h1>
-        <p className="text-slate-600">Your account does not have administrator permission.</p>
+        <h1 className="text-xl font-bold mb-3">{t("ad.denied")}</h1>
+        <p className="text-slate-600">{t("ad.deniedText")}</p>
       </main>
     );
   }

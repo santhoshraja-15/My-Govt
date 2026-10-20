@@ -214,7 +214,7 @@ async def test_catalogue_embedding_covers_schemes_and_services(conn):
     try:
         s = await emb.embed_catalogue(conn, p, "schemes.scheme", sleep=no_sleep)
         v = await emb.embed_catalogue(conn, p, "services.service", sleep=no_sleep)
-        assert s["embedded"] == 12 and v["embedded"] == 10 and s["failed"] == v["failed"] == 0
+        assert s["embedded"] == 29 and v["embedded"] == 21 and s["failed"] == v["failed"] == 0
         assert (await emb.embed_catalogue(conn, p, "schemes.scheme", sleep=no_sleep))["selected"] == 0
         with pytest.raises(ValueError):
             await emb.embed_catalogue(conn, p, "identity.citizen")

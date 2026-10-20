@@ -35,7 +35,7 @@ test.describe("landing page", () => {
 test.describe("language", () => {
   test("toggle switches interface text to Tamil and back, and persists", async ({ page }) => {
     await page.goto("/schemes");
-    const nav = page.getByRole("navigation", { name: "Main" });
+    const nav = page.getByTestId("site-header").getByRole("navigation");   // its accessible name is translated too
     await expect(nav.getByRole("link", { name: "Schemes" })).toBeVisible();
     await page.getByRole("button", { name: "தமிழ்" }).click();
     await expect(nav.getByRole("link", { name: "திட்டங்கள்" })).toBeVisible();

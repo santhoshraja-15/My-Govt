@@ -11,7 +11,7 @@ import { useLang } from "@/lib/i18n";
 const LEVELS = ["All","state","central","district"];
 
 function SchemeCard({ scheme }: { scheme: any }) {
-  const { names, pickL, label } = useLang();
+  const { names, pickL, label, dept } = useLang();
   const desc = pickL(scheme.description, scheme.description_ta);
   const nm = names(scheme.name, scheme.name_ta);
   return (
@@ -23,7 +23,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
             {nm.primary}
           </h3>
           {nm.secondary && (
-            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1" data-testid="scheme-secondary-name">{nm.secondary}</p>
+            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1" data-testid="scheme-secondary-name" data-i18n-skip lang={nm.secondaryLang}>{nm.secondary}</p>
           )}
         </div>
         <ChevronRight size={16} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-1 transition-all shrink-0 mt-0.5" />
@@ -35,7 +35,7 @@ function SchemeCard({ scheme }: { scheme: any }) {
 
       <div className="flex flex-wrap gap-2 pt-1">
         {scheme.department_name && (
-          <span className="badge badge-blue max-w-full truncate" title={scheme.department_name}>{scheme.department_name}</span>
+          <span className="badge badge-blue max-w-full truncate" title={dept(scheme.department_name)}>{dept(scheme.department_name)}</span>
         )}
         {scheme.category && (
           <span className="badge badge-slate">{label("cat", scheme.category)}</span>

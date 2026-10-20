@@ -18,7 +18,7 @@ const GROUPS = [
 ] as const;
 
 function DocCard({ doc }: { doc: any }) {
-  const { t, label, pickL, fmtDate } = useLang();
+  const { t, label, pickL, fmtDate, dept } = useLang();
   const [open, setOpen] = useState(false);
   const summary = pickL(doc.summary_en, doc.summary_ta);
   const showTamilNote = summary.lang === "ta" && !doc.summary_ta_reviewed;
@@ -32,7 +32,7 @@ function DocCard({ doc }: { doc: any }) {
           {doc.title_ta && <p className="text-xs text-slate-600 mb-1" lang="ta"><span className="sr-only">{t("docs.officialTitleTa")}: </span>{doc.title_ta}</p>}
           <div className="flex flex-wrap gap-2 mb-2">
             <span className="badge badge-blue">{label("cat", doc.category)}</span>
-            <span className="badge badge-slate max-w-full truncate" title={doc.issuing_authority} lang="en">{doc.issuing_authority}</span>
+            <span className="badge badge-slate max-w-full truncate" title={dept(doc.issuing_authority)}>{dept(doc.issuing_authority)}</span>
             <span className="badge badge-purple">{t(`docs.lang.${doc.language}` as TKey)}</span>
             <VerificationBadge status={doc.verification_status} />
           </div>
@@ -82,7 +82,7 @@ function DocCard({ doc }: { doc: any }) {
 }
 
 export default function DocumentsPage() {
-  const { t, label } = useLang();
+  const { t, label, dept } = useLang();
   const [items, setItems] = useState<any[]>([]);
   const [facets, setFacets] = useState<any>({ categories: {}, authorities: [], years: [] });
   const [total, setTotal] = useState(0);
@@ -159,7 +159,7 @@ export default function DocumentsPage() {
           {GROUPS.map((g) => (
             <button key={g.key} role="tab" aria-selected={group === g.key} data-testid={`doc-group-${g.key}`} onClick={() => setGroup(g.key)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all ${group === g.key ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-600 border-slate-200 hover:border-brand-300"}`}>
-              {t(g.label as TKey)} <span className="opacity-80">({countFor(g.key)})</span>
+              {t(g.label as TKey)} <span>({countFor(g.key)})</span>
             </button>
           ))}
         </div>
@@ -167,7 +167,7 @@ export default function DocumentsPage() {
         <div className="card p-4 mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="doc-filters">
           <div><label htmlFor="f-dept" className="label text-xs">{t("docs.department")}</label>
             <select id="f-dept" className="input text-xs" value={authority} onChange={(e) => setAuthority(e.target.value)} data-testid="filter-authority">
-              <option value="">{t("docs.allDepartments")}</option>{(facets.authorities || []).map((a: string) => <option key={a} value={a}>{a}</option>)}</select></div>
+              <option value="">{t("docs.allDepartments")}</option>{(facets.authorities || []).map((a: string) => <option key={a} value={a}>{dept(a)}</option>)}</select></div>
           <div><label htmlFor="f-year" className="label text-xs">{t("docs.year")}</label>
             <select id="f-year" className="input text-xs" value={year} onChange={(e) => setYear(e.target.value)} data-testid="filter-year">
               <option value="">{t("docs.allYears")}</option>{(facets.years || []).map((y: number) => <option key={y} value={y}>{y}</option>)}</select></div>

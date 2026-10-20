@@ -124,14 +124,14 @@ test.describe("operations panels", () => {
     await page.getByRole("button", { name: "Complaints" }).click();
     const row = page.getByTestId("complaint-row").filter({ hasText: ref });
     await expect(row).toBeVisible();
-    await expect(row).toContainText("awaiting triage");
+    await expect(row).toContainText("Awaiting triage");
 
     await page.getByRole("button", { name: "No authority" }).click();
     await expect(page.getByTestId("complaint-row").filter({ hasText: ref })).toBeVisible();
 
     // only legal transitions are offered: needs_triage -> classified
     const select = page.getByLabel(`Move ${ref}`);
-    await expect(select.locator("option")).toHaveText(["—", "classified"]);
+    await expect(select.locator("option")).toHaveText(["—", "Classified"]);
     await select.selectOption("classified");
     await expect(page.getByTestId("complaint-row").filter({ hasText: ref }).locator("[data-status]")).toHaveAttribute("data-status", "classified");
     const tracked = await (await request.get(`${API}/complaints/track/${ref}`)).json();
@@ -162,11 +162,11 @@ test.describe("operations panels", () => {
     await page.getByRole("button", { name: "Verification Queue" }).click();
     const q = page.getByTestId("verification-queue");
     await expect(q).toContainText("has not been confirmed against the issuing document");
-    await expect(q.getByRole("button", { name: /scheme \(12\)/ })).toBeVisible();
-    await expect(q.getByRole("button", { name: /district \(38\)/ })).toBeVisible();
+    await expect(q.getByRole("button", { name: /Schemes \(29\)/ })).toBeVisible();
+    await expect(q.getByRole("button", { name: /Districts \(38\)/ })).toBeVisible();
     await expect(q.getByTestId("queue-row").filter({ hasText: "TN-CM-BREAKFAST" })).toContainText("Provisional");
-    await q.getByRole("button", { name: /district/ }).click();
+    await q.getByRole("button", { name: /Districts/ }).click();
     await expect(q.getByTestId("queue-row")).toHaveCount(38);
-    await expect(q).toContainText("no official document evidence recorded");   // the logged reason for the status is visible
+    await expect(q).toContainText(/record stays provisional/);   // the logged reason for the status is visible
   });
 });

@@ -145,7 +145,7 @@ async def test_failed_initialisation_surfaces_the_real_error(admin_dsn, has_post
 
 
 async def test_legacy_seed_is_not_part_of_the_applied_set():
-    assert seed.SEED_FILES == ["002_verified_seed_data.sql"]
+    assert seed.SEED_FILES == ["002_verified_seed_data.sql", "003_content.sql"]   # the legacy 001 seed is never applied
     assert not any("001_seed" in f for f in seed.SEED_FILES)
 
 

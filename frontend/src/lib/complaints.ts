@@ -11,7 +11,9 @@ export function assignmentText(state: string, department?: string | null, author
 import type { TKey, Vars } from "@/lib/i18n";
 
 /** Same wording as assignmentText(), translated through the locale dictionaries. */
-export function assignmentTextT(t: (k: TKey, v?: Vars) => string, state: string, department?: string | null, authority?: string | null): string {
+export function assignmentTextT(t: (k: TKey, v?: Vars) => string, state: string, department?: string | null, authority?: string | null, tr: (s?: string | null) => string = (s) => s ?? ""): string {
+  department = department ? tr(department) : department;
+  authority = authority ? tr(authority) : authority;
   switch (state) {
     case "authority_assigned":
       if (!authority) return t("cmp.asg.authorityDefault");

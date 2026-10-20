@@ -16,7 +16,7 @@ function useFmt() {
 }
 
 function ComplaintSummary({ c }: { c: any }) {
-  const { t } = useLang();
+  const { t, dept, cat } = useLang();
   const fmt = useFmt();
   return (
     <div className="space-y-4" data-testid="complaint-summary">
@@ -28,11 +28,11 @@ function ComplaintSummary({ c }: { c: any }) {
       <div className="card p-4">
         <p className="text-xs text-slate-500 mb-1">{t("cmp.subject")}</p>
         <p className="font-semibold text-slate-800" lang="en">{c.title}</p>
-        {c.category_name && <p className="text-xs text-slate-500 mt-1">{t("cmp.categoryIs", { name: c.category_name })}</p>}
+        {c.category_name && <p className="text-xs text-slate-500 mt-1">{t("cmp.categoryIs", { name: cat(c.category_name) })}</p>}
       </div>
       <div className="card p-4" data-testid="assignment">
         <p className="text-xs text-slate-500 mb-1">{t("cmp.routing")}</p>
-        <p className="text-sm text-slate-700" data-state={c.assignment_state}>{assignmentTextT(t, c.assignment_state, c.department_name, c.authority_name)}</p>
+        <p className="text-sm text-slate-700" data-state={c.assignment_state}>{assignmentTextT(t, c.assignment_state, c.department_name, c.authority_name, dept)}</p>
       </div>
       {c.due_date && (
         <div data-testid="sla" className={`rounded-xl p-3 flex items-center gap-2 text-sm ${c.sla_breached ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
@@ -112,7 +112,7 @@ function LoginPrompt({ what }: { what: "file" | "mine" }) {
 
 function ComplaintForm() {
   const { user, loading: authLoading } = useAuth();
-  const { t, pick, apiError } = useLang();
+  const { t, pick, apiError, dept } = useLang();
   const fmt = useFmt();
   const [categories, setCategories] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
@@ -178,7 +178,7 @@ function ComplaintForm() {
       <h3 className="text-xl font-bold text-slate-900 mb-2">{t("cmp.success")}</h3>
       <p className="text-slate-500 mb-4">{t("cmp.yourRef")}</p>
       <div className="bg-slate-50 rounded-xl px-6 py-4 mb-4"><p className="font-mono text-2xl font-black text-brand-700" data-testid="new-reference">{result.reference_number}</p></div>
-      <p className="text-sm text-slate-600 mb-2" data-testid="assignment-text">{assignmentTextT(t, result.assignment_state, result.department_name)}</p>
+      <p className="text-sm text-slate-600 mb-2" data-testid="assignment-text">{assignmentTextT(t, result.assignment_state, result.department_name, undefined, dept)}</p>
       {result.due_date && <p className="text-sm text-slate-500 mb-4">{t("cmp.target")} {fmt(result.due_date)}</p>}
       {form.is_anonymous && <p className="text-xs text-amber-700 mb-4">{t("cmp.anonNote")}</p>}
       <button onClick={() => { setResult(null); setForm({ ...form, title: "", description: "" }); }} className="btn-secondary">{t("cmp.fileAnother")}</button>
@@ -254,7 +254,7 @@ function ComplaintForm() {
 
 function MyComplaints({ onTrack }: { onTrack: (ref: string) => void }) {
   const { user, loading: authLoading } = useAuth();
-  const { t, apiError } = useLang();
+  const { t, apiError, dept } = useLang();
   const fmt = useFmt();
   const [items, setItems] = useState<any[] | null>(null);
   const [error, setError] = useState("");
@@ -276,7 +276,7 @@ function MyComplaints({ onTrack }: { onTrack: (ref: string) => void }) {
           <div className="min-w-0">
             <p className="font-semibold text-slate-800 truncate" lang="en">{c.title}</p>
             <p className="text-xs text-slate-500 font-mono">{c.reference_number} · {fmt(c.created_at)}</p>
-            <p className="text-xs text-slate-500 mt-1">{assignmentTextT(t, c.assignment_state, c.department_name)}</p>
+            <p className="text-xs text-slate-500 mt-1">{assignmentTextT(t, c.assignment_state, c.department_name, undefined, dept)}</p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={c.status} />

@@ -23,6 +23,11 @@ body {
 
 .font-tamil { font-family: var(--font-tamil), 'Noto Sans Tamil', sans-serif; }
 
+/* Tamil interface: use the self-hosted Noto Sans Tamil everywhere except code / identifiers (monospace). Latin glyphs fall back to Inter. */
+html[lang="ta"] body, html[lang="ta"] body :not(.font-mono):not(code):not(pre):not(svg):not(path), :lang(ta):not(.font-mono):not(code):not(pre) {
+  font-family: var(--font-tamil), 'Noto Sans Tamil', var(--font-inter), system-ui, sans-serif;
+}
+
 /* ── Glass morphism ─────────────────────────────────────────── */
 .glass {
   background: rgba(255, 255, 255, 0.08);

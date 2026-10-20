@@ -30,7 +30,7 @@ function EnglishList({ items }: { items: string[] }) {
 
 export default function SchemeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { t, lang, label, names, pickL, fmtDate, fmtNumber } = useLang();
+  const { t, lang, label, dept, names, pickL, fmtDate, fmtNumber } = useLang();
   const [scheme, setScheme] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "eligibility" | "documents" | "benefits">("overview");
@@ -84,13 +84,13 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
             <ArrowLeft size={16} /> {t("scheme.allSchemes")}
           </Link>
           <div className="flex flex-wrap gap-3 mb-3">
-            {scheme.department_name && <span className="badge badge-blue max-w-full truncate" title={scheme.department_name}>{scheme.department_name}</span>}
+            {scheme.department_name && <span className="badge badge-blue max-w-full truncate" title={dept(scheme.department_name)}>{dept(scheme.department_name)}</span>}
             {scheme.category && <span className="badge badge-slate">{label("cat", scheme.category)}</span>}
             <span className="badge badge-green">{label("level", scheme.scheme_level)}</span>
             <VerificationBadge status={scheme.verification_status} />
           </div>
           <h1 className="text-2xl md:text-3xl font-black mb-2" data-testid="scheme-name">{nm.primary}</h1>
-          {nm.secondary && <p className="text-blue-100 text-lg" data-testid="scheme-secondary-name">{nm.secondary}</p>}
+          {nm.secondary && <p className="text-blue-100 text-lg" data-testid="scheme-secondary-name" data-i18n-skip lang={nm.secondaryLang}>{nm.secondary}</p>}
           <button type="button" className="btn-primary bg-saffron-500 hover:bg-saffron-600 mt-4" data-testid="check-my-eligibility" onClick={() => { setTab("eligibility"); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
             {t("scheme.checkEligibility")}
           </button>
@@ -149,7 +149,7 @@ export default function SchemeDetailPage({ params }: { params: Promise<{ id: str
                 <p className="text-xs text-slate-500 mb-1">{t("scheme.sourceTitle")}</p>
                 <p className="text-sm text-slate-700">
                   {scheme.verification_status === "official_verified"
-                    ? <>{t("scheme.verifiedAgainst")} <span className="font-mono">{scheme.source_document_ref}</span></>
+                    ? <>{t("scheme.verifiedAgainst")} <span className="font-mono" lang="en">{scheme.source_document_ref}</span></>
                     : <>{t("scheme.notVerified")}{scheme.source_document_ref ? <> {t("scheme.assertsPre")} <span className="font-mono">{scheme.source_document_ref}</span>{t("scheme.assertsPost")}</> : ` ${t("scheme.noSourceDoc")}`} {t("scheme.confirmWithDept")}</>}
                 </p>
                 {scheme.last_checked_on && <p className="text-xs text-slate-500 mt-2">{t("scheme.lastChecked", { date: fmtDate(scheme.last_checked_on) })}</p>}

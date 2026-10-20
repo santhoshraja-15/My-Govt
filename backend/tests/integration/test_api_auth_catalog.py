@@ -76,7 +76,7 @@ async def test_scheme_list_is_complete_and_labelled(client):
     r = await client.get(f"{API}/schemes", params={"page_size": 50})
     assert r.status_code == 200
     body = r.json()
-    assert body["total"] == 12 and len(body["items"]) == 12
+    assert body["total"] == 29 and len(body["items"]) == 29
     statuses = {i["verification_status"] for i in body["items"]}
     assert "official_verified" not in statuses  # nothing is verified without recorded evidence
     assert statuses <= {"provisional", "externally_referenced"}
@@ -87,7 +87,7 @@ async def test_scheme_filters(client):
     prov = (await client.get(f"{API}/schemes", params={"verification_status": "provisional", "page_size": 50})).json()
     ext = (await client.get(f"{API}/schemes", params={"verification_status": "externally_referenced"})).json()
     ver = (await client.get(f"{API}/schemes", params={"verification_status": "official_verified"})).json()
-    assert prov["total"] == 11 and ext["total"] == 1 and ver["total"] == 0
+    assert prov["total"] == 28 and ext["total"] == 1 and ver["total"] == 0
     hit = (await client.get(f"{API}/schemes", params={"q": "breakfast"})).json()
     assert any("Breakfast" in i["name"] for i in hit["items"])
     assert (await client.get(f"{API}/schemes", params={"level": "state", "page_size": 50})).json()["total"] >= 1
@@ -142,7 +142,7 @@ async def test_service_catalogue(client):
     r = await client.get(f"{API}/services", params={"page_size": 50})
     assert r.status_code == 200
     body = r.json()
-    assert body["total"] == 10
+    assert body["total"] == 21
     assert {i["verification_status"] for i in body["items"]} == {"provisional"}
     assert all(i["charges_verified"] is False for i in body["items"])     # fees/timing unconfirmed until verified
     item = body["items"][0]
@@ -230,3 +230,49 @@ async def test_eligibility_accepts_boundary_values_and_unknowns(client):
     sid = (await client.get("/api/v1/schemes", params={"page_size": 1})).json()["items"][0]["scheme_id"]
     for ok in ({}, {"age": 0}, {"age": 120}, {"annual_income": 0}, {"family_size": 1}, {"family_size": 50}):
         assert (await client.post(f"/api/v1/schemes/{sid}/eligibility", json=ok)).status_code == 200, ok
+
+
+# -- content completeness (migration 009 / seed 003) ----------------------------------------
+async def test_every_scheme_and_service_has_both_names_and_honest_content(client):
+    schemes = (await client.get(f"{API}/schemes", params={"page_size": 50})).json()["items"]
+    services = (await client.get(f"{API}/services", params={"page_size": 50})).json()["items"]
+    assert all(s["name"] and s["name_ta"] for s in schemes) and all(s["name"] and s["name_ta"] for s in services)
+    for s in schemes:
+        d = (await client.get(f"{API}/schemes/{s['scheme_id']}")).json()
+        assert d["verification_status"] != "official_verified"                    # nothing is promoted by this content load
+        assert d["eligibility_points"] or d["eligibility_rules"], s["name"]
+        assert d["benefits"], s["name"]
+        assert d["required_documents"], s["name"]
+        for b in d["benefits"]:
+            assert b["amount_status"] in {"verified_current", "historical", "unverified", "varies", "not_applicable"}
+            if b["amount"] is not None:
+                assert b["amount_status"] != "not_applicable"                      # a number always carries its confidence
+        assert d["last_checked_on"] and d["source_urls"] is not None
+    for v in services:
+        d = (await client.get(f"{API}/services/{v['service_id']}")).json()
+        assert d["requirements"], v["name"]
+        assert d["fee_status"] in {"listed_official_2023", "not_listed"}
+        if d["fee_status"] == "not_listed":
+            assert d["government_fee"] is None and d["service_charge"] is None and d["processing_time"] is None   # nothing invented
+
+
+async def test_service_requirements_are_specific_to_the_service(client):
+    services = (await client.get(f"{API}/services", params={"page_size": 50})).json()["items"]
+    lists = {}
+    for v in services:
+        d = (await client.get(f"{API}/services/{v['service_id']}")).json()
+        lists[v["service_code"]] = tuple(sorted(r["document_type"] for r in d["requirements"]))
+    # official lists differ per service: no two services share an identical document list unless both are the compiled fallback
+    official = [k for k, v in lists.items() if any(True for _ in v)]
+    assert len(set(lists[k] for k in official)) >= 15
+    assert lists["SVC-COMM-CERT"] != lists["SVC-INCOME-CERT"] != lists["SVC-LEGAL-HEIR"]
+
+
+async def test_policy_document_catalogue(client):
+    body = (await client.get(f"{API}/documents/policy", params={"page_size": 100})).json()
+    assert body["total"] == 40 and body["facets"]["categories"] == {"government_order": 8, "policy": 2, "circular": 10, "notification": 10, "act": 10}
+    for d in body["items"]:
+        if d["verification_status"] == "official_verified":
+            assert d["pdf_url"] and d["last_checked_on"]
+        assert d["summary_ta_reviewed"] is False
+    assert (await client.get(f"{API}/documents/policy", params={"category": "nope"})).status_code == 422

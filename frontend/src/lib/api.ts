@@ -203,6 +203,8 @@ export const admin = {
 };
 
 // ── Public stats ──────────────────────────────────────────────
+export const publicNames = { get: () => request<{ departments: Record<string, string>; categories: Record<string, string>; districts: Record<string, string> }>("/api/v1/public/names") };
+
 export const publicStats = {
   get: () => request<{ schemes: number; services: number; departments: number; districts: number; verified_schemes: number }>("/api/v1/public/stats"),
 };

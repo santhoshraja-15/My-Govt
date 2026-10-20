@@ -9,7 +9,7 @@ import { VerificationBadge } from "@/components/ui/VerificationBadge";
 import { useLang } from "@/lib/i18n";
 
 function ServiceCard({ svc }: { svc: any }) {
-  const { t, names, pickL, fmtNumber } = useLang();
+  const { t, names, pickL, fmtNumber, dept } = useLang();
   const nm = names(svc.name, svc.name_ta);
   const desc = pickL(svc.description, svc.description_ta);
   return (
@@ -20,10 +20,10 @@ function ServiceCard({ svc }: { svc: any }) {
       </div>
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-slate-900 text-sm group-hover:text-brand-700 transition-colors line-clamp-1 mb-0.5">{nm.primary}</h3>
-        {nm.secondary && <p className="text-xs text-slate-500 line-clamp-1 mb-2" data-testid="service-secondary-name">{nm.secondary}</p>}
+        {nm.secondary && <p className="text-xs text-slate-500 line-clamp-1 mb-2" data-testid="service-secondary-name" data-i18n-skip lang={nm.secondaryLang}>{nm.secondary}</p>}
         {desc.text && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed" lang={desc.lang}>{desc.text}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={svc.department_name}>{svc.department_name}</span>}
+          {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={dept(svc.department_name)}>{dept(svc.department_name)}</span>}
           {svc.charges_verified ? (
             <>
               {svc.government_fee > 0 && <span className="badge badge-green">{t("services.feeBadge", { amount: fmtNumber(svc.government_fee) })}</span>}

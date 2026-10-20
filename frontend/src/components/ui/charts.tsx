@@ -2,16 +2,19 @@
 
 /** Dependency-free SVG/CSS charts. Every chart has a text alternative (table or list) so it is usable without sight. */
 
+import { useLang } from "@/lib/i18n";
+
 export interface Slice { label: string; value: number; color: string }
 
 export function DonutChart({ slices, centerLabel, testId }: { slices: Slice[]; centerLabel?: string; testId?: string }) {
+  const { t } = useLang();
   const total = slices.reduce((a, s) => a + s.value, 0);
   const R = 52, C = 2 * Math.PI * R;
   let offset = 0;
   return (
     <div className="flex flex-wrap items-center gap-6" data-testid={testId}>
       <svg viewBox="0 0 140 140" className="w-36 h-36 shrink-0 -rotate-90" role="img"
-        aria-label={`Donut chart, ${total} in total: ${slices.map((s) => `${s.label} ${s.value}`).join(", ")}`}>
+        aria-label={t("chart.donut", { total, items: slices.map((s) => `${s.label} ${s.value}`).join(", ") })}>
         <circle cx="70" cy="70" r={R} fill="none" stroke="#e2e8f0" strokeWidth="16" />
         {total > 0 && slices.filter((s) => s.value > 0).map((s) => {
           const len = (s.value / total) * C;

@@ -292,8 +292,8 @@ export default function HomePage() {
                   <Star size={16} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm truncate" title={names(name, ta).text}>{names(name, ta).primary}</p>
-                  <p className="text-blue-200 text-xs truncate">{names(name, ta).secondary}</p>
+                  <p className="text-white font-semibold text-sm truncate" title={names(name, ta).text} data-i18n-skip>{names(name, ta).primary}</p>
+                  <p className="text-blue-200 text-xs truncate" data-i18n-skip>{names(name, ta).secondary}</p>
                   <p className="text-blue-300 text-xs">{t(dept as TKey)}</p>
                 </div>
                 <span className={`badge text-xs shrink-0 ${color}`}>{t(tag as TKey)}</span>

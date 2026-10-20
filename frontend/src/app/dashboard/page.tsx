@@ -14,7 +14,7 @@ import { useLang } from "@/lib/i18n";
 const TERMINAL = ["resolved", "closed", "rejected"];
 
 export default function DashboardPage() {
-  const { t, names, fmtDate, apiError } = useLang();
+  const { t, names, fmtDate, apiError, dept } = useLang();
   const fmt = (d?: string | null) => (d ? fmtDate(d) : "—");
   const user = useGuard((r) => r === "citizen");
   const [mine, setMine] = useState<any>(null);
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     <main className="max-w-6xl mx-auto px-4 py-8 space-y-8" data-testid="citizen-dashboard">
       <header className="rounded-3xl hero-gradient text-white p-6 sm:p-8 animate-fade-in">
         <p className="text-blue-100 text-sm">{t("dash.kicker")}</p>
-        <h1 className="text-2xl sm:text-3xl font-black mt-1" data-testid="dashboard-greeting">{t("dash.welcome", { name: first })}</h1>
+        <h1 className="text-2xl sm:text-3xl font-black mt-1" data-testid="dashboard-greeting">{t("dash.welcome", { name: "\u0001" }).split("\u0001").flatMap((part, i, arr) => (i < arr.length - 1 ? [part, <span key={i} data-i18n-skip>{first}</span>] : [part]))}</h1>
         <p className="text-blue-100 mt-2 max-w-2xl text-sm">
           {t("dash.intro")}
         </p>
@@ -81,8 +81,8 @@ export default function DashboardPage() {
                   {items.slice(0, 6).map((c) => (
                     <li key={c.complaint_id} className="py-3 flex flex-wrap items-center gap-3 justify-between">
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-800 truncate">{c.title}</p>
-                        <p className="text-xs text-slate-500"><span className="font-mono">{c.reference_number}</span> · {t("dash.filed", { date: fmt(c.created_at) })}{c.department_name ? ` · ${c.department_name}` : ""}</p>
+                        <p className="font-semibold text-slate-800 truncate" lang="en">{c.title}</p>
+                        <p className="text-xs text-slate-500"><span className="font-mono">{c.reference_number}</span> · {t("dash.filed", { date: fmt(c.created_at) })}{c.department_name ? ` · ${dept(c.department_name)}` : ""}</p>
                       </div>
                       <StatusBadge status={c.status} />
                     </li>
@@ -108,7 +108,7 @@ export default function DashboardPage() {
           {featured.map((s) => (
             <Link key={s.scheme_id} href={`/schemes/${s.scheme_id}`} className="card p-4 block" data-testid="featured-scheme">
               <p className="font-semibold text-slate-800 text-sm line-clamp-2">{names(s.name, s.name_ta).primary}</p>
-              {names(s.name, s.name_ta).secondary && <p className="text-xs text-slate-500 line-clamp-1">{names(s.name, s.name_ta).secondary}</p>}
+              {names(s.name, s.name_ta).secondary && <p className="text-xs text-slate-500 line-clamp-1" data-i18n-skip>{names(s.name, s.name_ta).secondary}</p>}
               <div className="mt-3 flex items-center justify-between">
                 <VerificationBadge status={s.verification_status} />
                 <span className="text-xs text-brand-700 flex items-center gap-1">{t("dash.eligibility")} <ArrowRight size={12} /></span>
