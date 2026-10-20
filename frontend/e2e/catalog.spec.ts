@@ -5,7 +5,7 @@ test.describe("scheme discovery", () => {
   test("lists schemes, each labelled with its verification status", async ({ page }) => {
     await page.goto("/schemes");
     await expect(page.getByTestId("scheme-card").first()).toBeVisible();
-    await expect(page.getByText(/12 schemes found/)).toBeVisible();
+    await expect(page.getByText(/29 schemes found/)).toBeVisible();
     const badges = page.getByTestId("scheme-card").getByTestId("verification-badge");
     expect(await badges.count()).toBeGreaterThan(0);
     // Nothing is presented as "Verified": no official document evidence is recorded.
@@ -51,7 +51,7 @@ test.describe("citizen services", () => {
   test("lists all services with verification labels and search works", async ({ page }) => {
     await page.goto("/services");
     await expect(page.getByTestId("service-card").first()).toBeVisible();
-    await expect(page.getByText(/10 services/)).toBeVisible();
+    await expect(page.getByText(/21 services/)).toBeVisible();
     const statuses = await page.getByTestId("service-card").getByTestId("verification-badge")
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
     expect(statuses.length).toBeGreaterThan(0);

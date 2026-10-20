@@ -6,8 +6,12 @@ import { Search, FileText, ArrowLeft, ExternalLink, Download, Loader2, Filter } 
 import { services as servicesAPI } from "@/lib/api";
 import { ErrorState } from "@/components/ui/AsyncState";
 import { VerificationBadge } from "@/components/ui/VerificationBadge";
+import { useLang } from "@/lib/i18n";
 
 function ServiceCard({ svc }: { svc: any }) {
+  const { t, names, pickL, fmtNumber, dept } = useLang();
+  const nm = names(svc.name, svc.name_ta);
+  const desc = pickL(svc.description, svc.description_ta);
   return (
     <Link data-testid="service-card" href={`/services/${svc.service_id}`}
       className="group card p-5 flex gap-4 items-start hover:border-brand-200">
@@ -15,20 +19,22 @@ function ServiceCard({ svc }: { svc: any }) {
         <FileText size={18} className="text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-slate-900 text-sm group-hover:text-brand-700 transition-colors line-clamp-1 mb-0.5">{svc.name}</h3>
-        {svc.name_ta && <p className="text-xs text-slate-500 font-tamil line-clamp-1 mb-2">{svc.name_ta}</p>}
-        {svc.description && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{svc.description}</p>}
+        <h3 className="font-bold text-slate-900 text-sm group-hover:text-brand-700 transition-colors line-clamp-1 mb-0.5">{nm.primary}</h3>
+        {nm.secondary && <p className="text-xs text-slate-500 line-clamp-1 mb-2" data-testid="service-secondary-name" data-i18n-skip lang={nm.secondaryLang}>{nm.secondary}</p>}
+        {desc.text && <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed" lang={desc.lang}>{desc.text}</p>}
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={svc.department_name}>{svc.department_name}</span>}
+          {svc.department_name && <span className="badge badge-blue max-w-full truncate" title={dept(svc.department_name)}>{dept(svc.department_name)}</span>}
           {svc.charges_verified ? (
             <>
-              {svc.government_fee > 0 && <span className="badge badge-green">₹{svc.government_fee} fee</span>}
-              {svc.government_fee === 0 && <span className="badge badge-green">Free</span>}
-              {svc.processing_time && <span className="badge badge-slate">{svc.processing_time}</span>}
+              {svc.government_fee > 0 && <span className="badge badge-green">{t("services.feeBadge", { amount: fmtNumber(svc.government_fee) })}</span>}
+              {svc.government_fee === 0 && <span className="badge badge-green">{t("common.free")}</span>}
+              {svc.processing_time && <span className="badge badge-slate" lang="en">{svc.processing_time}</span>}
             </>
+          ) : svc.fee_status === "listed_official_2023" ? (
+            <span className="badge badge-yellow" data-testid="fee-listed" title={t("services.feeListedTitle")}>{t("services.feeListed")}</span>
           ) : (
-            <span className="badge badge-yellow" data-testid="charges-unconfirmed" title="Fees and processing time for this service have not been verified against an official source">
-              Fees &amp; timing unconfirmed
+            <span className="badge badge-yellow" data-testid="charges-unconfirmed" title={t("services.chargesUnconfirmedTitle")}>
+              {t("services.chargesUnconfirmed")}
             </span>
           )}
           <VerificationBadge status={svc.verification_status} />
@@ -39,6 +45,7 @@ function ServiceCard({ svc }: { svc: any }) {
 }
 
 export default function ServicesPage() {
+  const { t, label } = useLang();
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -63,7 +70,7 @@ export default function ServicesPage() {
       setTotal(res.total || 0);
       setPages(res.pages || 1);
       setPage(pg);
-    } catch (e: any) { setItems([]); setTotal(0); setError(e?.message || "Could not load services."); }
+    } catch (e: any) { setItems([]); setTotal(0); setError("load"); }
     setLoading(false);
   }, [q, category]);
 
@@ -75,27 +82,27 @@ export default function ServicesPage() {
       <div className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white py-12">
         <div className="max-w-6xl mx-auto px-4">
           <Link href="/" className="inline-flex items-center gap-1.5 text-emerald-200 hover:text-white text-sm mb-4 transition-colors">
-            <ArrowLeft size={16} /> Home
+            <ArrowLeft size={16} /> {t("common.home")}
           </Link>
           <div className="flex items-center gap-3 mb-2">
             <FileText size={30} className="text-emerald-300" />
-            <h1 className="text-3xl font-black">e-Sevai Services</h1>
+            <h1 className="text-3xl font-black">{t("services.title")}</h1>
           </div>
-          <p className="text-emerald-200 text-lg mb-6">Apply online for {total > 0 ? total : ""} government certificates and services</p>
+          <p className="text-emerald-200 text-lg mb-6">{total > 0 ? t("services.subtitle", { count: total }) : t("services.subtitleNoCount")}</p>
 
           <form onSubmit={(e) => { e.preventDefault(); setQ(inputVal); }} role="search" className="flex flex-wrap gap-2 max-w-xl">
             <div className="flex-1 min-w-[12rem] flex items-center gap-2 bg-white/15 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5">
               <Search size={18} className="text-emerald-200 shrink-0" />
-              <input value={inputVal} onChange={e => setInputVal(e.target.value)} aria-label="Search services" data-testid="service-search"
-                placeholder="Search services…" className="flex-1 min-w-0 bg-transparent text-white placeholder-emerald-300 text-sm outline-none" />
+              <input value={inputVal} onChange={e => setInputVal(e.target.value)} aria-label={t("services.searchLabel")} data-testid="service-search"
+                placeholder={t("services.searchPlaceholder")} className="flex-1 min-w-0 bg-transparent text-white placeholder-emerald-300 text-sm outline-none" />
             </div>
-            <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">Search</button>
+            <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">{t("common.search")}</button>
           </form>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <h2 className="sr-only">Service results</h2>
+        <h2 className="sr-only">{t("services.resultsHeading")}</h2>
         {/* Category filter pills */}
         <div className="flex flex-wrap gap-2 mb-6">
           {["All", ...cats].map(c => (
@@ -104,23 +111,23 @@ export default function ServicesPage() {
                 category === c
                   ? "bg-brand-600 text-white border-brand-600 shadow-sm"
                   : "bg-white text-slate-600 border-slate-200 hover:border-brand-300 hover:text-brand-600"}`}>
-              {c === "All" ? "All Categories" : c.replace(/_/g," ")}
+              {c === "All" ? t("services.allCategories") : label("cat", c)}
             </button>
           ))}
         </div>
 
         <div className="flex items-center justify-between mb-5">
-          <p className="text-sm text-slate-500">{loading ? "Loading…" : error ? "" : `${total} service${total !== 1 ? "s" : ""}`}</p>
+          <p className="text-sm text-slate-500">{loading ? t("common.loading") : error ? "" : total === 1 ? t("services.foundOne") : t("services.found", { count: total })}</p>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-brand-600" /></div>
         ) : error ? (
-          <ErrorState message={error} onRetry={() => load(1)} />
+          <ErrorState message={t("services.loadFailed")} onRetry={() => load(1)} />
         ) : items.length === 0 ? (
           <div className="text-center py-20" data-testid="empty-state">
             <FileText size={48} className="text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">No services found</p>
+            <p className="text-slate-500">{t("services.empty")}</p>
           </div>
         ) : (
           <>
@@ -129,14 +136,14 @@ export default function ServicesPage() {
             </div>
             {pages > 1 && (
               <div className="flex justify-center gap-2 mt-10">
-                <button onClick={() => load(page-1)} disabled={page===1} className="btn-ghost disabled:opacity-40">← Prev</button>
+                <button onClick={() => load(page-1)} disabled={page===1} className="btn-ghost disabled:opacity-40">{t("pager.prev")}</button>
                 {Array.from({length: Math.min(pages,7)}, (_, i) => i+1).map(p => (
                   <button key={p} onClick={() => load(p)}
                     className={`w-9 h-9 rounded-xl text-sm font-semibold ${p===page ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
                     {p}
                   </button>
                 ))}
-                <button onClick={() => load(page+1)} disabled={page===pages} className="btn-ghost disabled:opacity-40">Next →</button>
+                <button onClick={() => load(page+1)} disabled={page===pages} className="btn-ghost disabled:opacity-40">{t("pager.next")}</button>
               </div>
             )}
           </>

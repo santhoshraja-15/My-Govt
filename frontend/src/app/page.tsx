@@ -4,6 +4,8 @@ import Link from "next/link";
 import { publicStats } from "@/lib/api";
 import { AuthNav } from "@/components/layout/AuthNav";
 import { LangToggle } from "@/components/layout/LangToggle";
+import { useAuth } from "@/lib/auth";
+import { useLang, type TKey } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import {
   Search, MessageSquare, FileText, MapPin, ClipboardList,
@@ -12,12 +14,16 @@ import {
 } from "lucide-react";
 
 // ── Typed words for hero ──────────────────────────────────────
-const TYPED_WORDS = ["Schemes", "Services", "Benefits", "Answers", "Information"];
+const TYPED_KEYS = ["home.typed.schemes", "home.typed.services", "home.typed.benefits", "home.typed.answers", "home.typed.information"] as const;
 
 function TypedWord() {
+  const { t, lang } = useLang();
+  const TYPED_WORDS = TYPED_KEYS.map((k) => t(k));
   const [index, setIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => { setDisplayed(""); setDeleting(false); }, [lang]);
 
   useEffect(() => {
     const word = TYPED_WORDS[index];
@@ -34,7 +40,8 @@ function TypedWord() {
       setIndex((i) => (i + 1) % TYPED_WORDS.length);
     }
     return () => clearTimeout(timeout);
-  }, [displayed, deleting, index]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayed, deleting, index, lang]);
 
   return (
     <span className="text-saffron-400">
@@ -46,6 +53,8 @@ function TypedWord() {
 
 // ── Navigation ────────────────────────────────────────────────
 function Navbar() {
+  const { t } = useLang();
+  const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -61,23 +70,23 @@ function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-saffron-400 to-brand-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-sm">MG</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-128.png" alt="" width={40} height={40} className="w-10 h-10 rounded-full bg-white shadow-lg" />
             <div className="flex flex-col leading-tight">
               <span className="text-white font-bold text-base">MyGovt</span>
-              <span className="text-blue-200 text-[10px] font-medium">Tamil Nadu</span>
+              <span className="text-blue-200 text-[10px] font-medium">{t("home.brand.sub")}</span>
             </div>
           </Link>
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
             {[
-              { href: "/schemes", label: "Schemes" },
-              { href: "/services", label: "Services" },
-              { href: "/documents", label: "Documents" },
-              { href: "/complaints", label: "Complaints" },
-              { href: "/assistant", label: "AI Assistant" },
+              { href: "/schemes", label: t("nav.schemes") },
+              { href: "/services", label: t("nav.services") },
+              { href: "/documents", label: t("nav.documents") },
+              { href: "/complaints", label: t("nav.complaints") },
+              { href: "/assistant", label: t("nav.assistant") },
+              ...(isAdmin ? [{ href: "/database-architecture", label: t("nav.architecture") }] : []),
             ].map((item) => (
               <Link key={item.href} href={item.href}
                 className="px-3 py-2 rounded-lg text-sm font-medium text-blue-100 hover:text-white hover:bg-white/10 transition-all">
@@ -93,7 +102,7 @@ function Navbar() {
           </div>
 
           {/* Mobile menu */}
-          <button onClick={() => setOpen(!open)} className="md:hidden text-white p-2" aria-label="Toggle navigation menu" aria-expanded={open}>
+          <button onClick={() => setOpen(!open)} className="md:hidden text-white p-2" aria-label={t("home.toggleNav")} aria-expanded={open}>
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
@@ -102,15 +111,15 @@ function Navbar() {
       {/* Mobile dropdown */}
       {open && (
         <div className="md:hidden glass-dark border-t border-white/10 px-4 py-3 space-y-1">
-          {["/schemes", "/services", "/documents", "/complaints", "/assistant"].map((href) => (
+          {([["/schemes", "nav.schemes"], ["/services", "nav.services"], ["/documents", "nav.documents"], ["/complaints", "nav.complaints"], ["/assistant", "nav.assistant"]] as [string, TKey][]).map(([href, key]) => (
             <Link key={href} href={href} onClick={() => setOpen(false)}
-              className="block px-3 py-2 text-sm text-blue-100 hover:text-white hover:bg-white/10 rounded-lg capitalize">
-              {href.slice(1)}
+              className="block px-3 py-2 text-sm text-blue-100 hover:text-white hover:bg-white/10 rounded-lg">
+              {t(key)}
             </Link>
           ))}
-          <div className="flex gap-3 pt-2">
-            <Link href="/login" className="flex-1 text-center py-2 text-sm text-blue-200 border border-white/20 rounded-xl">Sign In</Link>
-            <Link href="/register" className="flex-1 text-center py-2 text-sm text-white bg-saffron-500 rounded-xl font-semibold">Register</Link>
+          <div className="flex gap-3 pt-2"><LangToggle className="shrink-0" />
+            <Link href="/login" className="flex-1 text-center py-2 text-sm text-blue-200 border border-white/20 rounded-xl">{t("auth.signin")}</Link>
+            <Link href="/register" className="flex-1 text-center py-2 text-sm text-white bg-saffron-500 rounded-xl font-semibold">{t("auth.register")}</Link>
           </div>
         </div>
       )}
@@ -121,41 +130,42 @@ function Navbar() {
 // ── Stats ─────────────────────────────────────────────────────
 // Counts come from GET /api/v1/public/stats (live database counts); nothing here is hardcoded.
 const STAT_DEFS = [
-  { key: "schemes", label: "Government Schemes", icon: Award },
-  { key: "districts", label: "Districts Covered", icon: MapPin },
-  { key: "services", label: "Citizen Services", icon: Building2 },
-  { key: "departments", label: "Departments", icon: Users },
+  { key: "schemes", label: "home.stat.schemes", icon: Award },
+  { key: "districts", label: "home.stat.districts", icon: MapPin },
+  { key: "services", label: "home.stat.services", icon: Building2 },
+  { key: "departments", label: "home.stat.departments", icon: Users },
 ] as const;
 
 // ── Quick actions ─────────────────────────────────────────────
 const QUICK_ACTIONS = [
-  { href: "/schemes", icon: Award, title: "Find Schemes", desc: "Discover benefits you qualify for", color: "from-blue-500 to-blue-700" },
-  { href: "/assistant", icon: MessageSquare, title: "AI Assistant", desc: "Ask anything about government services", color: "from-purple-500 to-purple-700" },
-  { href: "/complaints", icon: ClipboardList, title: "File Complaint", desc: "Report civic issues & track resolution", color: "from-rose-500 to-rose-700" },
-  { href: "/services", icon: FileText, title: "Get Certificates", desc: "Apply for nativity, income, community & more", color: "from-emerald-500 to-emerald-700" },
-  { href: "/documents", icon: Globe, title: "Policy Documents", desc: "Access GOs, policies and official documents", color: "from-indigo-500 to-indigo-700" },
+  { href: "/schemes", icon: Award, k: "schemes", color: "from-blue-500 to-blue-700" },
+  { href: "/assistant", icon: MessageSquare, k: "assistant", color: "from-purple-500 to-purple-700" },
+  { href: "/complaints", icon: ClipboardList, k: "complaints", color: "from-rose-500 to-rose-700" },
+  { href: "/services", icon: FileText, k: "services", color: "from-emerald-500 to-emerald-700" },
+  { href: "/documents", icon: Globe, k: "documents", color: "from-indigo-500 to-indigo-700" },
 ];
 
 // ── Feature cards ─────────────────────────────────────────────
 const FEATURES = [
-  { icon: Shield, title: "Source-Grounded Answers", desc: "Answers come only from the records we hold, each labelled Verified, Provisional or External — no invented facts." },
-  { icon: Zap, title: "Real-time AI Eligibility", desc: "Eligibility checks run only on rules recorded for a scheme; where rules are missing we say so instead of guessing." },
-  { icon: Globe, title: "Bilingual — English & Tamil", desc: "Ask questions in English or Tamil. Navigation and scheme names are bilingual; many page texts are still English and the Tamil is unreviewed." },
-  { icon: TrendingUp, title: "End-to-End Complaint Tracking", desc: "File, track, and escalate civic complaints with SLA timelines and real-time status updates." },
+  { icon: Shield, k: "f1" },
+  { icon: Zap, k: "f2" },
+  { icon: Globe, k: "f3" },
+  { icon: TrendingUp, k: "f4" },
 ];
 
 // ── Popular schemes ───────────────────────────────────────────
 const POPULAR_SCHEMES = [
-  { name: "Kalaignar Magalir Urimai Thogai", dept: "Social Welfare", tag: "Provisional", color: "badge-yellow" },
-  { name: "CMCHIS (Health Insurance)", dept: "Health", tag: "Provisional", color: "badge-yellow" },
-  { name: "Pudhumai Penn", dept: "Higher Education", tag: "Provisional", color: "badge-yellow" },
-  { name: "PM-Kisan", dept: "Agriculture (central scheme)", tag: "External source", color: "badge-blue" },
-  { name: "Vidiyal Payanam", dept: "Transport", tag: "Provisional", color: "badge-yellow" },
-  { name: "Old Age Pension", dept: "Social Welfare", tag: "Provisional", color: "badge-yellow" },
+  { name: "Kalaignar Magalir Urimai Thogai", ta: "கலைஞர் மகளிர் உரிமைத் தொகை", dept: "home.pop.dept.social", tag: "status.provisional", color: "badge-yellow" },
+  { name: "CMCHIS (Health Insurance)", ta: "முதலமைச்சரின் விரிவான மருத்துவக் காப்பீடு", dept: "home.pop.dept.health", tag: "status.provisional", color: "badge-yellow" },
+  { name: "Pudhumai Penn", ta: "புதுமைப் பெண் திட்டம்", dept: "home.pop.dept.education", tag: "status.provisional", color: "badge-yellow" },
+  { name: "PM-Kisan", ta: "பிரதம மந்திரி கிசான் சம்மான் நிதி", dept: "home.pop.dept.agri", tag: "status.external", color: "badge-blue" },
+  { name: "Vidiyal Payanam", ta: "விடியல் பயணம்", dept: "home.pop.dept.transport", tag: "status.provisional", color: "badge-yellow" },
+  { name: "Old Age Pension", ta: "முதியோர் ஓய்வூதியம்", dept: "home.pop.dept.social", tag: "status.provisional", color: "badge-yellow" },
 ];
 
 // ── Main page ─────────────────────────────────────────────────
 export default function HomePage() {
+  const { t, names } = useLang();
   const [searchQuery, setSearchQuery] = useState("");
   const [liveStats, setLiveStats] = useState<Record<string, number> | null>(null);
   useEffect(() => { publicStats.get().then(setLiveStats).catch(() => setLiveStats(null)); }, []);
@@ -182,16 +192,16 @@ export default function HomePage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 mb-6 animate-fade-in">
             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse-slow" />
-            <span className="text-blue-100 text-sm font-medium">AI-powered citizen information platform — university demonstration</span>
+            <span className="text-blue-100 text-sm font-medium">{t("home.badge")}</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-white leading-tight mb-6 animate-slide-up">
-            Your Government.<br />
-            Your <TypedWord />.
+            {t("home.h1a")}<br />
+            {t("home.h1b")} <TypedWord />.
           </h1>
 
           <p className="text-lg md:text-xl text-blue-200 max-w-2xl mx-auto mb-10 font-medium animate-fade-in">
-            Browse Tamil Nadu government schemes, check eligibility where rules are recorded, track complaints, and access all Tamil Nadu citizen services — powered by AI.
+            {t("home.lead")}
           </p>
 
           {/* Search bar */}
@@ -203,23 +213,23 @@ export default function HomePage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search schemes, services, or ask a question…" aria-label="Search schemes, services, or ask a question" data-testid="landing-search"
+                  placeholder={t("home.searchPlaceholder")} aria-label={t("home.searchLabel")} data-testid="landing-search"
                   className="flex-1 min-w-0 bg-transparent text-white placeholder-blue-300 text-sm outline-none"
                 />
               </div>
               <button type="submit" className="btn-primary bg-saffron-500 hover:bg-saffron-600 shrink-0">
-                Search <ArrowRight size={16} />
+                {t("common.search")} <ArrowRight size={16} />
               </button>
             </div>
           </form>
 
           {/* Popular searches */}
           <div className="flex flex-wrap items-center justify-center gap-2 animate-fade-in">
-            <span className="text-blue-300 text-sm">Popular:</span>
-            {["Kalaignar Magalir Urimai", "CM Health Insurance", "Old Age Pension", "Free Bus Pass"].map((term) => (
+            <span className="text-blue-300 text-sm">{t("home.popular")}</span>
+            {([["Kalaignar Magalir Urimai", "home.pop1"], ["CM Health Insurance", "home.pop2"], ["Old Age Pension", "home.pop3"], ["Free Bus Pass", "home.pop4"]] as [string, TKey][]).map(([term, key]) => (
               <Link key={term} href={`/schemes?q=${encodeURIComponent(term)}`}
                 className="text-sm glass hover:bg-white/20 text-blue-100 px-3 py-1 rounded-full transition-all">
-                {term}
+                {t(key)}
               </Link>
             ))}
           </div>
@@ -232,7 +242,7 @@ export default function HomePage() {
               <div key={label} className="glass rounded-2xl p-5 text-center animate-fade-in" data-testid={`stat-${key}`}>
                 <Icon size={24} className="text-saffron-400 mx-auto mb-2" />
                 <div className="text-3xl font-black text-white">{liveStats ? liveStats[key] : "—"}</div>
-                <div className="text-blue-200 text-xs font-medium mt-1">{label}</div>
+                <div className="text-blue-200 text-xs font-medium mt-1">{t(label as TKey)}</div>
               </div>
             ))}
           </div>
@@ -243,20 +253,20 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 py-20">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
-            What would you like to do?
+            {t("home.q.title")}
           </h2>
-          <p className="text-slate-500 text-lg">Everything you need — in one place</p>
+          <p className="text-slate-500 text-lg">{t("home.q.sub")}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {QUICK_ACTIONS.map(({ href, icon: Icon, title, desc, color }) => (
+          {QUICK_ACTIONS.map(({ href, icon: Icon, k, color }) => (
             <Link key={href} href={href}
               className="group card p-6 flex gap-4 items-start hover:border-brand-200">
               <div className={`shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200`}>
                 <Icon size={22} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-slate-900 mb-1 group-hover:text-brand-700 transition-colors">{title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
+                <h3 className="font-bold text-slate-900 mb-1 group-hover:text-brand-700 transition-colors">{t(`home.qa.${k}.title` as TKey)}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{t(`home.qa.${k}.desc` as TKey)}</p>
               </div>
               <ChevronRight size={18} className="text-slate-300 group-hover:text-brand-500 group-hover:translate-x-1 transition-all shrink-0 mt-0.5" />
             </Link>
@@ -269,25 +279,26 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between mb-10">
             <div>
-              <h2 className="text-3xl font-bold text-white mb-2">Popular Schemes</h2>
-              <p className="text-blue-300">Most accessed government benefit programmes</p>
+              <h2 className="text-3xl font-bold text-white mb-2">{t("home.pop.title")}</h2>
+              <p className="text-blue-300">{t("home.pop.sub")}</p>
             </div>
             <Link href="/schemes" className="btn-secondary bg-transparent border-blue-300 text-blue-100 hover:bg-white/10">
-              View All <ChevronRight size={16} />
+              {t("home.pop.viewAll")} <ChevronRight size={16} />
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {POPULAR_SCHEMES.map(({ name, dept, tag, color }) => (
+            {POPULAR_SCHEMES.map(({ name, ta, dept, tag, color }) => (
               <Link key={name} href={`/schemes?q=${encodeURIComponent(name)}`}
                 className="group flex items-center gap-4 glass hover:bg-white/15 rounded-2xl p-4 transition-all duration-200">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-saffron-400 to-brand-600 flex items-center justify-center shrink-0">
                   <Star size={16} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm truncate">{name}</p>
-                  <p className="text-blue-300 text-xs">{dept}</p>
+                  <p className="text-white font-semibold text-sm truncate" title={names(name, ta).text} data-i18n-skip>{names(name, ta).primary}</p>
+                  <p className="text-blue-200 text-xs truncate" data-i18n-skip>{names(name, ta).secondary}</p>
+                  <p className="text-blue-300 text-xs">{t(dept as TKey)}</p>
                 </div>
-                <span className={`badge text-xs shrink-0 ${color}`}>{tag}</span>
+                <span className={`badge text-xs shrink-0 ${color}`}>{t(tag as TKey)}</span>
               </Link>
             ))}
           </div>
@@ -297,20 +308,20 @@ export default function HomePage() {
       {/* ── Why MyGovt ───────────────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 py-20">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">Why MyGovt?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">{t("home.why.title")}</h2>
           <p className="text-slate-500 text-lg max-w-xl mx-auto">
-            Built on source-labelled data and grounded AI. Records stay marked Provisional until checked against an official document.
+            {t("home.why.sub")}
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="card p-6 flex gap-4">
+          {FEATURES.map(({ icon: Icon, k }) => (
+            <div key={k} className="card p-6 flex gap-4">
               <div className="shrink-0 w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center">
                 <Icon size={22} className="text-brand-600" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 mb-1.5">{title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
+                <h3 className="font-bold text-slate-900 mb-1.5">{t(`home.${k}.title` as TKey)}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{t(`home.${k}.desc` as TKey)}</p>
               </div>
             </div>
           ))}
@@ -324,17 +335,17 @@ export default function HomePage() {
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 bg-white/15 rounded-full px-4 py-1.5 mb-6">
               <MessageSquare size={16} className="text-saffron-300" />
-              <span className="text-white text-sm font-medium">Powered by AI — Grounded in Government Data</span>
+              <span className="text-white text-sm font-medium">{t("home.cta.badge")}</span>
             </div>
             <h2 className="text-3xl md:text-5xl font-black text-white mb-4">
-              Ask anything about<br />Tamil Nadu Government
+              {t("home.cta.title1")}<br />{t("home.cta.title2")}
             </h2>
             <p className="text-blue-200 text-lg mb-8 max-w-xl mx-auto">
-              Get instant answers, with sources and verification status, about schemes, services, eligibility criteria, deadlines and more — in English or Tamil.
+              {t("home.cta.desc")}
             </p>
             <Link href="/assistant" className="inline-flex items-center gap-3 bg-white text-brand-700 font-bold px-8 py-4 rounded-2xl hover:bg-blue-50 transition-all shadow-2xl text-lg">
               <MessageSquare size={22} />
-              Start Conversation
+              {t("home.cta.button")}
               <ArrowRight size={20} />
             </Link>
           </div>
@@ -347,27 +358,26 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-saffron-400 to-brand-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">MG</span>
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-128.png" alt="" width={36} height={36} className="w-9 h-9 rounded-full bg-white" />
                 <span className="text-white font-bold">MyGovt</span>
               </div>
               <p className="text-sm leading-relaxed">
-                Your Government. Your Services. Your Voice.<br />
-                Tamil Nadu, India.
+                {t("home.footer.tagline")}<br />
+                {t("home.footer.place")}
               </p>
             </div>
             {[
-              { title: "Citizen Services", links: [["Find schemes", "/schemes"], ["Government services", "/services"], ["File a complaint", "/complaints"], ["Track a complaint", "/complaints"]] },
-              { title: "Information", links: [["Policy documents", "/documents"], ["AI assistant", "/assistant"]] },
-              { title: "Account", links: [["Sign in", "/login"], ["Register", "/register"]] },
+              { title: "home.footer.citizen", links: [["home.footer.l.schemes", "/schemes"], ["home.footer.l.services", "/services"], ["home.footer.l.file", "/complaints"], ["home.footer.l.track", "/complaints"]] },
+              { title: "home.footer.info", links: [["home.footer.l.documents", "/documents"], ["home.footer.l.assistant", "/assistant"], ["home.footer.l.architecture", "/database-architecture"]] },
+              { title: "home.footer.account", links: [["home.footer.l.signin", "/login"], ["home.footer.l.register", "/register"]] },
             ].map(({ title, links }) => (
               <div key={title}>
-                <h4 className="text-white font-semibold mb-3 text-sm">{title}</h4>
+                <h4 className="text-white font-semibold mb-3 text-sm">{t(title as TKey)}</h4>
                 <ul className="space-y-2">
-                  {links.map(([label, href]) => (
-                    <li key={label}>
-                      <Link href={href} className="text-sm hover:text-white transition-colors">{label}</Link>
+                  {links.map(([lk, href]) => (
+                    <li key={lk}>
+                      <Link href={href} className="text-sm hover:text-white transition-colors">{t(lk as TKey)}</Link>
                     </li>
                   ))}
                 </ul>
@@ -375,8 +385,8 @@ export default function HomePage() {
             ))}
           </div>
           <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs">MyGovt is a university demonstration project. It is not an official Government of Tamil Nadu website.</p>
-            <p className="text-xs">Records are labelled by verification status. Provisional items have not yet been verified against an official document; confirm with the department before acting.</p>
+            <p className="text-xs">{t("home.footer.demo")}</p>
+            <p className="text-xs">{t("home.footer.labels")}</p>
           </div>
         </div>
       </footer>

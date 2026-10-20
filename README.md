@@ -239,3 +239,9 @@ Platform code: MIT License.
 ---
 
 *Built with ❤️ for Tamil Nadu citizens.*
+
+## Policy documents, scheme/service content and Tamil/English interface
+
+* `documents.policy_document` (migration 009, seed `003_content.sql`) holds 40 official Tamil Nadu documents (G.O.s and policies, circulars, notifications, Acts) with identifiers, issue dates and **downloaded, verified** official PDF links. Rebuild with `python etl/policy_documents/build_documents.py`, then `python etl/content/generate_seed.py`. Research notes: `docs/tamilnadu-government-document-research.md`.
+* Scheme and service content (eligibility, benefits, documents, steps, fees/timelines with their provenance) is in `etl/content/`; completeness reports: `docs/scheme-data-completeness.md`, `docs/service-data-completeness.md`. All schemes and services stay *provisional*.
+* The whole interface switches between English and Tamil (`frontend/src/lib/locales/`, typed so a missing Tamil string fails the build). Audit: `node frontend/audit/localization.js`; report: `docs/localization-audit.md`. The Tamil text is an unreviewed translation.

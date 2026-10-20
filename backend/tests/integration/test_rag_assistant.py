@@ -217,14 +217,14 @@ async def test_withdrawn_superseded_unreadable_and_deprecated_documents_are_neve
     await docs("Draft Order", [(1, "The Frobnitz benefit draft text.")], status="draft")
     await docs("Scan Order", [(1, "The Frobnitz benefit scan text.")], extraction="empty")
     await docs("Deprecated Order", [(1, "The Frobnitz benefit deprecated text.")], verification="deprecated")
-    r = await ask(session_factory, "Frobnitz benefit", embedder=DeterministicTestProvider())
+    r = await ask(session_factory, "Frobnitz", embedder=DeterministicTestProvider())
     assert r.abstained and r.citations == []
 
 
 @pytest.mark.db
 async def test_outdated_and_single_source_evidence_is_flagged(session_factory, docs):
     await docs("Expired Circular", [(1, "The Wibblewob programme circular applies until the stated expiry.")], expiry=date.today() - timedelta(days=30))
-    r = await ask(session_factory, "Wibblewob programme circular", embedder=DeterministicTestProvider())
+    r = await ask(session_factory, "Wibblewob", embedder=DeterministicTestProvider())
     assert r.citations[0].outdated is True
     assert any("outdated" in n for n in r.evidence_notes) and any("Only one supporting source" in n for n in r.evidence_notes)
     assert "outdated" in r.answer

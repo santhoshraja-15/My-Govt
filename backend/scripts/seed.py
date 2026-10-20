@@ -37,7 +37,7 @@ from urllib.parse import quote
 
 import asyncpg
 
-SEED_FILES = ["002_verified_seed_data.sql"]
+SEED_FILES = ["002_verified_seed_data.sql", "003_content.sql"]
 PLACEHOLDER_CHECKSUMS = {
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",  # sha256 of empty input
     "a1b2c3d4" * 8,
@@ -193,12 +193,20 @@ async def run_checks(conn: asyncpg.Connection) -> list[Check]:
     add("districts == 38", n_dist == 38, f"found {n_dist}")
     n_state = await count("SELECT count(*) FROM administration.state WHERE state_code='TN'")
     add("state TN present", n_state == 1, f"found {n_state}")
+    # 003_content.sql adds further provisional records, so the validated JSON is a floor: every validated record must exist
+    # and anything beyond it must not claim official verification.
     if schemes is not None:
-        n = await count("SELECT count(*) FROM schemes.scheme")
-        add(f"schemes == {len(schemes)} (validated JSON)", n == len(schemes), f"found {n}")
+        have = {r["scheme_code"] for r in await conn.fetch("SELECT scheme_code FROM schemes.scheme")}
+        missing = sorted({s["scheme_code"] for s in schemes} - have)
+        add(f"all {len(schemes)} validated-JSON schemes present", not missing, f"missing: {missing}" if missing else f"{len(have)} schemes in total")
+        extra = await count("SELECT count(*) FROM schemes.scheme WHERE scheme_code <> ALL($1::text[]) AND verification_status = 'official_verified'"
+                            .replace("$1::text[]", "ARRAY[" + ",".join("'" + s["scheme_code"] + "'" for s in schemes) + "]"))
+        add("schemes beyond the validated JSON are not official_verified", extra == 0, f"{extra} over-claimed")
     if services is not None:
         n = await count("SELECT count(*) FROM services.service")
-        add(f"services == {len(services)} (validated JSON)", n == len(services), f"found {n}")
+        add(f"services >= {len(services)} (validated JSON)", n >= len(services), f"found {n}")
+        extra = await count("SELECT count(*) FROM services.service WHERE verification_status = 'official_verified'")
+        add("no service is official_verified without evidence", extra == 0, f"{extra} over-claimed")
 
     # LGD codes
     n_lgd = await count("SELECT count(DISTINCT lgd_code) FROM administration.district WHERE lgd_code IS NOT NULL")

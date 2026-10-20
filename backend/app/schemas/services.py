@@ -11,6 +11,7 @@ class ServiceRequirementOut(BaseModel):
     document_type: str
     description: Optional[str] = None
     mandatory: bool = True
+    requirement_level: Optional[str] = None    # required | conditional | category_specific | recommended | unverified
 
     class Config:
         from_attributes = True
@@ -22,6 +23,8 @@ class ServiceListItem(BaseModel):
     name: str
     name_ta: Optional[str] = None
     description: Optional[str] = None
+    description_ta: Optional[str] = None
+    fee_status: Optional[str] = None     # listed_official_2023 | unverified | not_listed
     department_name: Optional[str] = None
     category: Optional[str] = None
     government_fee: Optional[float] = None
@@ -52,6 +55,17 @@ class ServiceDetail(ServiceListItem):
     application_url: Optional[str] = None
     official_source_url: Optional[str] = None
     notes: Optional[str] = None
+    responsible_department: Optional[str] = None
+    eligibility_points: List[str] = []
+    application_steps: List[str] = []
+    how_to_apply: Optional[str] = None
+    applicable_rules: Optional[str] = None
+    forms: List[dict] = []
+    source_urls: List[dict] = []
+    last_checked_on: Optional[date] = None
+    fee_note: Optional[str] = None
+    processing_time_note: Optional[str] = None
+    field_evidence: dict = {}
 
 
 # ── Documents ─────────────────────────────────────────────────
@@ -113,3 +127,42 @@ class CitizenProfileOut(CitizenProfileIn):
 
     class Config:
         from_attributes = True
+
+
+# ── Policy-document catalogue (documents.policy_document) ─────
+class PolicyDocumentOut(BaseModel):
+    policy_document_id: UUID
+    doc_code: str
+    category: Literal["government_order", "policy", "circular", "notification", "act"]
+    identifier: Optional[str] = None
+    title: str
+    title_ta: Optional[str] = None
+    issuing_authority: str
+    issued_on: Optional[date] = None
+    effective_on: Optional[date] = None
+    summary_en: str
+    summary_ta: Optional[str] = None
+    summary_ta_reviewed: bool = False
+    language: str = "en"
+    related_topics: List[str] = []
+    source_page_url: str
+    pdf_url: Optional[str] = None
+    pdf_pages: Optional[int] = None
+    legal_status: Optional[str] = None
+    superseded_status: str = "unknown"
+    verification_status: str = "provisional"
+    verification_method: Optional[str] = None
+    last_checked_on: Optional[date] = None
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PolicyDocumentList(BaseModel):
+    items: List[PolicyDocumentOut]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    facets: dict = {}

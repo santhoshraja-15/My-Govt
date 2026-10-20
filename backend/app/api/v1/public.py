@@ -20,3 +20,14 @@ async def public_stats(db: AsyncSession = Depends(get_db)) -> dict:
           (SELECT count(*) FROM schemes.scheme WHERE status = 'active' AND verification_status = 'official_verified') AS verified_schemes
     """))).one()
     return dict(row._mapping)
+
+
+@router.get("/names")
+async def public_names(db: AsyncSession = Depends(get_db)) -> dict:
+    """English -> Tamil display names for departments, complaint categories and districts (used to localise listings)."""
+    out = {}
+    for key, sql in (("departments", "SELECT department_name AS en, name_ta AS ta FROM administration.department WHERE name_ta IS NOT NULL"),
+                     ("categories", "SELECT category_name AS en, name_ta AS ta FROM complaints.complaint_category WHERE name_ta IS NOT NULL"),
+                     ("districts", "SELECT district_name AS en, name_ta AS ta FROM administration.district WHERE name_ta IS NOT NULL")):
+        out[key] = {r.en: r.ta for r in (await db.execute(text(sql))).fetchall()}
+    return out

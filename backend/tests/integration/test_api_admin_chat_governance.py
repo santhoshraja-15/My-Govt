@@ -40,7 +40,7 @@ async def test_overview_metrics_are_live_counts_excluding_synthetic(client, make
     _, h = await make_staff("state_admin")
     body = (await client.get(f"{API}/admin/overview", headers=h)).json()
     st = body["database_stats"]
-    assert st["schemes"] == 12 and st["services"] == 10 and st["districts"] == 38 and st["departments"] == 17
+    assert st["schemes"] == 29 and st["services"] == 21 and st["districts"] == 38 and st["departments"] == 17
     assert st["complaints_total"] == await conn.fetchval("SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic")
     assert st["complaints_unassigned"] == await conn.fetchval(
         "SELECT count(*) FROM complaints.complaint WHERE NOT is_synthetic AND authority_id IS NULL AND status NOT IN ('resolved','closed','rejected')")

@@ -6,71 +6,54 @@ import { Search, ClipboardList, Send, Loader2, CheckCircle2, Clock, AlertTriangl
 import { complaints as complaintsAPI, gis as gisAPI } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useLang } from "@/lib/i18n";
-import { assignmentText } from "@/lib/complaints";
+import { assignmentTextT } from "@/lib/complaints";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/AsyncState";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  submitted:    { label: "Submitted",     color: "badge-blue",   icon: Clock },
-  needs_triage: { label: "Awaiting triage", color: "badge-yellow", icon: Clock },
-  classified:   { label: "Classified",    color: "badge-blue",   icon: Clock },
-  assigned:     { label: "Assigned",      color: "badge-purple", icon: Clock },
-  in_progress:  { label: "In Progress",   color: "badge-yellow", icon: Clock },
-  resolved:     { label: "Resolved",      color: "badge-green",  icon: CheckCircle2 },
-  closed:       { label: "Closed",        color: "badge-slate",  icon: CheckCircle2 },
-  escalated:    { label: "Escalated",     color: "badge-red",    icon: AlertTriangle },
-  reopened:     { label: "Reopened",      color: "badge-yellow", icon: Clock },
-  rejected:     { label: "Rejected",      color: "badge-red",    icon: XCircle },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, color: "badge-slate", icon: Clock };
-  const Icon = cfg.icon;
-  return (
-    <span className={`badge ${cfg.color} flex items-center gap-1`} data-testid="status-badge" data-status={status}>
-      <Icon size={10} /> {cfg.label}
-    </span>
-  );
+function useFmt() {
+  const { lang } = useLang();
+  return (d?: string | null) => (d ? new Date(d).toLocaleString(lang === "ta" ? "ta-IN" : "en-IN") : "—");
 }
 
-function fmt(d?: string | null) { return d ? new Date(d).toLocaleString("en-IN") : "—"; }
-
 function ComplaintSummary({ c }: { c: any }) {
+  const { t, dept, cat } = useLang();
+  const fmt = useFmt();
   return (
     <div className="space-y-4" data-testid="complaint-summary">
       <div className="bg-slate-50 rounded-xl p-4 flex flex-wrap gap-4 justify-between">
-        <div><p className="text-xs text-slate-500">Reference</p><p className="font-mono font-bold text-slate-900" data-testid="reference">{c.reference_number}</p></div>
-        <div><p className="text-xs text-slate-500">Status</p><StatusBadge status={c.status} /></div>
-        <div><p className="text-xs text-slate-500">Filed</p><p className="text-sm font-medium">{fmt(c.created_at)}</p></div>
+        <div><p className="text-xs text-slate-500">{t("cmp.reference")}</p><p className="font-mono font-bold text-slate-900" data-testid="reference">{c.reference_number}</p></div>
+        <div><p className="text-xs text-slate-500">{t("cmp.status")}</p><StatusBadge status={c.status} /></div>
+        <div><p className="text-xs text-slate-500">{t("cmp.filed")}</p><p className="text-sm font-medium">{fmt(c.created_at)}</p></div>
       </div>
       <div className="card p-4">
-        <p className="text-xs text-slate-500 mb-1">Subject</p>
-        <p className="font-semibold text-slate-800">{c.title}</p>
-        {c.category_name && <p className="text-xs text-slate-500 mt-1">Category: {c.category_name}</p>}
+        <p className="text-xs text-slate-500 mb-1">{t("cmp.subject")}</p>
+        <p className="font-semibold text-slate-800" lang="en">{c.title}</p>
+        {c.category_name && <p className="text-xs text-slate-500 mt-1">{t("cmp.categoryIs", { name: cat(c.category_name) })}</p>}
       </div>
       <div className="card p-4" data-testid="assignment">
-        <p className="text-xs text-slate-500 mb-1">Routing</p>
-        <p className="text-sm text-slate-700" data-state={c.assignment_state}>{assignmentText(c.assignment_state, c.department_name, c.authority_name)}</p>
+        <p className="text-xs text-slate-500 mb-1">{t("cmp.routing")}</p>
+        <p className="text-sm text-slate-700" data-state={c.assignment_state}>{assignmentTextT(t, c.assignment_state, c.department_name, c.authority_name, dept)}</p>
       </div>
       {c.due_date && (
         <div data-testid="sla" className={`rounded-xl p-3 flex items-center gap-2 text-sm ${c.sla_breached ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
           <Clock size={14} className="shrink-0" />
-          {c.sla_breached ? "Resolution target missed: " : "Resolution target: "}<strong>{fmt(c.due_date)}</strong>
-          <span className="text-xs opacity-70">(platform target, not a statutory guarantee)</span>
+          {c.sla_breached ? t("cmp.targetMissed") : t("cmp.target")} <strong>{fmt(c.due_date)}</strong>
+          <span className="text-xs opacity-70">{t("cmp.targetNote")}</span>
         </div>
       )}
       {c.timeline?.length > 0 && (
         <div className="card p-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Timeline</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{t("cmp.timeline")}</p>
           <ol className="space-y-3">
-            {c.timeline.map((t: any, i: number) => (
+            {c.timeline.map((ev: any, i: number) => (
               <li key={i} className="flex gap-3 items-start">
                 <div className="w-2.5 h-2.5 rounded-full bg-brand-400 mt-1.5 shrink-0" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge status={t.new_status} />
-                    <span className="text-xs text-slate-500">{fmt(t.changed_at)}</span>
+                    <StatusBadge status={ev.new_status} />
+                    <span className="text-xs text-slate-500">{fmt(ev.changed_at)}</span>
                   </div>
-                  {t.remarks && <p className="text-xs text-slate-500 mt-1">{t.remarks}</p>}
+                  {ev.remarks && <p className="text-xs text-slate-500 mt-1" lang="en">{ev.remarks}</p>}
                 </div>
               </li>
             ))}
@@ -82,6 +65,7 @@ function ComplaintSummary({ c }: { c: any }) {
 }
 
 function TrackForm({ initialRef = "" }: { initialRef?: string }) {
+  const { t, apiError } = useLang();
   const [ref, setRef] = useState(initialRef);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -94,18 +78,18 @@ function TrackForm({ initialRef = "" }: { initialRef?: string }) {
     try {
       setResult(await complaintsAPI.track(ref.trim().toUpperCase()));
     } catch (err: any) {
-      setError(err.status === 404 ? "No complaint found with this reference number." : err.message || "Failed to fetch. Please try again.");
+      setError(err.status === 404 ? t("cmp.trackNotFound") : apiError(err));
     }
     setLoading(false);
   };
 
   return (
     <div className="card p-6">
-      <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Search size={20} className="text-brand-600" /> Track Existing Complaint</h2>
+      <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Search size={20} className="text-brand-600" /> {t("complaint.track")}</h2>
       <form onSubmit={track} className="flex gap-2 mb-4">
-        <label htmlFor="track-ref" className="sr-only">Reference number</label>
-        <input id="track-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Reference number e.g. MYG-2026-000001" className="input flex-1 font-mono" />
-        <button type="submit" disabled={loading} className="btn-primary shrink-0">{loading ? <Loader2 size={16} className="animate-spin" /> : "Track"}</button>
+        <label htmlFor="track-ref" className="sr-only">{t("cmp.refInput")}</label>
+        <input id="track-ref" value={ref} onChange={(e) => setRef(e.target.value)} placeholder={t("cmp.refPlaceholder")} className="input flex-1 font-mono" />
+        <button type="submit" disabled={loading} className="btn-primary shrink-0">{loading ? <Loader2 size={16} className="animate-spin" /> : t("cmp.trackBtn")}</button>
       </form>
       {error && <p role="alert" className="text-sm text-red-600 flex items-center gap-1.5"><AlertTriangle size={14} /> {error}</p>}
       {result && <div className="mt-4"><ComplaintSummary c={result} /></div>}
@@ -113,11 +97,11 @@ function TrackForm({ initialRef = "" }: { initialRef?: string }) {
   );
 }
 
-function LoginPrompt({ what }: { what: string }) {
+function LoginPrompt({ what }: { what: "file" | "mine" }) {
   const { t } = useLang();
   return (
     <div className="card p-8 text-center" data-testid="login-required">
-      <p className="text-slate-700 mb-4">{t("auth.required")} ({what})</p>
+      <p className="text-slate-700 mb-4">{t("auth.required")} ({what === "file" ? t("cmp.loginFor") : t("cmp.loginForMine")})</p>
       <div className="flex justify-center gap-3">
         <Link href="/login?next=/complaints" className="btn-primary">{t("auth.signin")}</Link>
         <Link href="/register?next=/complaints" className="btn-secondary">{t("auth.register")}</Link>
@@ -128,7 +112,8 @@ function LoginPrompt({ what }: { what: string }) {
 
 function ComplaintForm() {
   const { user, loading: authLoading } = useAuth();
-  const { t, pick } = useLang();
+  const { t, pick, apiError, dept } = useLang();
+  const fmt = useFmt();
   const [categories, setCategories] = useState<any[]>([]);
   const [districts, setDistricts] = useState<any[]>([]);
   const [form, setForm] = useState({ title: "", description: "", category_id: "", district_id: "", address: "", latitude: "", longitude: "", is_anonymous: false, locationConsent: false });
@@ -148,24 +133,24 @@ function ComplaintForm() {
   const hasCoords = form.latitude.trim() !== "" || form.longitude.trim() !== "";
 
   const useMyLocation = () => {
-    if (!navigator.geolocation) { setError("Your browser does not support location."); return; }
+    if (!navigator.geolocation) { setError(t("cmp.err.noGeo")); return; }
     navigator.geolocation.getCurrentPosition(
       (p) => { update("latitude", p.coords.latitude.toFixed(6)); update("longitude", p.coords.longitude.toFixed(6)); },
-      () => setError("Could not read your location. You can type the coordinates or leave them blank."),
+      () => setError(t("cmp.err.geoDenied")),
     );
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (form.title.trim().length < 3) return setError("Subject must be at least 3 characters.");
-    if (form.description.trim().length < 10) return setError("Description must be at least 10 characters.");
+    if (form.title.trim().length < 3) return setError(t("cmp.err.subject"));
+    if (form.description.trim().length < 10) return setError(t("cmp.err.description"));
     const lat = form.latitude.trim() === "" ? undefined : Number(form.latitude);
     const lon = form.longitude.trim() === "" ? undefined : Number(form.longitude);
-    if ((lat === undefined) !== (lon === undefined)) return setError("Provide both latitude and longitude, or neither.");
-    if (lat !== undefined && (Number.isNaN(lat) || lat < -90 || lat > 90)) return setError("Latitude must be a number between -90 and 90.");
-    if (lon !== undefined && (Number.isNaN(lon) || lon < -180 || lon > 180)) return setError("Longitude must be a number between -180 and 180.");
-    if (hasCoords && !form.locationConsent) return setError("Please confirm you agree to share your location.");
+    if ((lat === undefined) !== (lon === undefined)) return setError(t("cmp.err.bothCoords"));
+    if (lat !== undefined && (Number.isNaN(lat) || lat < -90 || lat > 90)) return setError(t("cmp.err.lat"));
+    if (lon !== undefined && (Number.isNaN(lon) || lon < -180 || lon > 180)) return setError(t("cmp.err.lon"));
+    if (hasCoords && !form.locationConsent) return setError(t("cmp.err.consent"));
 
     setSubmitting(true);
     try {
@@ -179,41 +164,41 @@ function ComplaintForm() {
         is_anonymous: form.is_anonymous,
       }));
     } catch (err: any) {
-      setError(err.status === 401 ? "Your session has expired. Please sign in again." : err.message || "Failed to submit complaint. Please try again.");
+      setError(apiError(err));
     }
     setSubmitting(false);
   };
 
   if (authLoading) return <LoadingState label={t("common.loading")} />;
-  if (!user) return <LoginPrompt what="file a complaint" />;
+  if (!user) return <LoginPrompt what="file" />;
 
   if (result) return (
     <div className="card p-8 text-center" data-testid="submit-success">
       <CheckCircle2 size={52} className="text-emerald-500 mx-auto mb-4" />
-      <h3 className="text-xl font-bold text-slate-900 mb-2">Complaint Filed Successfully</h3>
-      <p className="text-slate-500 mb-4">Your reference number is:</p>
+      <h3 className="text-xl font-bold text-slate-900 mb-2">{t("cmp.success")}</h3>
+      <p className="text-slate-500 mb-4">{t("cmp.yourRef")}</p>
       <div className="bg-slate-50 rounded-xl px-6 py-4 mb-4"><p className="font-mono text-2xl font-black text-brand-700" data-testid="new-reference">{result.reference_number}</p></div>
-      <p className="text-sm text-slate-600 mb-2" data-testid="assignment-text">{assignmentText(result.assignment_state, result.department_name)}</p>
-      {result.due_date && <p className="text-sm text-slate-500 mb-4">Resolution target: {fmt(result.due_date)}</p>}
-      {form.is_anonymous && <p className="text-xs text-amber-700 mb-4">Anonymous complaints cannot be tracked publicly. Keep your reference for the department.</p>}
-      <button onClick={() => { setResult(null); setForm({ ...form, title: "", description: "" }); }} className="btn-secondary">File Another Complaint</button>
+      <p className="text-sm text-slate-600 mb-2" data-testid="assignment-text">{assignmentTextT(t, result.assignment_state, result.department_name, undefined, dept)}</p>
+      {result.due_date && <p className="text-sm text-slate-500 mb-4">{t("cmp.target")} {fmt(result.due_date)}</p>}
+      {form.is_anonymous && <p className="text-xs text-amber-700 mb-4">{t("cmp.anonNote")}</p>}
+      <button onClick={() => { setResult(null); setForm({ ...form, title: "", description: "" }); }} className="btn-secondary">{t("cmp.fileAnother")}</button>
     </div>
   );
 
   return (
     <div className="card p-6">
       <h2 className="font-bold text-slate-900 mb-5 flex items-center gap-2"><ClipboardList size={20} className="text-brand-600" /> {t("complaint.title")}</h2>
-      {metaError && <ErrorState message="Could not load categories or districts." onRetry={loadMeta} retryLabel={t("common.retry")} />}
+      {metaError && <ErrorState message={t("cmp.err.meta")} onRetry={loadMeta} retryLabel={t("common.retry")} />}
       <form onSubmit={submit} className="space-y-4" noValidate>
         {error && <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 flex items-center gap-2"><AlertTriangle size={14} className="shrink-0" /> {error}</div>}
 
         <div>
           <label htmlFor="category" className="label">{t("complaint.category")}</label>
           <select id="category" className="input" value={form.category_id} onChange={(e) => update("category_id", e.target.value)}>
-            <option value="">— optional —</option>
+            <option value="">{t("cmp.optional")}</option>
             {categories.map((c: any) => <option key={c.category_id} value={c.category_id}>{pick(c.name, c.name_ta)}</option>)}
           </select>
-          <p className="text-xs text-slate-500 mt-1">Choosing a category lets us route the complaint to a department. Without one it waits for manual triage.</p>
+          <p className="text-xs text-slate-500 mt-1">{t("cmp.categoryHelp")}</p>
         </div>
 
         <div>
@@ -227,25 +212,25 @@ function ComplaintForm() {
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="district" className="label">District</label>
+            <label htmlFor="district" className="label">{t("cmp.district")}</label>
             <select id="district" className="input" value={form.district_id} onChange={(e) => update("district_id", e.target.value)}>
-              <option value="">— optional —</option>
+              <option value="">{t("cmp.optional")}</option>
               {districts.map((d: any) => <option key={d.district_id} value={d.district_id}>{pick(d.district_name, d.district_name_ta)}</option>)}
             </select>
           </div>
           <div>
-            <label htmlFor="address" className="label">Address / landmark</label>
+            <label htmlFor="address" className="label">{t("cmp.address")}</label>
             <input id="address" className="input" value={form.address} onChange={(e) => update("address", e.target.value)} maxLength={500} />
           </div>
         </div>
 
         <fieldset className="border border-slate-200 rounded-xl p-4">
-          <legend className="text-sm font-medium text-slate-700 px-1">Exact location (optional)</legend>
+          <legend className="text-sm font-medium text-slate-700 px-1">{t("cmp.exactLocation")}</legend>
           <div className="grid grid-cols-2 gap-4">
-            <div><label htmlFor="lat" className="label">Latitude</label><input id="lat" className="input font-mono" inputMode="decimal" value={form.latitude} onChange={(e) => update("latitude", e.target.value)} placeholder="13.0827" /></div>
-            <div><label htmlFor="lon" className="label">Longitude</label><input id="lon" className="input font-mono" inputMode="decimal" value={form.longitude} onChange={(e) => update("longitude", e.target.value)} placeholder="80.2707" /></div>
+            <div><label htmlFor="lat" className="label">{t("cmp.latitude")}</label><input id="lat" className="input font-mono" inputMode="decimal" value={form.latitude} onChange={(e) => update("latitude", e.target.value)} placeholder="13.0827" /></div>
+            <div><label htmlFor="lon" className="label">{t("cmp.longitude")}</label><input id="lon" className="input font-mono" inputMode="decimal" value={form.longitude} onChange={(e) => update("longitude", e.target.value)} placeholder="80.2707" /></div>
           </div>
-          <button type="button" onClick={useMyLocation} className="btn-secondary mt-3 inline-flex items-center gap-1.5"><MapPin size={14} /> Use my current location</button>
+          <button type="button" onClick={useMyLocation} className="btn-secondary mt-3 inline-flex items-center gap-1.5"><MapPin size={14} /> {t("cmp.useLocation")}</button>
           {hasCoords && (
             <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
               <input type="checkbox" className="w-4 h-4 mt-0.5 rounded accent-brand-600" checked={form.locationConsent} onChange={(e) => update("locationConsent", e.target.checked)} />
@@ -256,11 +241,11 @@ function ComplaintForm() {
 
         <label className="flex items-center gap-2.5 cursor-pointer">
           <input type="checkbox" className="w-4 h-4 rounded accent-brand-600" checked={form.is_anonymous} onChange={(e) => update("is_anonymous", e.target.checked)} />
-          <span className="text-sm text-slate-600">Hide my identity from the public tracking page</span>
+          <span className="text-sm text-slate-600">{t("cmp.anonymous")}</span>
         </label>
 
         <button type="submit" disabled={submitting} className="btn-primary w-full justify-center text-base py-3">
-          {submitting ? <><Loader2 size={18} className="animate-spin" /> Submitting…</> : <><Send size={18} /> {t("complaint.submit")}</>}
+          {submitting ? <><Loader2 size={18} className="animate-spin" /> {t("cmp.submitting")}</> : <><Send size={18} /> {t("complaint.submit")}</>}
         </button>
       </form>
     </div>
@@ -269,32 +254,33 @@ function ComplaintForm() {
 
 function MyComplaints({ onTrack }: { onTrack: (ref: string) => void }) {
   const { user, loading: authLoading } = useAuth();
-  const { t } = useLang();
+  const { t, apiError, dept } = useLang();
+  const fmt = useFmt();
   const [items, setItems] = useState<any[] | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
     setItems(null); setError("");
-    complaintsAPI.mine({ page_size: 50 }).then((r) => setItems(r.items)).catch((e) => setError(e.message || t("common.error")));
-  }, [t]);
+    complaintsAPI.mine({ page_size: 50 }).then((r) => setItems(r.items)).catch((e) => setError(apiError(e)));
+  }, [apiError]);
   useEffect(() => { if (user) load(); }, [user, load]);
 
   if (authLoading) return <LoadingState label={t("common.loading")} />;
-  if (!user) return <LoginPrompt what="see your complaints" />;
+  if (!user) return <LoginPrompt what="mine" />;
   if (error) return <ErrorState message={error} onRetry={load} retryLabel={t("common.retry")} />;
   if (items === null) return <LoadingState label={t("common.loading")} />;
-  if (items.length === 0) return <EmptyState message="You have not filed any complaints yet." />;
+  if (items.length === 0) return <EmptyState message={t("cmp.noneYet")} />;
   return (
     <ul className="space-y-3" data-testid="my-complaints">
       {items.map((c) => (
         <li key={c.complaint_id} className="card p-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-800 truncate">{c.title}</p>
+            <p className="font-semibold text-slate-800 truncate" lang="en">{c.title}</p>
             <p className="text-xs text-slate-500 font-mono">{c.reference_number} · {fmt(c.created_at)}</p>
-            <p className="text-xs text-slate-500 mt-1">{assignmentText(c.assignment_state, c.department_name)}</p>
+            <p className="text-xs text-slate-500 mt-1">{assignmentTextT(t, c.assignment_state, c.department_name, undefined, dept)}</p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={c.status} />
-            <button type="button" className="text-xs text-brand-700 underline" onClick={() => onTrack(c.reference_number)}>Details</button>
+            <button type="button" className="text-xs text-brand-700 underline" onClick={() => onTrack(c.reference_number)}>{t("cmp.details")}</button>
           </div>
         </li>
       ))}
@@ -307,8 +293,8 @@ export default function ComplaintsPage() {
   const [activeTab, setActiveTab] = useState<"file" | "track" | "mine">("file");
   const [trackRef, setTrackRef] = useState("");
   const tabs = [
-    { key: "file", label: "File Complaint" },
-    { key: "track", label: "Track Status" },
+    { key: "file", label: t("cmp.tab.file") },
+    { key: "track", label: t("cmp.tab.track") },
     { key: "mine", label: t("complaint.mine") },
   ] as const;
 
@@ -317,11 +303,11 @@ export default function ComplaintsPage() {
       <div className="bg-gradient-to-r from-rose-800 to-rose-600 text-white py-10">
         <div className="max-w-3xl mx-auto px-4">
           <div className="flex items-center gap-3 mb-2"><ClipboardList size={30} className="text-rose-300" /><h1 className="text-3xl font-black">{t("nav.complaints")}</h1></div>
-          <p className="text-rose-200">File civic complaints and track their routing and resolution target.</p>
+          <p className="text-rose-200">{t("cmp.pageSub")}</p>
         </div>
       </div>
       <main className="max-w-3xl mx-auto px-4 py-8">
-        <div role="tablist" className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 mb-6">
+        <div role="tablist" aria-label={t("cmp.tabs")} className="flex gap-1 bg-white rounded-xl p-1 border border-slate-200 mb-6">
           {tabs.map((tab) => (
             <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === tab.key ? "bg-brand-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}>

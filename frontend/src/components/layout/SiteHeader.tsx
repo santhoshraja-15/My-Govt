@@ -14,7 +14,7 @@ const ITEMS = [
   { href: "/complaints", key: "nav.complaints" },
   { href: "/assistant", key: "nav.assistant" },
   { href: "/documents", key: "nav.documents" },
-];
+] as const;
 
 /** Compact global header for all pages except the landing page (which has its own hero navigation). */
 export function SiteHeader() {
@@ -26,13 +26,16 @@ export function SiteHeader() {
     ...(user?.role === "citizen" ? [{ href: "/dashboard", label: t("nav.dashboard") }] : []),
     ...ITEMS.map((i) => ({ href: i.href, label: t(i.key) })),
     ...(isStaff ? [{ href: "/officer", label: t("nav.officer") }] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin" }, { href: "/database-architecture", label: t("nav.architecture"), icon: true }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: t("nav.admin") }, { href: "/database-architecture", label: t("nav.architecture"), icon: true }] : []),
   ];
   return (
     <header className="bg-brand-800 text-white" data-testid="site-header">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <Link href="/" className="font-black tracking-tight">MyGovt</Link>
-        <nav aria-label="Main" className="flex flex-wrap gap-4 text-sm text-blue-100">
+        <Link href="/" className="font-black tracking-tight inline-flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-128.png" alt="" width={32} height={32} className="w-8 h-8 rounded-full bg-white" />MyGovt
+        </Link>
+        <nav aria-label={t("nav.main")} className="flex flex-wrap gap-4 text-sm text-blue-100">
           {items.map((i) => (
             <Link key={i.href} href={i.href} aria-current={path.startsWith(i.href) ? "page" : undefined}
               data-testid={i.href === "/database-architecture" ? "nav-database-architecture" : undefined}

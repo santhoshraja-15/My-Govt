@@ -120,7 +120,8 @@ class SchemeService:
         result = await self.db.execute(
             text(f"""
                 SELECT s.scheme_id, s.scheme_code, s.scheme_name AS name, s.name_ta,
-                       s.short_description AS description, d.department_name, s.category,
+                       s.short_description AS description, s.short_description_ta AS description_ta,
+                       d.department_name, s.category,
                        s.scheme_level, s.status, s.effective_from, s.effective_to,
                        s.verified_at, sr.url AS source_url,
                        s.verification_status, s.source_document_ref
@@ -151,7 +152,10 @@ class SchemeService:
                        s.verified_at, sr.url AS source_url,
                        s.verification_status, s.source_document_ref,
                        s.application_url, s.official_url AS official_source_url,
-                       s.full_description, s.benefits_summary, NULL::text AS notes
+                       s.full_description, s.benefits_summary, s.content_notes AS notes,
+                       s.short_description_ta AS description_ta, s.implementing_department, s.purpose,
+                       s.eligibility_points, s.exclusion_points, s.application_steps, s.how_to_apply_note,
+                       s.source_urls, s.last_checked_on, s.field_evidence
                 FROM schemes.scheme s
                 LEFT JOIN administration.department d ON d.department_id = s.department_id
                 LEFT JOIN system.source_registry sr ON sr.source_id = s.source_id
@@ -169,8 +173,8 @@ class SchemeService:
         br = await self.db.execute(
             text("""
                 SELECT benefit_id, benefit_type, description, amount::float AS amount,
-                       currency AS unit
-                FROM schemes.benefit WHERE scheme_id = :sid
+                       currency AS unit, frequency, conditions, amount_status
+                FROM schemes.benefit WHERE scheme_id = :sid ORDER BY amount DESC NULLS LAST
             """),
             {"sid": scheme_id},
         )
@@ -195,8 +199,9 @@ class SchemeService:
         dr = await self.db.execute(
             text("""
                 SELECT document_requirement_id AS requirement_id, document_name AS document_type,
-                       description, mandatory
+                       description, mandatory, requirement_level
                 FROM schemes.document_requirement WHERE scheme_id = :sid
+                ORDER BY array_position(ARRAY['required','category_specific','conditional','recommended','unverified'], requirement_level), document_name
             """),
             {"sid": scheme_id},
         )

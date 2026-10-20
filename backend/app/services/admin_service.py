@@ -440,7 +440,7 @@ class AdminService:
                                       ("department", "administration.department", "department_code", "department_name"),
                                       ("district", "administration.district", "district_code", "district_name")):
             rows = (await self.db.execute(text(
-                f"SELECT '{label}' AS kind, {key} AS code, {name} AS name, verification_status, source_document_ref "
+                f"SELECT '{label}' AS kind, {key} AS code, {name} AS name, name_ta, verification_status, source_document_ref "
                 f"FROM {tbl} WHERE verification_status <> 'official_verified' ORDER BY {key} LIMIT :n"), {"n": limit})).fetchall()
             queue.extend(dict(r._mapping) for r in rows)
         log = (await self.db.execute(text(

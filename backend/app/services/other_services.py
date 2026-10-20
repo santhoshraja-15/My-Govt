@@ -142,6 +142,7 @@ class ServiceService:
         r = await self.db.execute(
             text(f"""
                 SELECT s.service_id, s.service_code, s.service_name AS name, s.name_ta, s.description,
+                       s.description_ta, s.fee_status,
                        d.department_name, s.category, s.government_fee::float AS government_fee,
                        s.service_charge::float AS service_charge,
                        s.processing_time, s.status,
@@ -166,13 +167,17 @@ class ServiceService:
         r = await self.db.execute(
             text("""
                 SELECT s.service_id, s.service_code, s.service_name AS name, s.name_ta, s.description,
+                       s.description_ta, s.fee_status,
                        d.department_name, s.category, s.government_fee::float AS government_fee,
                        s.service_charge::float AS service_charge,
                        s.processing_time, s.status,
                        s.verification_status, s.source_document_ref,
                        (s.verification_status = 'official_verified') AS charges_verified,
                        s.application_url, s.official_url AS official_source_url,
-                       s.statutory_act_ref AS notes
+                       coalesce(s.content_notes, s.statutory_act_ref) AS notes,
+                       s.description_ta, s.responsible_department, s.eligibility_points, s.application_steps,
+                       s.how_to_apply, s.applicable_rules, s.forms, s.source_urls, s.last_checked_on,
+                       s.fee_note, s.processing_time_note, s.fee_status, s.field_evidence
                 FROM services.service s
                 LEFT JOIN administration.department d ON d.department_id = s.department_id
                 WHERE s.service_id = :sid
@@ -185,8 +190,9 @@ class ServiceService:
         data = dict(row._mapping)
         rr = await self.db.execute(
             text("""
-                SELECT requirement_id, document_name AS document_type, description, mandatory
+                SELECT requirement_id, document_name AS document_type, description, mandatory, requirement_level
                 FROM services.service_requirement WHERE service_id = :sid
+                ORDER BY array_position(ARRAY['required','category_specific','conditional','recommended','unverified'], requirement_level), document_name
             """),
             {"sid": service_id},
         )
@@ -411,3 +417,54 @@ class GraphService:
             return {"status": "healthy", "node_counts": nodes, "relationship_counts": rels}
         except Exception as e:
             return {"status": "unavailable", "error": str(e)}
+
+
+class PolicyDocumentService:
+    """Catalogue of official policy documents (documents.policy_document). Filtering, search, sorting and paging run in SQL."""
+
+    COLUMNS = ("policy_document_id, doc_code, category, identifier, title, title_ta, issuing_authority, issued_on, effective_on, summary_en, summary_ta, "
+               "summary_ta_reviewed, language, related_topics, source_page_url, pdf_url, pdf_pages, legal_status, superseded_status, verification_status, "
+               "verification_method, last_checked_on, notes")
+    SORTS = {"newest": "issued_on DESC NULLS LAST, doc_code", "oldest": "issued_on ASC NULLS LAST, doc_code", "title": "title ASC"}
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def list(self, q, category, authority, year, language, verification_status, sort, page, page_size) -> dict:
+        cond, params = ["TRUE"], {}
+        if q:
+            cond.append("(coalesce(title,'') || ' ' || coalesce(title_ta,'') || ' ' || coalesce(identifier,'') || ' ' || coalesce(summary_en,'') || ' ' || coalesce(summary_ta,'') || ' ' "
+                        "|| coalesce(issuing_authority,'') || ' ' || array_to_string(related_topics, ' ')) ILIKE :q")
+            params["q"] = f"%{q}%"
+        if category:
+            cond.append("category = ANY(CAST(:cat AS text[]))"); params["cat"] = category.split(",")
+        if authority:
+            cond.append("issuing_authority = :auth"); params["auth"] = authority
+        if year:
+            cond.append("extract(year FROM issued_on) = :yr"); params["yr"] = year
+        if language:
+            cond.append("language = :lang"); params["lang"] = language
+        if verification_status:
+            cond.append("verification_status = :vs"); params["vs"] = verification_status
+        where = " AND ".join(cond)
+        total = (await self.db.execute(text(f"SELECT count(*) FROM documents.policy_document WHERE {where}"), params)).scalar() or 0
+        order = self.SORTS.get(sort or "newest", self.SORTS["newest"])
+        r = await self.db.execute(
+            text(f"SELECT {self.COLUMNS} FROM documents.policy_document WHERE {where} ORDER BY {order} LIMIT :lim OFFSET :off"),
+            {**params, "lim": page_size, "off": (page - 1) * page_size})
+        items = [dict(x._mapping) for x in r.fetchall()]
+        # facets ignore the category/authority/year filters so the filter controls always show every option
+        base_cond, base_params = ["TRUE"], {}
+        if q:
+            base_cond.append(cond[1]); base_params["q"] = params["q"]
+        fw = " AND ".join(base_cond)
+        cats = (await self.db.execute(text(f"SELECT category, count(*) AS n FROM documents.policy_document WHERE {fw} GROUP BY category"), base_params)).fetchall()
+        auths = (await self.db.execute(text("SELECT issuing_authority, count(*) AS n FROM documents.policy_document GROUP BY 1 ORDER BY 1"))).fetchall()
+        years = (await self.db.execute(text("SELECT extract(year FROM issued_on)::int AS y FROM documents.policy_document WHERE issued_on IS NOT NULL GROUP BY 1 ORDER BY 1 DESC"))).fetchall()
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "pages": math.ceil(total / page_size) if total else 0,
+                "facets": {"categories": {c: n for c, n in cats}, "authorities": [a for a, _ in auths], "years": [y for (y,) in years]}}
+
+    async def get(self, doc_code: str) -> Optional[dict]:
+        r = await self.db.execute(text(f"SELECT {self.COLUMNS} FROM documents.policy_document WHERE doc_code = :c"), {"c": doc_code})
+        row = r.fetchone()
+        return dict(row._mapping) if row else None

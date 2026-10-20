@@ -21,8 +21,8 @@ export function AuthNav({ className = "" }: { className?: string }) {
   }
   return (
     <span className={`flex items-center gap-3 text-blue-100 ${className}`}>
-      {path === "/" && <Link href={homeFor(user.role)} data-testid="home-link" className="text-sm underline">{user.role === "citizen" ? "My dashboard" : user.role === "officer" || user.role === "department_admin" ? "Console" : "Admin"}</Link>}
-      <span data-testid="user-name" className="text-sm font-medium">{user.full_name || user.email}</span>
+      {path === "/" && <Link href={homeFor(user.role)} data-testid="home-link" className="text-sm underline">{user.role === "citizen" ? t("nav.myDashboard") : user.role === "officer" || user.role === "department_admin" ? t("nav.console") : t("nav.admin")}</Link>}
+      <span data-testid="user-name" data-i18n-skip className="text-sm font-medium">{user.full_name || user.email}</span>
       <button onClick={() => logout()} className="btn-ghost text-blue-100 hover:bg-white/10 hover:text-white">{t("auth.logout")}</button>
     </span>
   );

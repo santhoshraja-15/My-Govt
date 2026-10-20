@@ -27,6 +27,9 @@ class BenefitOut(BaseModel):
     description: Optional[str] = None
     amount: Optional[float] = None
     unit: Optional[str] = None
+    frequency: Optional[str] = None
+    conditions: Optional[str] = None
+    amount_status: Optional[str] = None    # verified_current | historical | unverified | varies | not_applicable
 
     class Config:
         from_attributes = True
@@ -37,6 +40,7 @@ class DocumentRequirementOut(BaseModel):
     document_type: str
     description: Optional[str] = None
     mandatory: bool = True
+    requirement_level: Optional[str] = None    # required | conditional | category_specific | recommended | unverified
 
     class Config:
         from_attributes = True
@@ -48,6 +52,7 @@ class SchemeListItem(BaseModel):
     name: str
     name_ta: Optional[str] = None
     description: Optional[str] = None
+    description_ta: Optional[str] = None
     department_name: Optional[str] = None
     category: Optional[str] = None
     scheme_level: str
@@ -81,6 +86,15 @@ class SchemeDetail(SchemeListItem):
     full_description: Optional[str] = None
     benefits_summary: Optional[str] = None
     notes: Optional[str] = None
+    implementing_department: Optional[str] = None
+    purpose: Optional[str] = None
+    eligibility_points: List[str] = []
+    exclusion_points: List[str] = []
+    application_steps: List[str] = []
+    how_to_apply_note: Optional[str] = None
+    source_urls: List[dict] = []
+    last_checked_on: Optional[date] = None
+    field_evidence: dict = {}
 
 
 # ── Eligibility Check ─────────────────────────────────────────

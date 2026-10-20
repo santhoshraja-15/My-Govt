@@ -1,5 +1,5 @@
 /** Client for the Database Architecture Explorer API plus the pure layout/highlight helpers used by the diagrams. */
-import { tokens } from "@/lib/api";
+import { APIError, tokens } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -9,13 +9,9 @@ async function get<T>(path: string): Promise<T> {
   try {
     res = await fetch(`${API_BASE}/api/v1/architecture${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   } catch {
-    throw new Error("Cannot reach the server. Check that the API is running and try again.");
+    throw new APIError(0, "NETWORK_ERROR", "network");
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(res.status === 403 ? "Only state and system administrators may view technical database metadata."
-      : res.status === 401 ? "Please sign in to continue." : typeof body.detail === "string" ? body.detail : "Request failed.");
-  }
+  if (!res.ok) throw new APIError(res.status, "API_ERROR", "request failed");
   return res.json();
 }
 
@@ -33,12 +29,13 @@ export const architectureApi = {
   explainExample: (id: string) => get<any>(`/examples/${id}/explain`),
 };
 
-export const STATUS_STYLE: Record<string, { cls: string; label: string }> = {
-  active: { cls: "badge-green", label: "Active" },
-  unavailable: { cls: "badge-red", label: "Unavailable" },
-  disabled: { cls: "badge-slate", label: "Disabled by design" },
-  "not installed": { cls: "badge-slate", label: "Not installed" },
-  unknown: { cls: "badge-slate", label: "Unknown" },
+/** `label` is a translation key (st.*). */
+export const STATUS_STYLE: Record<string, { cls: string; label: "st.active" | "st.unavailable" | "st.disabled" | "st.not installed" | "st.unknown" }> = {
+  active: { cls: "badge-green", label: "st.active" },
+  unavailable: { cls: "badge-red", label: "st.unavailable" },
+  disabled: { cls: "badge-slate", label: "st.disabled" },
+  "not installed": { cls: "badge-slate", label: "st.not installed" },
+  unknown: { cls: "badge-slate", label: "st.unknown" },
 };
 
 export interface Positioned { key: string; x: number; y: number; w: number; h: number }

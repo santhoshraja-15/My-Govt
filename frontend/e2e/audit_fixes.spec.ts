@@ -114,8 +114,15 @@ test.describe("service details (links used to 404)", () => {
     await expect(page).toHaveURL(/\/services\/[0-9a-f-]{36}/);
     await expect(page.getByTestId("service-name")).not.toBeEmpty();
     await expect(page.getByTestId("fees-section")).toBeVisible();
-    await expect(page.getByTestId("charges-unconfirmed-detail")).toContainText("not been confirmed");   // seeded records are provisional
-    await expect(page.getByTestId("fees-section")).not.toContainText("₹");
+    // Fees are shown only with their provenance: the official e-Sevai list (updated 10 Apr 2023) or "not confirmed" - never as current fact.
+    const listed = page.getByTestId("charges-listed-note");
+    if (await listed.count()) {
+      await expect(listed).toContainText("10 April 2023");
+      await expect(page.getByTestId("fee-note")).toContainText(/e-Sevai|service charge/);
+    } else {
+      await expect(page.getByTestId("charges-unconfirmed-detail")).toContainText("not been confirmed");
+    }
+    await expect(page.getByTestId("fees-section")).not.toContainText("Free");
     await expect(page.getByTestId("source-info")).toContainText("Not yet verified");
     await expect(page.getByTestId("requirements-section")).toBeVisible();
     const apply = page.getByTestId("apply-link");
